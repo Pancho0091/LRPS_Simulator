@@ -207,6 +207,7 @@
     $('#station-next').hidden = step === 'shoot' && S.mode === 'stage' && S.stage && !S.stage.over;
     $('#station-next').textContent = step === 'chrono' ? 'Done → Zero' : step === 'zero' ? 'Zero confirmed → Shoot' : 'End session → Debrief';
     $('#range-new').hidden = step !== 'shoot';
+    scheduleSave();
     if (enter) window.scrollTo({ top: 0, behavior: reduced() ? 'auto' : 'smooth' });
   }
 
@@ -217,13 +218,12 @@
     S.world.start = performance.now();
     S.rifle = RANGE.newRifle(S.setup, S.toggles);
     S.rifle.setup = Object.assign({}, S.setup);
-    S.zoomIdx = Math.min(S.zoomIdx, S.rifle.optic.zooms.length - 1); renderZoom(); // the rifle keeps the zero distance it was zeroed at
     S.log = []; S.shotNo = 0; S.lrfBad = 0;
     S.chrono = { shots: [] };
     S.session = { shots: 0, hits: 0, targets: 0, firstHits: 0, streak: 0, byRange: {} };
     S.stage = null;
     S.mode = 'kd';
-    S.zoomIdx = 1;
+    S.zoomIdx = Math.min(1, S.rifle.optic.zooms.length - 1); renderZoom();
     S.debriefed = false;
     $('#shot-log tbody').innerHTML = '';
     $('#shot-log-sum').textContent = '';
@@ -231,6 +231,64 @@
     $$('.turret').forEach((el) => buildDial($('svg', el)));
     setStep('chrono');
     L.sfx.click();
+    scheduleSave();
+  }
+
+  // ------------------------------------------------------------ session persistence
+  // The whole session (day, hidden rifle truth, string, zero, log, dials) survives a
+  // reload. Clocks are stored as offsets from "now" so they resume where they paused.
+  const SESSION_V = 1;
+  let saveTimer = 0;
+  function scheduleSave() { clearTimeout(saveTimer); saveTimer = setTimeout(saveSession, 250); }
+
+  function saveSession() {
+    clearTimeout(saveTimer);
+    try {
+      if (!S.rifle || !S.world) { localStorage.removeItem('lrps.range.session'); return; }
+      const now = performance.now();
+      const rel = (t) => (typeof t === 'number' && t > -1e8 ? t - now : null);
+      L.store.set('range.session', {
+        v: SESSION_V, step: S.step, mode: S.mode, zoomIdx: S.zoomIdx, dial: S.dial, target: S.target,
+        stage: S.stage && Object.assign({}, S.stage, { start: S.stage.start ? rel(S.stage.start) : 0 }),
+        chrono: S.chrono, log: S.log, shotNo: S.shotNo, session: S.session, lrfBad: S.lrfBad, debriefed: !!S.debriefed,
+        world: Object.assign({}, S.world, { start: rel(S.world.start) }),
+        rifle: Object.assign({}, S.rifle, { lastShotAt: rel(S.rifle.lastShotAt) }),
+      });
+    } catch (e) { /* storage blocked or full: the session lives in memory only */ }
+  }
+
+  function restoreSession() {
+    const d = L.store.get('range.session', null);
+    if (!d || typeof d !== 'object' || d.v !== SESSION_V) return false;
+    if (!d.rifle || !d.world || !d.rifle.load || !d.rifle.cart || !d.rifle.optic || !Array.isArray(d.rifle.optic.zooms) || !Array.isArray(d.log)) return false;
+    if (!['setup', 'chrono', 'zero', 'shoot', 'debrief'].includes(d.step)) return false;
+    const now = performance.now();
+    const abs = (o, fb) => (typeof o === 'number' && Number.isFinite(o) ? now + o : fb);
+    const blank = () => ({ shots: 0, hits: 0, targets: 0, firstHits: 0, streak: 0, byRange: {} });
+    S.world = Object.assign({}, d.world, { start: abs(d.world.start, now) });
+    S.rifle = Object.assign({}, d.rifle, { lastShotAt: abs(d.rifle.lastShotAt, -1e9) });
+    S.rifle.setup = S.rifle.setup && typeof S.rifle.setup === 'object' ? S.rifle.setup : Object.assign({}, S.setup);
+    S.step = d.step;
+    S.mode = ['kd', 'ukd', 'stage'].includes(d.mode) ? d.mode : 'kd';
+    S.dial = { elev: +(d.dial && d.dial.elev) || 0, wind: +(d.dial && d.dial.wind) || 0 };
+    S.target = d.target && typeof d.target === 'object' && Array.isArray(d.target.marks) ? d.target : null;
+    S.stage = d.stage && Array.isArray(d.stage.targets) ? Object.assign({}, d.stage, { start: d.stage.start ? abs(d.stage.start, 0) : 0 }) : null;
+    S.chrono = d.chrono && Array.isArray(d.chrono.shots) ? d.chrono : { shots: [] };
+    S.log = d.log.filter((e) => e && typeof e === 'object' && typeof e.dialE === 'number');
+    S.shotNo = +d.shotNo || S.log.length;
+    S.session = d.session && typeof d.session === 'object' ? Object.assign(blank(), d.session) : blank();
+    S.lrfBad = +d.lrfBad || 0;
+    S.debriefed = !!d.debriefed;
+    S.zoomIdx = Math.min(Math.max(0, d.zoomIdx | 0), S.rifle.optic.zooms.length - 1);
+    $('#shot-log tbody').innerHTML = '';
+    $('#shot-log-sum').textContent = '';
+    S.log.forEach(logRow);
+    $$('.turret').forEach((el) => buildDial($('svg', el)));
+    setDial('elev', S.dial.elev, true); setDial('wind', S.dial.wind, true);
+    renderZoom();
+    renderKestrel(performance.now());
+    if (S.step !== 'setup' && S.step !== 'debrief') $('#range-feedback').innerHTML = '<span class="hint">Session restored — carry on from your notes.</span>';
+    return true;
   }
 
   // ------------------------------------------------------------ targets
@@ -247,6 +305,7 @@
     if (S.toggles.cant && S.step === 'shoot') { S.cant = L.gauss() * 2.2; S.cantTarget = S.cant; } else { S.cant = 0; S.cantTarget = 0; }
     renderStation();
     renderHud();
+    scheduleSave();
   }
 
   function enterChrono() {
@@ -307,6 +366,7 @@
     t.lrf = r;
     t.lases = (t.lases || 0) + 1;
     L.sfx.click();
+    scheduleSave();
     renderStation();
     const el = $('#lrf-num');
     if (el && !reduced()) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
@@ -536,6 +596,7 @@
     $('#station-next').hidden = false;
     if (hits === st.targets.length) { L.confetti(); L.sfx.good(); }
     L.addXp(xp, 'stage complete');
+    scheduleSave();
   }
 
   // ------------------------------------------------------------ turrets
@@ -562,6 +623,7 @@
     const v = +B.roundToClick(RANGE.clamp(value, axis === 'elev' ? -5 : -travel / 2, axis === 'elev' ? travel : travel / 2), CLICK).toFixed(1);
     const prev = S.dial[axis];
     S.dial[axis] = v;
+    if (S.rifle) scheduleSave();
     const el = $(`.turret[data-axis="${axis}"]`);
     $('input', el).value = v.toFixed(1);
     $('input', el).step = CLICK;
@@ -702,6 +764,7 @@
     else landSteel(entry, first);
     logRow(entry);
     renderHud();
+    scheduleSave();
   }
 
   function landChrono(e) {
@@ -819,7 +882,7 @@
     const layers = layerTable(farY, ss.byRange[farY] ? ss.byRange[farY].angleDeg : 0);
 
     const xp = Math.min(60, ss.hits * 2 + ranges.length * 5 + (chrono.n >= 5 ? 10 : 0) + (Math.abs(zeroResid.e) < 0.15 && Math.abs(zeroResid.w) < 0.15 ? 10 : 0));
-    if (!S.debriefed) { S.debriefed = true; if (xp) L.addXp(xp, 'session debrief'); }
+    if (!S.debriefed) { S.debriefed = true; if (xp) L.addXp(xp, 'session debrief'); scheduleSave(); }
 
     $('#debrief').innerHTML = `
       <div class="card-title"><h3>Debrief · ${esc(r.cart.name)} · ${esc(w.loc.name)}</h3><span class="chip">${esc(S.setup.preset)}</span></div>
@@ -1047,8 +1110,10 @@
     buildSetupForm();
     $$('#range-preset button').forEach((b) => b.classList.toggle('on', b.dataset.v === S.setup.preset));
     renderSetupSummary();
-    previewWorld();
+    if (!restoreSession()) previewWorld();
     renderZoom();
+    window.addEventListener('pagehide', saveSession);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveSession(); });
 
     $('#rig-form').addEventListener('change', (e) => {
       const id = e.target.id;

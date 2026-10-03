@@ -1477,12 +1477,24 @@ async function checkRangeDeep() {
     if (!/HIT|MISS/.test(await page.$eval('#range-feedback', (e) => e.innerText))) fail('no verdict after landing post tab-switch');
     await page.click('#station-next'); await page.waitForFunction(() => !document.getElementById('r-debrief').hidden);
     if (/NaN|undefined/.test(await page.$eval('#debrief', (e) => e.innerText))) fail('realistic debrief NaN');
-    // refresh mid-session: setup + toggles restore, the session itself does not
+    // refresh mid-session: the whole session comes back — step, log, dials, setup and toggles
+    const rowsBefore = await page.$$eval('#shot-log tbody tr', (r) => r.length);
+    const debriefBefore = await page.$eval('#debrief', (e) => e.innerText.replace(/\s+/g, ' ').slice(0, 400));
     await page.reload(); await page.waitForFunction(() => window.LRPS && window.LRPS.currentTab === 'range' && document.getElementById('kestrel').innerHTML.length > 0);
-    const rs = await page.evaluate(() => ({ setup: !document.getElementById('r-setup').hidden, cart: document.getElementById('rig-cart').value, spotterOn: document.getElementById('opt-spotter').checked, shootDisabled: document.querySelector('#r-steps [data-step="shoot"]').disabled }));
-    if (!rs.setup || rs.cart !== '338lm' || !rs.spotterOn || !rs.shootDisabled) fail(`after refresh (toggles were inverted, so spotter should be on): ${JSON.stringify(rs)}`);
-    warn('Refreshing mid-session restores only setup + toggles; the chrono string, zero and shot log are lost (no session persistence)');
-    info(`lased ${readings[0]}…${readings[7]} yd, mil-it mode, 13 toggles inverted + fired, mid-flight tab switch lands, refresh restores setup`);
+    const rs = await page.evaluate(() => ({ debrief: !document.getElementById('r-debrief').hidden, rows: document.querySelectorAll('#shot-log tbody tr').length, cart: document.getElementById('rig-cart').value, spotterOn: document.getElementById('opt-spotter').checked, shootEnabled: !document.querySelector('#r-steps [data-step="shoot"]').disabled, debriefText: document.getElementById('debrief').innerText.replace(/\s+/g, ' ').slice(0, 400) }));
+    if (!rs.debrief || rs.rows !== rowsBefore || !rs.shootEnabled) fail(`session not restored after refresh: ${JSON.stringify({ ...rs, rowsBefore, debriefText: undefined })}`);
+    if (rs.debriefText !== debriefBefore) fail('debrief differs after refresh (session truth not restored verbatim)');
+    if (rs.cart !== '338lm' || !rs.spotterOn) fail(`setup/toggles lost on refresh: ${JSON.stringify(rs)}`);
+    // the restored session keeps shooting: back to the line, one round, log grows
+    await page.click('#r-steps [data-step="shoot"]'); await sleep(300);
+    await page.click('#station .lane:last-child'); await blur(page);
+    await page.keyboard.press(' '); await sleep(80);
+    try { await fireReady(page); } catch (e) { fail('restored session cannot fire'); }
+    if ((await page.$$eval('#shot-log tbody tr', (r) => r.length)) !== rowsBefore + 1) fail('shot after restore did not extend the log');
+    // a fresh session replaces the stored one; nothing leaks from the previous day
+    await page.click('#r-steps [data-step="setup"]'); await sleep(200); await page.click('#setup-go'); await sleep(300);
+    if ((await page.$$eval('#shot-log tbody tr', (r) => r.length)) !== 0) fail('new session kept the old log');
+    info(`lased ${readings[0]}…${readings[7]} yd, mil-it mode, 13 toggles inverted + fired, mid-flight tab switch lands, refresh restores the session (${rowsBefore} rounds, debrief verbatim)`);
   }, { reducedMotion: 'no-preference' });
 
   await check('Range · 22 LR stage + lanes, printable book from the line, body.print-range cleared', async ({ page, fail, info }) => {

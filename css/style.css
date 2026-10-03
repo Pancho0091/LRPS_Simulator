@@ -1,3 +1,7 @@
+/* =========================================================== fonts (self-hosted, latin subsets of the variable files) */
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 400 800; font-display: swap; src: url("../fonts/inter-latin.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400 800; font-display: swap; src: url("../fonts/jetbrains-mono-latin.woff2") format("woff2"); }
+
 /* =========================================================== tokens */
 :root {
   --bg: #eef1ee;

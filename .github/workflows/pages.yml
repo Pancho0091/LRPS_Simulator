@@ -31,7 +31,7 @@ jobs:
       - name: Stage site
         run: |
           mkdir _site
-          cp -r index.html css js _site/
+          cp -r index.html css js fonts _site/
           # Cache-bust every stylesheet and script with the commit, so a fresh page never runs stale assets
           sed -i -E "s#(href|src)=\"(css|js)/([^\"]+)\.(css|js)\"#\1=\"\2/\3.\4?v=${GITHUB_SHA::8}\"#g" _site/index.html
           touch _site/.nojekyll

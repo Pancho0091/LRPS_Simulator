@@ -4,7 +4,7 @@
 
 **Long-range precision shooting academy · ballistic solver · dope card builder · realistic range simulator**
 
-[![Version](https://img.shields.io/badge/version-v2.3.0-f59e0b?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
+[![Version](https://img.shields.io/badge/version-v2.4.0-f59e0b?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
 [![Updated](https://img.shields.io/badge/last%20updated-2026--10--03-6b7280?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
 [![Live](https://img.shields.io/badge/live-pancho0091.github.io%2FLRPS__Simulator-4ade80?style=for-the-badge&labelColor=0a0e0c)](https://pancho0091.github.io/LRPS_Simulator/)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-auto--deploy-222222?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Pancho0091/LRPS_Simulator/actions/workflows/pages.yml)
@@ -41,7 +41,7 @@ Academy  ──▶  Lab  ──▶  Build Card  ──▶  Drills  ──▶  Ra
 Everything is in **MIL** — reticle, turrets (0.1 mil clicks), card, spotter calls.
 
 Static site, no build step, no dependencies. Every push to the deploy branch runs the solver tests and
-republishes to GitHub Pages. Course progress, XP and rank, your card, Range setup and preferences live in the browser's localStorage.
+republishes to GitHub Pages. Course progress, XP and rank, your card, Range setup, the Range session in progress and preferences live in the browser's localStorage. The app makes no network request after it loads: fonts are self-hosted and a Content-Security-Policy pins every asset to the site itself.
 
 ---
 
@@ -137,6 +137,7 @@ paper — the Range never shows a dope card or a solution while you shoot. A pri
 
 ```
 index.html                shell, tabs, static content
+fonts/                    Inter + JetBrains Mono (woff2, self-hosted)
 css/style.css             design tokens, light/dark themes, components
 css/range.css             Range tab: session stepper, stations, instruments, print sheet
 js/ballistics.js          solver (UMD — loads in the browser and in Node tests)
@@ -182,6 +183,7 @@ Validated against published numbers: 6.5 Creedmoor 140 gr ELD-M at 2710 fps, sea
 
 | Version | Date | Notes |
 |---|---|---|
+| **v2.4.0** | 2026-10-03 | **Offline-clean**: the Range session survives a reload (day, hidden rifle truth, chronograph string, zero, dials, log, stage clock — restored to the step you were on). Fonts self-hosted; Content-Security-Policy header; no external request after load. Repository default branch is `main`. |
 | **v2.3.0** | 2026-10-03 | **QA release**: six-agent audit — physics, content, code review, browser QA, Range deep test, security. Fixed the aerodynamic-jump sign in the solver, lesson, figure and test. Range no longer resets on a tab switch or regenerates the day when a toggle changes; in-flight rounds are scored against the target they were fired at; stage one-shot enforcement. Build Card no longer crashes on out-of-range inputs; solver returns null-safe rows, accepts unsorted ranges and degenerate inputs; stored data is type-checked on load. Memoised illustrations, LRF realism (re-lase, beam divergence), flag calibration, example dope regenerated from the solver. Browser QA round two: focused buttons keep Space, zoom buttons follow the chosen optic, `−` zooms out, Review mode reachable on mobile, light-theme eyebrow contrast, toast de-dupe, preset clears when edited, tighter Build bounds. README, attribution and LICENSE; cache-busted deploys |
 | **v2.2.1** | 2026-10-03 | **Illustrations**: 73 isometric figures across every lesson and 15 module thumbnails from an in-house SVG engine (`js/iso.js`). **Range overhaul**: session stepper (Setup → Chronograph → Zero → Shoot → Debrief), 18 factory loads with box data, barrel length / twist, rifle and optic classes, 6 locations, a hidden rifle truth you measure with the chronograph and zero paper, dope written on your own paper with a printable data book, LRF / mil-it / PRS stage modes, layer-by-layer debrief. Physics audit test suite. Polish and `css/range.css` |
 | **v2.2.0** | 2026-10-03 | **Academy rebuilt as a beginner-first linear course**: 13 modules (00 Safety → 12 Field craft) and 57 lessons plus a glossary; perfect quiz score unlocks the next lesson, finished modules unlock the next, review mode unlocks all. Ammo and calibers now come before ballistics. Course map with lesson status, "In this lesson" contents, key-term chips and "What you now know" recaps. New widgets: rifle anatomy, cartridge cutaway, firing-sequence stepper, flashcards, history timelines. Module completion awards XP and confetti. Playwright smoke test (`npm run smoke`) |
@@ -214,7 +216,7 @@ npm run smoke      # Playwright browser smoke test (scripts/smoke.js) — needs 
 - **Spin drift and aerodynamic jump**: Bryan Litz's empirical fits, as published in *Applied Ballistics for Long Range Shooting*.
 - **Gyroscopic stability**: the Miller twist rule.
 - **Ammunition**: load names in the Range are manufacturer trademarks (Hornady, Berger, Federal, Sierra, Lapua, SK, Black Hills, CCI) used only to identify the loads. Velocities, BCs and SDs are approximate figures taken from published box and catalogue data, each noted in `js/range/data.js`. This project is not affiliated with or endorsed by any of them.
-- **Fonts**: Inter and JetBrains Mono (SIL Open Font License) via Google Fonts — the only third-party request the app makes. No analytics, no tracking.
+- **Fonts**: Inter and JetBrains Mono (SIL Open Font License), self-hosted from `fonts/` as latin subsets of the variable files. No third-party requests, no analytics, no tracking.
 
 ## License
 
