@@ -355,6 +355,18 @@ const verdict = (page) => page.$eval('#range-feedback', (el) => {
   return v ? v.textContent.trim() : '';
 });
 
+const fireReady = (page) => page.waitForFunction(() => !document.getElementById('fire-btn').disabled, null, { timeout: 8000 });
+
+/** Fire n rounds, waiting for each to land. */
+async function fireRounds(page, n) {
+  for (let i = 0; i < n; i++) {
+    await fireReady(page);
+    await page.click('#fire-btn');
+    await page.waitForFunction(() => document.getElementById('fire-btn').disabled, null, { timeout: 2000 }).catch(() => {});
+    await fireReady(page);
+  }
+}
+
 async function waitShot(page, timeout = 8000) {
   await page.waitForFunction(() => {
     const v = document.querySelector('#range-feedback .verdict');
@@ -362,45 +374,110 @@ async function waitShot(page, timeout = 8000) {
   }, null, { timeout });
 }
 
+/** Setup → session started (chronograph station). */
+async function startSession(page, preset) {
+  await gotoTab(page, 'range');
+  await page.waitForFunction(() => document.getElementById('kestrel').innerHTML.trim().length > 0);
+  if (preset) await page.click(`#range-preset button[data-v="${preset}"]`);
+  await page.click('#setup-go');
+  await page.waitForFunction(() => !document.getElementById('r-line').hidden && document.querySelector('#station .chrono'));
+}
+
 async function checkRange() {
-  await check('Range · training: dial up, fire', async ({ page, fail, info }) => {
+  await check('Range · setup → chrono → zero → shoot (training)', async ({ page, fail, info }) => {
     await gotoTab(page, 'range');
+    await page.waitForFunction(() => document.getElementById('kestrel').innerHTML.trim().length > 0);
+    const carts = await page.$$eval('#rig-cart option', (o) => o.length);
+    if (carts < 8) fail(`only ${carts} cartridges in setup`);
+    await page.selectOption('#rig-cart', '308');
+    await page.waitForFunction(() => [...document.querySelectorAll('#rig-load option')].some((o) => o.value === 'fed-gmm-175'));
+    await page.selectOption('#rig-load', 'fed-gmm-175');
+    await page.selectOption('#rig-barrel', '20');
+    const summary = await page.locator('#rig-summary').innerText();
+    if (!/Gold Medal 175/.test(summary)) fail('setup summary does not show the chosen load');
+    if (!/2512|2510|2515/.test(summary)) fail(`box velocity not scaled for a 20" barrel (summary: ${summary.slice(0, 120)})`);
     await page.click('#range-preset button[data-v="training"]');
-    await page.waitForSelector('#fire-btn:not([disabled])');
+    await page.click('#setup-go');
+    await page.waitForFunction(() => !document.getElementById('r-line').hidden && document.querySelector('#station .chrono'));
+    if (!(await page.$eval('#r-setup', (el) => el.hidden))) fail('setup step still visible after starting the session');
+
+    // chronograph: 5 rounds → velocities, avg, SD
+    await fireRounds(page, 5);
+    const chrono = await page.$$eval('#station .chrono-list span', (s) => s.map((x) => x.textContent.replace(/\D/g, '')));
+    if (chrono.length !== 5) fail(`chronograph shows ${chrono.length} velocities, expected 5`);
+    const sd = await page.$eval('#station .chrono-stats', (el) => el.innerText);
+    if (!/SD/i.test(sd)) fail('chronograph stats missing SD');
+    await page.click('#station-next');
+    await page.waitForSelector('#zero-set');
+
+    // zero: 3 rounds on paper, slip turrets
+    await fireRounds(page, 3);
+    const paper = await page.$$eval('#shot-log tbody tr', (r) => r.filter((x) => /Zero/.test(x.textContent)).length);
+    if (paper !== 3) fail(`shot log shows ${paper} zero rounds, expected 3`);
+    await page.keyboard.press('ArrowDown');
+    await page.click('#zero-set');
+    const e = +(await page.inputValue('#dial-elev'));
+    if (e !== 0) fail(`dial reads ${e} after setting zero, expected 0.0`);
+    await page.click('#station-next');
+    await page.waitForSelector('#range-mode');
+
+    // shoot: keyboard dial, fire
     await page.evaluate(() => document.activeElement && document.activeElement.blur());
     const e0 = +(await page.inputValue('#dial-elev'));
     for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowUp');
     await page.keyboard.press('Shift+ArrowUp');
     const e1 = +(await page.inputValue('#dial-elev'));
-    if (!(e1 > e0)) fail(`ArrowUp did not raise elevation (${e0} → ${e1})`);
-    else if (Math.abs(e1 - e0 - 1.0) > 0.051) fail(`5×↑ + Shift↑ should add 1.0 mil, got ${(e1 - e0).toFixed(2)}`);
-    const w0 = +(await page.inputValue('#dial-wind'));
+    if (Math.abs(e1 - e0 - 1.0) > 0.051) fail(`5×↑ + Shift↑ should add 1.0 mil, got ${(e1 - e0).toFixed(2)}`);
     await page.keyboard.press('ArrowRight');
     const w1 = +(await page.inputValue('#dial-wind'));
-    if (!(w1 > w0)) fail(`ArrowRight did not move windage (${w0} → ${w1})`);
+    if (!(w1 > 0)) fail(`ArrowRight did not move windage (${w1})`);
     await page.keyboard.press('Space');
-    try { await waitShot(page); } catch (e) { fail('no HIT/MISS in #range-feedback within 8 s of Space'); return; }
+    try { await waitShot(page); } catch (err) { fail('no HIT/MISS in #range-feedback within 8 s of Space'); return; }
     const rows = await page.$$eval('#shot-log tbody tr', (r) => r.length);
-    if (rows !== 1) fail(`shot log has ${rows} rows, expected 1`);
-    info(`dial ${e0} → ${e1.toFixed(1)} mil, Space fired: ${await verdict(page)}`);
+    if (rows !== 9) fail(`shot log has ${rows} rows, expected 9`);
+    const lanes = await page.$$eval('#station .lane', (l) => l.length);
+    if (lanes < 5) fail(`known-distance picker shows ${lanes} lanes`);
+    const spot = await page.locator('#range-feedback').innerText();
+    if (!/Spotter/.test(spot)) fail('training preset: no spotter call after the shot');
+    info(`chrono ${chrono.join('/')} fps · zero set · ${await verdict(page)} at KD`);
   });
 
-  await check('Range · realistic: fire, reveal, what changed', async ({ page, fail, info }) => {
-    await gotoTab(page, 'range');
-    await page.click('#range-preset button[data-v="realistic"]');
-    await page.waitForSelector('#fire-btn:not([disabled])');
+  await check('Range · realistic: unknown distance, lase, debrief', async ({ page, fail, info }) => {
+    await startSession(page, 'realistic');
+    await page.click('#station-next'); // skip chrono
+    await page.waitForSelector('#zero-set');
+    await page.click('#station-next'); // skip zero
+    await page.waitForSelector('#range-mode');
+    await page.click('#range-mode button[data-v="ukd"]');
+    await page.waitForSelector('#lase-btn');
+    const before = await page.locator('#station .lrf-tile').innerText();
+    if (/\d{3}/.test(before.split('\n')[1] || '')) fail('unknown-distance target shows a distance before lasing');
+    await page.evaluate(() => document.activeElement && document.activeElement.blur());
+    await page.keyboard.press('r');
+    await page.waitForSelector('#lrf-num');
+    const reading = await page.$eval('#lrf-num', (el) => el.textContent.trim());
+    if (!/^\d{2,4}/.test(reading)) fail(`rangefinder reading "${reading}" is not a number`);
+    const call = await page.locator('#station').innerText();
+    if (!/None/.test(call)) fail('realistic preset still gives a wind call');
     await page.click('#fire-btn');
-    try { await waitShot(page); } catch (e) { fail('no HIT/MISS in #range-feedback within 8 s'); return; }
-    const v = await verdict(page);
-    await page.click('#range-reveal');
-    await page.waitForFunction(() => !document.getElementById('whatchanged-card').hidden);
-    const rows = await page.$$eval('#whatchanged tbody tr', (r) => r.length);
-    if (rows < 2) fail(`#whatchanged has ${rows} rows`);
-    info(`fired (${v}), reveal → ${rows} "what changed" rows`);
+    try { await waitShot(page); } catch (err) { fail('no HIT/MISS after firing at the UKD target'); return; }
+    if (/Spotter/.test(await page.locator('#range-feedback').innerText())) fail('realistic preset: spotter still calling impacts');
+    await page.click('#station-next');
+    await page.waitForFunction(() => !document.getElementById('r-debrief').hidden);
+    const truth = await page.$$eval('#debrief .tbl.text tbody tr', (r) => r.length);
+    if (truth < 8) fail(`debrief truth table has ${truth} rows`);
+    const dope = await page.$$eval('#debrief table', (t) => t.length);
+    if (dope < 3) fail(`debrief shows ${dope} tables, expected truth + dope + layers`);
+    if (!(await page.$('#debrief-again'))) fail('debrief has no "Shoot more" button');
+    info(`lased ${reading} yd, fired (${await verdict(page)}), debrief ${truth} truth rows`);
   });
 
   await check('Range · PRS stage: 5 shots → summary', async ({ page, fail, info }) => {
-    await gotoTab(page, 'range');
+    await startSession(page, 'training');
+    await page.click('#station-next');
+    await page.waitForSelector('#zero-set');
+    await page.click('#station-next');
+    await page.waitForSelector('#range-mode');
     await page.click('#range-mode button[data-v="stage"]');
     await page.waitForFunction(() => /STAGE READY/.test(document.getElementById('range-feedback').textContent));
     const n = await page.$$eval('#stage-list .st-row', (r) => r.length);
@@ -420,14 +497,54 @@ async function checkRange() {
       await page.waitForFunction(() => /STAGE:\s*\d+\/\d+/.test(document.getElementById('range-feedback').textContent), null, { timeout: 5000 });
     } catch (e) { fail('no "STAGE: x/5" summary after 5 shots'); return; }
     const summary = (await verdict(page)) || '';
-    const extra = await page.$('#range-feedback #stage-again');
-    if (!extra) fail('stage summary has no "Run another stage" button');
-    // Firing after the stage is over must do nothing
+    if (!(await page.$('#range-feedback #stage-again'))) fail('stage summary has no "Run another stage" button');
     await page.click('#fire-btn');
     await sleep(150);
     if (!/STAGE:/.test(await verdict(page))) fail('firing after stage end replaced the summary');
     info(`${summary}`);
   });
+
+  await check('Range · printable blank data book', async ({ page, fail, info }) => {
+    await gotoTab(page, 'range');
+    await page.waitForFunction(() => document.getElementById('kestrel').innerHTML.trim().length > 0);
+    await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+    const st = await page.evaluate(() => ({
+      cls: document.body.classList.contains('print-range'),
+      rows: document.querySelectorAll('#range-print-sheet .ps-dope tbody tr').length,
+      filled: [...document.querySelectorAll('#range-print-sheet .ps-dope tbody td:not(:first-child)')].filter((td) => td.textContent.trim()).length,
+    }));
+    if (!st.cls) fail('beforeprint did not switch the page to the data book');
+    if (st.rows < 10) fail(`data book has ${st.rows} dope rows`);
+    if (st.filled) fail(`data book is not blank: ${st.filled} filled cells`);
+    await page.emulateMedia({ media: 'print' });
+    const vis = await page.evaluate(() => ({
+      sheet: document.getElementById('range-print-sheet').getBoundingClientRect().height > 0,
+      build: document.getElementById('tab-build').getBoundingClientRect().height > 0,
+      scope: document.getElementById('r-setup').getBoundingClientRect().height > 0,
+    }));
+    if (!vis.sheet) fail('data book not visible in print media');
+    if (vis.build) fail('Build card also printed with the data book');
+    if (vis.scope) fail('Range setup UI printed with the data book');
+    await page.emulateMedia({ media: 'screen' });
+    info(`${st.rows} blank dope rows, only the sheet prints`);
+  });
+
+  await check('Mobile 390×844 · range shooting step · no horizontal overflow', async ({ page, fail, info }) => {
+    await startSession(page, 'training');
+    for (const step of ['chrono', 'zero', 'shoot']) {
+      if (step !== 'chrono') { await page.click('#station-next'); await sleep(150); }
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const r = await measureOverflow(page, MOBILE.width);
+      if (r.scrollWidth > MOBILE.width) {
+        fail(`${step}: documentElement.scrollWidth = ${r.scrollWidth} > ${MOBILE.width}`);
+        r.offenders.forEach((o) => fail(`  ${o}`));
+      } else info(`${step}: scrollWidth ${r.scrollWidth}`);
+    }
+    await page.click('#station-next');
+    await page.waitForFunction(() => !document.getElementById('r-debrief').hidden);
+    const r = await measureOverflow(page, MOBILE.width);
+    if (r.scrollWidth > MOBILE.width) { fail(`debrief: scrollWidth ${r.scrollWidth}`); r.offenders.forEach((o) => fail(`  ${o}`)); }
+  }, { viewport: MOBILE, colorScheme: 'light' });
 }
 
 // ------------------------------------------------------------ 6. mobile

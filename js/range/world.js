@@ -188,8 +188,8 @@
       solverBase,
       zeroAngleRad: zeroSolve.zeroAngleRad,
       sg: zeroSolve.sg,
-      boreE: L.gauss() * 1.4 + L.pick([-1, 1]) * 0.6,   // mil, + = shoots high with turrets at mechanical zero
-      boreW: L.gauss() * 1.0 + L.pick([-1, 1]) * 0.4,   // mil, + = shoots right
+      boreE: L.gauss() * 1.1 + L.pick([-1, 1]) * 0.5,   // mil, + = shoots high with turrets at mechanical zero
+      boreW: L.gauss() * 0.8 + L.pick([-1, 1]) * 0.4,   // mil, + = shoots right
       coldBore: { e: Math.sin(a) * cb, w: Math.cos(a) * cb, mv: toggles.coldBore ? -L.rand(6, 18) : 0 },
       heatDir: { e: Math.sin(ha), w: Math.cos(ha) },
       contour: rifle.contour,

@@ -1,312 +1,515 @@
 /*
- * Range tab: a steel-plate shooting simulator driven by the real solver.
+ * Range tab: a range day driven by the real solver.
  *
- * The world differs from the card the way a real range does:
- *  - weather on the day (density altitude, powder temperature → MV)
- *  - shot angle, wind that varies near/mid/far and gusts over time
- *  - second-order effects (spin drift, Coriolis, aerodynamic jump)
- *  - the shooter: position wobble, breathing, cant, MV spread, dispersion
- * Training mode turns most of this off; Realistic turns it on.
- * All angles are in MIL.
+ *   Setup → Chronograph → Zero → Shoot → Debrief
+ *
+ * The app plays the RANGE, not the solver: it hands the shooter what a real
+ * range hands them (a rangefinder reading, a weather meter, chronograph
+ * velocities, splash and steel) and nothing else. Dope lives on the
+ * shooter's own paper. The hidden truth (true MV, boresight, cold bore,
+ * barrel heat, tracking error, today's air) only comes out in the debrief.
+ *
+ * Catalogue, environment and drawing live in js/range/*.js; this file is the
+ * session flow and the UI. All angles are MIL.
  */
 (function () {
   'use strict';
 
   const L = window.LRPS;
   const { B, $, $$ } = L;
+  let RANGE = null; // window.LRPS_RANGE, resolved at init (its scripts load after this one)
 
-  const scope = $('#scope');
-  const sctx = scope.getContext('2d');
-  const flags = $('#flags');
-  const fctx = flags.getContext('2d');
+  const CLICK = 0.1;
+  const toMil = (inches, yards) => B.inchesToMil(inches, yards);
+  const milIn = (mil, yards) => B.milToInches(mil, yards);
+  const fmt1 = (v) => (v >= 0 ? '+' : '') + v.toFixed(1);
+  const fmt2 = (v) => (v >= 0 ? '+' : '') + v.toFixed(2);
+  const esc = L.escapeHtml;
 
-  const LOCATIONS = [
-    { name: 'Coastal range', alt: 50, lat: 34, temp: [50, 82] },
-    { name: 'Midwest range', alt: 900, lat: 41, temp: [20, 95] },
-    { name: 'Desert range', alt: 2500, lat: 33, temp: [60, 108] },
-    { name: 'Mountain range', alt: 6200, lat: 39, temp: [25, 85] },
-    { name: 'Northern range', alt: 1200, lat: 61, temp: [5, 70] },
-  ];
+  // ------------------------------------------------------------ state
 
-  // Wobble amplitude in MIL for each position
-  const POSITIONS = { bench: 0.035, 'prone-bag': 0.09, prone: 0.18, barricade: 0.4, kneeling: 0.75, standing: 1.3 };
-
-  const PRESETS = {
-    training: { 'opt-weather': false, 'opt-angle': false, 'opt-rf': true, 'opt-call': true, 'opt-spotter': true, 'opt-gusts': true, 'opt-cant': false, 'opt-adv': false, 'opt-truing': false, position: 'prone-bag' },
-    realistic: { 'opt-weather': true, 'opt-angle': true, 'opt-rf': true, 'opt-call': false, 'opt-spotter': false, 'opt-gusts': true, 'opt-cant': true, 'opt-adv': true, 'opt-truing': false, position: 'prone' },
-  };
-
-  const HALF_FOV = 5; // mil from center to edge of the scope view
-
-  const R = {
-    s: null,
-    world: null,          // weather + wind field, shared by all targets in a stage
-    dial: { elev: 0, wind: 0 },
+  const S = {
+    inited: false,
+    step: 'setup',
+    setup: null,
+    toggles: {},
+    world: null,
+    rifle: null,
+    dial: { elev: 0, wind: 0 },   // what the turret reads
+    target: null,
+    mode: 'kd',
+    stage: null,
+    chrono: { shots: [] },
+    log: [],
+    shotNo: 0,
     flight: null,
     puffs: [],
     swing: { t0: 0, amp: 0 },
     cant: 0, cantTarget: 0,
     breath: { holding: false, start: 0, releasedAt: -1e9 },
-    session: { shots: 0, hits: 0, targets: 0, firstHits: 0, streak: 0 },
+    recoilAt: 0,
+    zoomIdx: 1,
+    session: { shots: 0, hits: 0, targets: 0, firstHits: 0, streak: 0, byRange: {} },
     best: L.store.get('range.bestStreak', 0),
-    stage: null,
-    shotNo: 0,
     running: false,
-    mirage: Array.from({ length: 46 }, () => ({ x: Math.random(), y: 0.25 + Math.random() * 0.7, len: 0.04 + Math.random() * 0.1, ph: Math.random() * 6 })),
-    trees: Array.from({ length: 64 }, (_, i) => 0.5 + 0.5 * Math.sin(i * 1.7) * Math.cos(i * 0.63) + Math.random() * 0.4),
-    tufts: Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random(), h: 0.4 + Math.random() * 0.6 })),
+    lrfBad: 0,
   };
 
-  const opt = (id) => $('#' + id).checked;
-  const CLICK = 0.1;
-  const toMil = (inches, yards) => B.inchesToMil(inches, yards);
-  const milIn = (mil, yards) => B.milToInches(mil, yards);
+  const reduced = () => L.reducedMotion();
+  const halfFov = () => 125 / zoomX();
+  const zoomX = () => (S.rifle ? S.rifle.optic : RANGE.optic(S.setup.optic)).zooms[S.zoomIdx];
 
-  // ------------------------------------------------------------ presets
+  // ------------------------------------------------------------ setup UI
 
-  function applyPreset(name) {
-    const p = PRESETS[name];
-    Object.keys(p).forEach((k) => { if (k !== 'position') $('#' + k).checked = p[k]; });
-    $('#opt-position').value = p.position;
-    $('#opt-plate').value = name === 'realistic' ? 'random' : '12';
-    L.store.set('range.preset', name);
-    if (R.stage) startStage(); else newWorld();
+  function option(value, label, selected) {
+    return `<option value="${esc(value)}"${selected ? ' selected' : ''}>${esc(label)}</option>`;
   }
 
-  L.seg($('#range-preset'), (v) => { applyPreset(v); L.toast(v === 'realistic' ? 'Realistic: no wind call, no spotter, real weather' : 'Training: helpers on'); });
-  L.seg($('#range-mode'), (v) => {
-    if (v === 'stage') startStage();
-    else { R.stage = null; renderStage(); newTarget(); }
-  });
-
-  // ------------------------------------------------------------ world
-
-  // Weather and the wind field. Kept for a whole stage so conditions stay coherent.
-  function newWorld() {
-    const p = L.profile;
-    let w;
-    if (opt('opt-weather')) {
-      const loc = L.pick(LOCATIONS);
-      w = {
-        loc: loc.name,
-        altitudeFt: loc.alt,
-        tempF: Math.round(L.rand(loc.temp[0], loc.temp[1])),
-        humidityPct: L.randInt(10, 90),
-        latitudeDeg: loc.lat,
-        azimuthDeg: L.randInt(0, 359),
-      };
-    } else {
-      w = { loc: 'Your card conditions', altitudeFt: +p.altitudeFt, tempF: +p.tempF, humidityPct: +p.humidityPct, latitudeDeg: 40, azimuthDeg: L.randInt(0, 359) };
-    }
-    w.atm = B.atmosphere(w);
-    // Ammo in the sun runs hotter than the air
-    w.powderTempF = w.tempF + (opt('opt-weather') ? L.randInt(0, 12) : 0);
-
-    const base = L.pick([0, 2, 4, 5, 6, 7, 8, 8, 9, 10, 10, 11, 12, 13, 14, 16]);
-    const clock = L.pick([1, 2, 3, 3, 4, 5, 7, 8, 9, 9, 10, 11, 12]);
-    const vary = opt('opt-gusts');
-    w.wind = {
-      base,
-      clock,
-      gust: vary && base ? 2 + Math.floor(base / 5) : 0,
-      zones: [0, 1, 2].map(() => ({
-        base: vary ? base * L.rand(0.75, 1.25) : base,
-        clock: vary && Math.random() < 0.3 ? ((clock + L.pick([-1, 1]) + 11) % 12) + 1 : clock,
-        ph1: Math.random() * 10,
-        ph2: Math.random() * 10,
-      })),
-    };
-    R.world = w;
-    newTarget();
+  function buildSetupForm() {
+    const st = S.setup;
+    $('#rig-cart').innerHTML = RANGE.CARTRIDGES.map((c) => option(c.id, c.name, c.id === st.cart)).join('');
+    $('#rig-rifle').innerHTML = RANGE.RIFLES.map((r) => option(r.id, r.name, r.id === st.rifle)).join('');
+    $('#rig-optic').innerHTML = RANGE.OPTICS.map((o) => option(o.id, o.name, o.id === st.optic)).join('');
+    $('#rig-sh').innerHTML = RANGE.SIGHT_HEIGHTS.map((h) => option(h, h.toFixed(1) + '"', +st.sightHeightIn === h)).join('');
+    $('#rig-loc').innerHTML = RANGE.LOCATIONS.map((l) => option(l.id, l.name, l.id === st.location)).join('');
+    $('#rig-sky').innerHTML = RANGE.SKY.map((s) => option(s.id, s.name, s.id === st.sky)).join('');
+    $('#opt-position').innerHTML = RANGE.POSITIONS.map((p) => option(p.id, p.name, p.id === st.position)).join('');
+    $('#range-toggles').innerHTML = RANGE.TOGGLES.map(([id, label]) =>
+      `<label class="check"><input type="checkbox" id="opt-${id}" data-toggle="${id}"> ${esc(label)}</label>`).join('');
+    fillCartridgeDependents();
+    $('#rig-zero').value = st.zeroYd;
+    applyToggles();
   }
 
-  // Wind at one zone (0 near, 1 mid, 2 far) at time t (ms)
-  function zoneWind(t, z) {
-    const w = R.world.wind;
-    const zn = w.zones[z];
-    const tt = t / 1000;
-    if (w.base === 0) {
-      return { speed: Math.max(0, 1 + Math.sin(tt * 0.7 + zn.ph1)), clock: (zn.clock + 3 * Math.sin(tt * 0.21 + zn.ph2) + 12) % 12 };
-    }
-    const g = w.gust * (0.62 * Math.sin(tt * 0.43 + zn.ph1) + 0.38 * Math.sin(tt * 1.37 + zn.ph2));
-    return { speed: Math.max(0, zn.base + g), clock: zn.clock };
+  function fillCartridgeDependents() {
+    const st = S.setup;
+    const cart = RANGE.cartridge(st.cart);
+    const loads = RANGE.loadsFor(cart.id);
+    if (!loads.some((l) => l.id === st.load)) st.load = loads[0].id;
+    $('#rig-load').innerHTML = loads.map((l) => option(l.id, `${l.brand} ${l.name}`, l.id === st.load)).join('');
+    if (!cart.barrels.includes(+st.barrelIn)) st.barrelIn = cart.barrels.includes(24) ? 24 : cart.barrels[Math.floor(cart.barrels.length / 2)];
+    $('#rig-barrel').innerHTML = cart.barrels.map((b) => option(b, b + '"', +st.barrelIn === b)).join('');
+    if (!cart.twists.includes(+st.twistIn)) st.twistIn = cart.twists[0];
+    $('#rig-twist').innerHTML = cart.twists.map((t) => option(t, '1:' + t, +st.twistIn === t)).join('');
+    if (cart.id === '22lr' && +st.zeroYd > 100) st.zeroYd = 50;
+    $('#rig-zero').value = st.zeroYd;
   }
 
-  // Vector blend of the three zones; wind near the muzzle is weighted most
-  function blend(winds) {
-    const wts = [0.4, 0.35, 0.25];
-    let cross = 0, head = 0;
-    winds.forEach((w, z) => {
-      const a = w.clock * Math.PI / 6;
-      cross += wts[z] * w.speed * Math.sin(a);
-      head += wts[z] * w.speed * Math.cos(a);
-    });
-    let clock = Math.atan2(cross, head) / (Math.PI / 6);
-    if (clock <= 0) clock += 12;
-    return { speed: Math.hypot(cross, head), clock };
-  }
-  const pathWind = (t) => blend([0, 1, 2].map((z) => zoneWind(t, z)));
-  const meanWind = () => blend(R.world.wind.zones.map((zn) => ({ speed: zn.base, clock: zn.clock })));
-
-  // ------------------------------------------------------------ targets
-
-  function randomPlate() {
-    const v = $('#opt-plate').value;
-    return v === 'random' ? L.pick([8, 10, 12, 12, 14, 16, 18]) : +v;
+  function readSetupForm() {
+    const st = S.setup;
+    st.cart = $('#rig-cart').value;
+    st.load = $('#rig-load').value;
+    st.barrelIn = +$('#rig-barrel').value;
+    st.twistIn = +$('#rig-twist').value;
+    st.rifle = $('#rig-rifle').value;
+    st.optic = $('#rig-optic').value;
+    st.sightHeightIn = +$('#rig-sh').value;
+    st.zeroYd = +$('#rig-zero').value;
+    st.location = $('#rig-loc').value;
+    st.sky = $('#rig-sky').value;
+    st.position = $('#opt-position').value;
+    L.store.set('range.setup', st);
   }
 
-  function newTarget(forced) {
-    if (!R.world) { newWorld(); return; }
-    const p = L.profile;
-    const maxR = Math.max(400, Math.min(1500, +p.rangeEnd || 1000));
-    const minR = Math.min(300, maxR - 100);
-    const yards = forced ? forced.yards : Math.round(L.rand(minR, maxR) / 5) * 5;
-    const angle = opt('opt-angle') ? Math.round(Math.max(-15, Math.min(15, L.gauss() * 6))) : 0;
-    let mvOffset = 0;
-    if (opt('opt-truing')) mvOffset = R.stage && R.stage.mvOffset != null ? R.stage.mvOffset : Math.round(L.pick([-1, 1]) * L.rand(30, 70));
-    if (R.stage) R.stage.mvOffset = mvOffset;
-    // The rifle was zeroed at home, at card conditions, with the real load
-    const zeroAngleRad = B.solve(L.solverInput(p, { muzzleVelocityFps: +p.muzzleVelocityFps + mvOffset, windMph: 0 }), [+p.zeroYards]).zeroAngleRad;
-    const rfErr = Math.round(L.gauss() * (1 + yards / 600));
-
-    R.s = {
-      yards,
-      rfYards: yards + rfErr,
-      angle,
-      mvOffset,
-      zeroAngleRad,
-      plateIn: forced ? forced.plateIn : randomPlate(),
-      precisionMil: Math.max(0, +$('#opt-precision').value || 0),
-      marks: [],
-      shotsHere: 0,
-    };
-    if (opt('opt-cant')) { R.cant = L.gauss() * 2.2; R.cantTarget = R.cant; } else { R.cant = 0; R.cantTarget = 0; }
-    R.session.targets++;
-    R.puffs = [];
-    if (!R.stage) { setDial('elev', 0, true); setDial('wind', 0, true); }
-    $('#range-feedback').innerHTML = R.stage ? '' : '<span class="hint">Range it, read the wind, dial from your card, send it.</span>';
-    $('#whatchanged-card').hidden = true;
-    renderBrief();
-    renderHud();
+  function applyToggles() {
+    RANGE.TOGGLES.forEach(([id]) => { const el = $('#opt-' + id); if (el) el.checked = !!S.toggles[id]; });
+    const n = RANGE.TOGGLES.filter(([id]) => S.toggles[id]).length;
+    $('#range-settings-sum').textContent = `· ${n}/${RANGE.TOGGLES.length} on`;
   }
 
-  // ------------------------------------------------------------ brief
-
-  function windCallText() {
-    const w = R.world.wind;
-    if (w.base === 0) return 'Calm · 0–2 mph, variable';
-    const sp = w.gust ? `${Math.max(0, w.base - w.gust)}–${w.base + w.gust} mph` : `${w.base} mph`;
-    return `${sp} from ${w.clock} o'clock`;
+  function readToggles() {
+    RANGE.TOGGLES.forEach(([id]) => { S.toggles[id] = $('#opt-' + id).checked; });
+    L.store.set('range.toggles', S.toggles);
+    const n = RANGE.TOGGLES.filter(([id]) => S.toggles[id]).length;
+    $('#range-settings-sum').textContent = `· ${n}/${RANGE.TOGGLES.length} on`;
   }
 
-  function renderBrief() {
-    const s = R.s;
-    const rf = opt('opt-rf')
-      ? `<div class="range-num">${s.rfYards}<small> yd</small></div>`
-      : '<div class="range-num">—<small> mil it</small></div>';
-    const ang = s.angle
-      ? `<div class="hint">${s.angle > 0 ? '▲ uphill' : '▼ downhill'} ${Math.abs(s.angle)}° · cos ${Math.cos(s.angle * Math.PI / 180).toFixed(3)}</div>`
-      : '<div class="hint">Flat · 0°</div>';
-    $('#range-brief').innerHTML = `
-      <div class="tile wide"><div class="label">${opt('opt-rf') ? 'Rangefinder (line of sight)' : 'Rangefinder unavailable'}</div>${rf}${ang}</div>
-      <div class="tile wide"><div class="label">Wind call</div><div style="font-weight:700;font-size:16px">${opt('opt-call') ? windCallText() : 'None — read the flags, mirage and meter'}</div></div>
-      <div class="tile"><div class="label">Plate</div><div class="value" style="font-size:17px">${s.plateIn}"<small>${opt('opt-rf') ? toMil(s.plateIn, s.yards).toFixed(2) + ' mil' : 'steel'}</small></div></div>
-      <div class="tile"><div class="label">Position</div><div style="font-weight:700;font-size:13px;margin-top:4px">${$('#opt-position').selectedOptions[0].textContent}</div></div>`;
-    $('#level-btn').hidden = !opt('opt-cant');
+  function setPreset(name, silent) {
+    S.setup.preset = name;
+    S.toggles = Object.assign({}, RANGE.PRESETS[name]);
+    L.store.set('range.toggles', S.toggles);
+    L.store.set('range.setup', S.setup);
+    $$('#range-preset button').forEach((b) => b.classList.toggle('on', b.dataset.v === name));
+    applyToggles();
+    if (!silent) L.toast(name === 'realistic' ? 'Realistic: real weather, no calls, every effect on' : 'Training: standard-ish day, spotter and wind call on');
+  }
+
+  function renderSetupSummary() {
+    const st = S.setup;
+    const cart = RANGE.cartridge(st.cart), load = RANGE.load(st.load), rifle = RANGE.rifle(st.rifle), optic = RANGE.optic(st.optic);
+    const boxMv = RANGE.boxMv(load, st.barrelIn);
+    const sg = B.millerStability({ bulletWeightGr: load.bulletGr, bulletDiameterIn: load.diaIn, bulletLengthIn: load.lenIn, twistIn: st.twistIn, muzzleVelocityFps: boxMv, tempF: 59, pressureInHg: 29.92 });
+    const sgCls = sg < 1 ? 'bad' : sg < 1.4 ? 'warn' : 'good';
+    const sgWord = sg < 1 ? 'unstable' : sg < 1.4 ? 'marginal' : 'stable';
+    const std = B.solve({ muzzleVelocityFps: boxMv, bc: load.bc, dragModel: load.dragModel, bulletWeightGr: load.bulletGr, sightHeightIn: st.sightHeightIn, zeroYards: st.zeroYd, windMph: 0 }, [cart.maxYd]).rows[0];
+    const tile = (l, v, u, cls) => `<div class="tile${cls ? ' ' + cls : ''}"><div class="label">${l}</div><div class="value">${v}<small>${u || ''}</small></div></div>`;
+    $('#rig-summary').innerHTML = `
+      <div class="card-title"><h3>${esc(cart.name)}</h3><span class="chip">box data · approx.</span></div>
+      <div class="rig-line"><b>${esc(load.brand)} ${esc(load.name)}</b> · ${esc(rifle.name)}, ${st.barrelIn}" 1:${st.twistIn} · ${esc(optic.name)} · sight ${(+st.sightHeightIn).toFixed(1)}" · zero ${st.zeroYd} yd</div>
+      <div class="tiles rig-tiles">
+        ${tile('Box velocity', boxMv, ` fps · ${st.barrelIn}"`)}
+        ${tile('Bullet', load.bulletGr, ` gr · ${load.lenIn}"`)}
+        ${tile('BC ' + load.dragModel, load.bc.toFixed(3), '')}
+        ${tile('Stability Sg', sg.toFixed(2), ' ' + sgWord, 'sg-' + sgCls)}
+        ${tile('Typical SD', load.sdFps, ' fps')}
+        ${tile('Temp sens.', load.tempSens.toFixed(1), ' fps/°F')}
+        ${tile(`Mach @${cart.maxYd}`, std.mach.toFixed(2), std.mach < 1 ? ' subsonic' : std.mach < 1.2 ? ' transonic' : '')}
+        ${tile('Recoil', rifle.weightLb, ` lb rifle`)}
+      </div>
+      <p class="hint" style="margin:10px 0 0">${esc(load.src)}. ${esc(cart.note)}<br>
+        Box velocity is scaled ${cart.fpsPerIn ? `${cart.fpsPerIn} fps per inch from the ${load.refBarrelIn}" test barrel` : 'flat for rimfire past 16"'}.
+        ${sg < 1.4 ? `<b>Sg ${sg.toFixed(2)}: this twist is ${sgWord} for this bullet — expect a lower effective BC and more drift.</b>` : ''}</p>`;
+    $('#rig-rifle-desc').textContent = rifle.desc;
+    $('#rig-optic-desc').textContent = optic.desc + ` Magnification ${optic.zooms.join(' / ')}×.`;
+    const loc = RANGE.location(st.location);
+    $('#rig-loc-desc').textContent = loc ? `${loc.terrain} Elevation ${loc.alt} ft, berms to ${loc.maxYd} yd, ${loc.lat}°N.` : '';
+  }
+
+  function previewWorld() {
+    readSetupForm(); readToggles();
+    S.world = RANGE.newWorld(S.setup, S.toggles);
     renderKestrel(performance.now());
   }
 
+  // ------------------------------------------------------------ steps
+
+  const STEPS = ['setup', 'chrono', 'zero', 'shoot', 'debrief'];
+
+  function setStep(step) {
+    S.step = step;
+    $('#r-setup').hidden = step !== 'setup';
+    $('#r-line').hidden = !(step === 'chrono' || step === 'zero' || step === 'shoot');
+    $('#r-debrief').hidden = step !== 'debrief';
+    $$('#r-steps button').forEach((b) => {
+      const i = STEPS.indexOf(b.dataset.step), cur = STEPS.indexOf(step);
+      b.classList.toggle('on', b.dataset.step === step);
+      b.classList.toggle('done', i < cur);
+      b.disabled = !S.rifle && b.dataset.step !== 'setup';
+    });
+    // the instruments (weather meter + flags) follow the shooter
+    const inst = $('#instruments');
+    const slot = step === 'setup' ? $('#setup-instruments-card') : $('#instruments-slot');
+    if (inst.parentElement !== slot) slot.appendChild(inst);
+    releaseBreath();
+    if (step === 'chrono') enterChrono();
+    else if (step === 'zero') enterZero();
+    else if (step === 'shoot') enterShoot();
+    else if (step === 'debrief') renderDebrief();
+    $('#station-next').hidden = step === 'shoot' && S.mode === 'stage' && S.stage && !S.stage.over;
+    $('#station-next').textContent = step === 'chrono' ? 'Done → Zero' : step === 'zero' ? 'Zero confirmed → Shoot' : 'End session → Debrief';
+    $('#range-new').hidden = step !== 'shoot';
+    window.scrollTo({ top: 0, behavior: reduced() ? 'auto' : 'smooth' });
+  }
+
+  function startSession() {
+    readSetupForm(); readToggles();
+    if (!S.world) S.world = RANGE.newWorld(S.setup, S.toggles);
+    S.world.start = performance.now();
+    S.rifle = RANGE.newRifle(S.setup, S.toggles);
+    S.log = []; S.shotNo = 0; S.lrfBad = 0;
+    S.chrono = { shots: [] };
+    S.session = { shots: 0, hits: 0, targets: 0, firstHits: 0, streak: 0, byRange: {} };
+    S.stage = null;
+    S.mode = 'kd';
+    S.zoomIdx = 1;
+    S.debriefed = false;
+    $('#shot-log tbody').innerHTML = '';
+    $('#shot-log-sum').textContent = '';
+    setDial('elev', 0, true); setDial('wind', 0, true);
+    $$('.turret').forEach((el) => buildDial($('svg', el)));
+    setStep('chrono');
+    L.sfx.click();
+  }
+
+  // ------------------------------------------------------------ targets
+
+  function paperTarget() {
+    const y = +S.setup.zeroYd;
+    return { yards: y, plateIn: 24, kind: 'paper', shape: 'square', angleDeg: 0, calIn: S.rifle.load.diaIn, marks: [], shotsHere: 0, lrf: null, known: true };
+  }
+
+  function setTarget(t) {
+    S.target = t;
+    S.puffs = [];
+    S.swing = { t0: 0, amp: 0 };
+    if (S.toggles.cant && S.step === 'shoot') { S.cant = L.gauss() * 2.2; S.cantTarget = S.cant; } else { S.cant = 0; S.cantTarget = 0; }
+    if (S.step === 'shoot') { S.session.targets++; }
+    renderStation();
+    renderHud();
+  }
+
+  function enterChrono() {
+    setTarget(paperTarget());
+    $('#range-feedback').innerHTML = '<span class="hint">Shoot a string over the chronograph. Write down every velocity, the average and the SD.</span>';
+  }
+
+  function enterZero() {
+    setTarget(paperTarget());
+    $('#range-feedback').innerHTML = '<span class="hint">Fire a group, read it against the grid (1" squares) and the reticle, dial the correction, then set zero.</span>';
+  }
+
+  function enterShoot() {
+    if (S.mode === 'stage') startStage();
+    else if (S.mode === 'ukd') newUkdTarget();
+    else newKdTarget(kdLanes()[Math.min(2, kdLanes().length - 1)].yards);
+  }
+
+  function kdLanes() {
+    const cart = S.rifle.cart;
+    return RANGE.kdLanes(cart, S.world.loc.maxYd);
+  }
+
+  function newKdTarget(yards) {
+    const lane = kdLanes().find((l) => l.yards === yards) || kdLanes()[0];
+    setTarget({ yards: lane.yards, plateIn: lane.plateIn, kind: 'steel', shape: lane.yards % 200 === 0 ? 'square' : 'round', angleDeg: 0, marks: [], shotsHere: 0, lrf: { yards: lane.yards, angleDeg: 0, bad: false }, known: true });
+    $('#range-feedback').innerHTML = '<span class="hint">Known distance. Dial from your paper, read the wind, send it.</span>';
+  }
+
+  function newUkdTarget() {
+    const cart = S.rifle.cart;
+    const far = Math.min(cart.maxYd, S.world.loc.maxYd);
+    const near = cart.id === '22lr' ? 40 : 250;
+    const yards = Math.round(L.rand(near, far) / 5) * 5;
+    const plates = cart.id === '22lr' ? [2, 3, 4, 4, 6, 8] : [8, 10, 12, 12, 14, 16, 18, 20];
+    const angle = S.toggles.angle ? Math.round(RANGE.clamp(L.gauss() * 7, -20, 20)) : 0;
+    setTarget({ yards, plateIn: L.pick(plates), kind: 'steel', shape: Math.random() < 0.3 ? 'square' : 'round', angleDeg: angle, marks: [], shotsHere: 0, lrf: null, known: false });
+    $('#range-feedback').innerHTML = `<span class="hint">${S.toggles.lrf ? 'Lase it (R), then dial from your paper.' : 'No rangefinder: mil the plate, work out the range on paper, then dial.'}</span>`;
+  }
+
+  function nextTarget() {
+    if (S.step !== 'shoot') return;
+    if (S.mode === 'stage') startStage();
+    else if (S.mode === 'ukd') newUkdTarget();
+    else {
+      const lanes = kdLanes();
+      const i = lanes.findIndex((l) => l.yards === S.target.yards);
+      newKdTarget(lanes[(i + 1) % lanes.length].yards);
+    }
+    L.sfx.click();
+  }
+
+  function lase() {
+    const t = S.target;
+    if (!t || S.step !== 'shoot' || !S.toggles.lrf || t.known) return;
+    const r = RANGE.lase(t, S.toggles);
+    if (r.bad) S.lrfBad++;
+    t.lrf = r;
+    t.lases = (t.lases || 0) + 1;
+    L.sfx.click();
+    renderStation();
+    const el = $('#lrf-num');
+    if (el && !reduced()) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+  }
+
+  // ------------------------------------------------------------ station panel
+
+  function renderStation() {
+    const t = S.target;
+    const box = $('#station');
+    if (!t) { box.innerHTML = ''; return; }
+    if (S.step === 'chrono') box.innerHTML = chronoHtml();
+    else if (S.step === 'zero') box.innerHTML = zeroHtml();
+    else box.innerHTML = shootHtml();
+    renderStage();
+    bindStation();
+  }
+
+  function chronoHtml() {
+    const sh = S.chrono.shots;
+    const st = RANGE.stats(sh);
+    const last = sh.length ? sh[sh.length - 1] : null;
+    return `
+      <div class="chrono">
+        <div class="k-head"><span>CHRONOGRAPH</span><span>${S.setup.zeroYd} yd paper · ${esc(S.rifle.load.brand)} ${esc(S.rifle.load.name)}</span></div>
+        <div class="chrono-big">${last != null ? last : '— — — —'}<small>fps</small></div>
+        <div class="chrono-list">${sh.map((v, i) => `<span><i>${i + 1}</i>${v}</span>`).join('') || '<span class="hint">no shots yet</span>'}</div>
+        <div class="chrono-stats">
+          <div><small>n</small><b>${st.n}</b></div>
+          <div><small>avg</small><b>${st.n ? Math.round(st.avg) : '–'}</b></div>
+          <div><small>SD</small><b>${st.n > 1 ? st.sd.toFixed(1) : '–'}</b></div>
+          <div><small>ES</small><b>${st.n > 1 ? st.es : '–'}</b></div>
+        </div>
+        <div class="actions" style="margin-top:8px"><button type="button" class="btn" id="chrono-clear">Clear string</button></div>
+      </div>
+      <p class="hint" style="margin:10px 0 0">Air ${S.world.tempF}°F · ammo ${S.world.ammoInShade ? 'in the shade' : S.toggles.sun ? 'in the sun' : 'at air temperature'}.
+        A 5-shot string gives a rough average; 10 shots gives a usable SD. Your box says ${S.rifle.boxMv} fps.</p>`;
+  }
+
+  function zeroHtml() {
+    const marks = S.target.marks;
+    let group = '';
+    if (marks.length >= 2) {
+      const n = marks.length;
+      const cu = marks.reduce((a, m) => a + toMil(m.upIn, S.target.yards), 0) / n;
+      const cr = marks.reduce((a, m) => a + toMil(m.rightIn, S.target.yards), 0) / n;
+      let maxD = 0;
+      marks.forEach((a) => marks.forEach((b) => { maxD = Math.max(maxD, Math.hypot(a.upIn - b.upIn, a.rightIn - b.rightIn)); }));
+      group = S.toggles.spotter
+        ? `<div class="tiles" style="grid-template-columns:1fr 1fr 1fr"><div class="tile"><div class="label">Group</div><div class="value">${toMil(maxD, S.target.yards).toFixed(2)}<small>mil</small></div></div>
+           <div class="tile"><div class="label">Centre ↑</div><div class="value">${fmt2(cu)}<small>mil</small></div></div>
+           <div class="tile"><div class="label">Centre →</div><div class="value">${fmt2(cr)}<small>mil</small></div></div></div>`
+        : `<div class="tiles" style="grid-template-columns:1fr"><div class="tile"><div class="label">Group</div><div class="value">${toMil(maxD, S.target.yards).toFixed(2)}<small>mil · ${maxD.toFixed(2)}"</small></div></div></div>`;
+    }
+    return `
+      <div class="k-head"><span>ZERO TARGET</span><span>${S.setup.zeroYd} yd · 1" grid</span></div>
+      ${group || '<p class="hint" style="margin:0">Shots on paper so far: ' + marks.length + '</p>'}
+      <ol class="zero-steps">
+        <li>Fire 3–5 rounds at the diamond.</li>
+        <li>Read the group centre: <b>1" = ${toMil(1, S.setup.zeroYd).toFixed(2)} mil</b> at ${S.setup.zeroYd} yd.</li>
+        <li>Dial the opposite: group high → come down, group left → come right.</li>
+        <li>Confirm with a shot, then <b>Set zero</b> to slip the turrets to 0.0.</li>
+      </ol>
+      <div class="actions"><button type="button" class="btn" id="zero-set">Set zero (slip turrets)</button><button type="button" class="btn" id="zero-paper">Fresh paper</button></div>
+      <p class="hint" style="margin:8px 0 0">Turrets slipped so far: elev ${fmt1(S.rifle.slip.elev)} · wind ${fmt1(S.rifle.slip.wind)} from mechanical zero.</p>`;
+  }
+
+  function shootHtml() {
+    const t = S.target;
+    const lanes = kdLanes();
+    const modeSeg = `<div class="seg r-mode" id="range-mode">
+        <button type="button" data-v="kd"${S.mode === 'kd' ? ' class="on"' : ''}>Known</button>
+        <button type="button" data-v="ukd"${S.mode === 'ukd' ? ' class="on"' : ''}>Unknown</button>
+        <button type="button" data-v="stage"${S.mode === 'stage' ? ' class="on"' : ''}>Stage</button></div>`;
+    let picker = '';
+    if (S.mode === 'kd') {
+      picker = `<div class="lanes">${lanes.map((l) => `<button type="button" class="lane${l.yards === t.yards ? ' on' : ''}" data-yd="${l.yards}">${l.yards}<small>${l.plateIn}"</small></button>`).join('')}</div>`;
+    }
+    const lrfOn = S.toggles.lrf && S.mode !== 'stage';
+    let rf;
+    if (t.known) rf = `<div class="range-num">${t.yards}<small> yd</small></div><div class="hint">Known distance · berm sign</div>`;
+    else if (t.stage) rf = `<div class="range-num">${t.lrf.yards}<small> yd</small></div><div class="hint">Lased in prep${t.angleDeg ? ` · ${t.angleDeg > 0 ? '▲' : '▼'} ${Math.abs(t.angleDeg)}°` : ' · flat'}</div>`;
+    else if (!lrfOn) rf = `<div class="range-num">?<small> mil it</small></div><div class="hint">No rangefinder · plate is <b>${t.plateIn}"</b> ${t.shape}</div>`;
+    else if (!t.lrf) rf = `<div class="range-num" id="lrf-num">— — —<small> yd</small></div><div class="hint">Press <b>Lase</b> (R)</div>`;
+    else rf = `<div class="range-num${t.lrf.bad ? ' bad' : ''}" id="lrf-num">${t.lrf.yards}<small> yd</small></div><div class="hint">${t.lrf.angleDeg ? `${t.lrf.angleDeg > 0 ? '▲' : '▼'} ${Math.abs(t.lrf.angleDeg)}° · cos ${Math.cos(t.lrf.angleDeg * Math.PI / 180).toFixed(3)}` : 'Flat · 0°'} · reading ${t.lases || 1}</div>`;
+    const windCall = S.toggles.windCall ? RANGE.windCallText(S.world) : 'None — read the flags, mirage and meter';
+    const plateMil = t.known || t.stage ? toMil(t.plateIn, t.yards).toFixed(2) + ' mil' : (lrfOn ? 'steel' : 'mil it');
+    return `
+      ${modeSeg}${picker}
+      <div class="brief">
+        <div class="tile wide lrf-tile"><div class="label">${t.known ? 'Distance' : t.stage ? 'Stage brief' : lrfOn ? 'Laser rangefinder' : 'Rangefinder unavailable'}</div>${rf}
+          ${!t.known && !t.stage && lrfOn ? '<button type="button" class="btn lase-btn" id="lase-btn">Lase</button>' : ''}</div>
+        <div class="tile wide"><div class="label">Wind call</div><div class="brief-wind">${esc(windCall)}</div></div>
+        <div class="tile"><div class="label">Plate</div><div class="value" style="font-size:17px">${t.plateIn}"<small> ${plateMil}</small></div></div>
+        <div class="tile"><div class="label">Position</div><div class="brief-pos">${esc(RANGE.position(S.setup.position).name)}</div></div>
+      </div>`;
+  }
+
+  function bindStation() {
+    const cc = $('#chrono-clear'); if (cc) cc.addEventListener('click', () => { S.chrono.shots = []; renderStation(); L.sfx.click(); });
+    const zs = $('#zero-set'); if (zs) zs.addEventListener('click', setZero);
+    const zp = $('#zero-paper'); if (zp) zp.addEventListener('click', () => { S.target.marks = []; S.target.shotsHere = 0; renderStation(); L.sfx.click(); });
+    const lb = $('#lase-btn'); if (lb) lb.addEventListener('click', lase);
+    const seg = $('#range-mode');
+    if (seg) L.seg(seg, (v) => { S.mode = v; S.stage = null; enterShoot(); $('#station-next').hidden = v === 'stage'; });
+    $$('.lane').forEach((b) => b.addEventListener('click', () => { newKdTarget(+b.dataset.yd); L.sfx.click(); }));
+  }
+
+  function setZero() {
+    const r = S.rifle;
+    r.slip.elev += S.dial.elev;
+    r.slip.wind += S.dial.wind;
+    S.dial.elev = 0; S.dial.wind = 0;
+    setDial('elev', 0, true); setDial('wind', 0, true);
+    L.sfx.click();
+    L.toast('Turrets slipped: this is now 0.0 / 0.0');
+    renderStation();
+  }
+
+  // ------------------------------------------------------------ instruments
+
   let kestrelAt = 0;
+  const windHist = [];
   function renderKestrel(now) {
-    const w = R.world;
+    const w = S.world;
     if (!w) return;
-    const near = zoneWind(now, 0);
-    const inHg = w.atm.pressurePa / 3386.389;
+    RANGE.tickWind(w, now);
+    const near = RANGE.zoneWind(w, now, 0);
+    windHist.push(near.speed);
+    if (windHist.length > 20) windHist.shift();
+    const avg = windHist.reduce((a, b) => a + b, 0) / windHist.length;
+    const max = Math.max.apply(null, windHist);
     const dir = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(w.azimuthDeg / 45) % 8];
-    const grid = `
-        <div><small>Temp</small><b>${w.tempF}°F</b></div>
-        <div><small>Station</small><b>${inHg.toFixed(2)}"</b></div>
-        <div><small>Humidity</small><b>${w.humidityPct}%</b></div>
-        <div><small>DA</small><b>${Math.round(w.atm.densityAltitudeFt)} ft</b></div>
-        <div><small>Wind here</small><b>${near.speed.toFixed(1)} mph</b></div>
-        <div><small>From</small><b>~${Math.round(near.clock) || 12} o'clock</b></div>
-        <div><small>Latitude</small><b>${w.latitudeDeg}°N</b></div>
-        <div><small>Azimuth</small><b>${w.azimuthDeg}° ${dir}</b></div>`;
     const box = $('#kestrel');
     if (!$('.k-grid', box)) {
-      box.innerHTML = `<div class="k-head"><span>WEATHER METER</span><span class="k-loc"></span></div><div class="k-grid"></div>
-        <button class="btn k-btn" id="k-load" type="button">Load today's weather into my card</button>`;
-      $('#k-load').addEventListener('click', () => {
-        const ww = R.world;
-        L.setProfile(Object.assign({}, L.profile, { altitudeFt: ww.altitudeFt, tempF: ww.tempF, humidityPct: ww.humidityPct }));
-        L.toast(`Card recomputed for ${Math.round(ww.atm.densityAltitudeFt)} ft DA`);
-      });
+      box.innerHTML = `<div class="k-head"><span>WEATHER METER</span><span class="k-loc"></span></div><div class="k-grid"></div>`;
     }
-    $('.k-loc', box).textContent = w.loc;
-    $('.k-grid', box).innerHTML = grid;
+    $('.k-loc', box).textContent = `${w.loc.name} · ${w.sky.name}`;
+    $('.k-grid', box).innerHTML = `
+        <div><small>Temp</small><b>${w.tempF}°F</b></div>
+        <div><small>Station</small><b>${w.stationPressureInHg.toFixed(2)}"</b></div>
+        <div><small>Humidity</small><b>${w.humidityPct}%</b></div>
+        <div><small>DA</small><b>${Math.round(w.atm.densityAltitudeFt)} ft</b></div>
+        <div><small>Wind</small><b>${near.speed.toFixed(1)} mph</b></div>
+        <div><small>Avg / max</small><b>${avg.toFixed(1)} / ${max.toFixed(1)}</b></div>
+        <div><small>From</small><b>${RANGE.toClockHalf(near.dirDeg)} o'clock</b></div>
+        <div><small>Azimuth</small><b>${w.azimuthDeg}° ${dir} · ${w.latitudeDeg}°N</b></div>`;
     kestrelAt = now;
   }
 
   function renderHud() {
-    const ss = R.session;
-    const pct = ss.shots ? Math.round(ss.hits / ss.shots * 100) + '%' : '–';
+    const ss = S.session;
     const tile = (l, v) => `<div class="tile"><div class="label">${l}</div><div class="value">${v}</div></div>`;
-    $('#range-hud').innerHTML = tile('Shots', ss.shots) + tile('Hits', ss.hits) + tile('Hit %', pct) +
-      tile('1st-round', `${ss.firstHits}/${Math.max(0, ss.targets - (R.s && !R.s.shotsHere ? 1 : 0))}`) +
-      tile('Streak', `${ss.streak}<small>best ${R.best}</small>`);
+    let html;
+    if (S.step === 'chrono') {
+      const st = RANGE.stats(S.chrono.shots);
+      html = tile('String', st.n) + tile('Average', st.n ? Math.round(st.avg) : '–') + tile('SD', st.n > 1 ? st.sd.toFixed(1) : '–') + tile('ES', st.n > 1 ? st.es : '–') + tile('Rounds', S.rifle.rounds);
+    } else if (S.step === 'zero') {
+      html = tile('On paper', S.target ? S.target.marks.length : 0) + tile('Elev dial', S.dial.elev.toFixed(1)) + tile('Wind dial', S.dial.wind.toFixed(1)) + tile('Rounds', S.rifle.rounds) + tile('Zoom', zoomX() + '×');
+    } else {
+      const pct = ss.shots ? Math.round(ss.hits / ss.shots * 100) + '%' : '–';
+      html = tile('Shots', ss.shots) + tile('Hits', ss.hits) + tile('Hit %', pct) +
+        tile('1st-round', `${ss.firstHits}/${Math.max(0, ss.targets - (S.target && !S.target.shotsHere ? 1 : 0))}`) +
+        tile('Streak', `${ss.streak}<small>best ${S.best}</small>`);
+    }
+    $('#range-hud').innerHTML = html;
   }
 
   // ------------------------------------------------------------ stage
 
   function startStage() {
-    R.stage = null;
-    newWorld();
-    const p = L.profile;
-    const maxR = Math.max(500, Math.min(1500, +p.rangeEnd || 1000));
+    S.stage = null;
+    const lanes = kdLanes();
+    const far = lanes[lanes.length - 1].yards, near = Math.max(lanes[0].yards, S.rifle.cart.id === '22lr' ? 40 : 250);
     const n = 5;
-    const yards = Array.from({ length: n }, (_, i) => Math.round((300 + (maxR - 300) * (i + L.rand(0.1, 0.9)) / n) / 5) * 5);
-    R.stage = {
-      targets: yards.map((y) => ({ yards: y, plateIn: L.pick([10, 12, 12, 14, 16, 18]), result: null })),
-      i: 0,
-      start: 0,
-      par: 150,
-      over: false,
-      mvOffset: null,
+    const yards = Array.from({ length: n }, (_, i) => Math.round((near + (far - near) * (i + L.rand(0.1, 0.9)) / n) / 5) * 5);
+    S.stage = {
+      targets: yards.map((y) => ({ yards: y, plateIn: RANGE.platesFor(S.rifle.cart, y) + L.pick([0, 2, 4]), angleDeg: S.toggles.angle ? Math.round(RANGE.clamp(L.gauss() * 6, -15, 15)) : 0, result: null })),
+      i: 0, start: 0, par: 150, over: false,
     };
-    setDial('elev', 0, true); setDial('wind', 0, true);
     goStageTarget(0);
-    $('#range-feedback').innerHTML = `<div class="verdict">STAGE READY</div><div>${n} targets, one shot each, ${R.stage.par} s par. The clock starts on your first shot — plan your dope from the list first.</div>`;
+    $('#range-feedback').innerHTML = `<div class="verdict">STAGE READY</div><div>${n} targets, one shot each, ${S.stage.par} s par. Distances were lased during prep. The clock starts on your first shot.</div>`;
+    $('#station-next').hidden = true;
   }
 
   function goStageTarget(i) {
-    R.stage.i = i;
-    const t = R.stage.targets[i];
-    newTarget({ yards: t.yards, plateIn: t.plateIn });
-    renderStage();
+    const st = S.stage;
+    st.i = i;
+    const t = st.targets[i];
+    setTarget({ yards: t.yards, plateIn: t.plateIn, kind: 'steel', shape: 'round', angleDeg: t.angleDeg, marks: [], shotsHere: 0, lrf: { yards: t.yards, angleDeg: t.angleDeg, bad: false }, known: false, stage: true });
   }
 
   function renderStage() {
-    const st = R.stage;
-    $('#range-new').textContent = st ? 'Restart stage' : 'New target';
-    if (!st) { $('#stage-list').innerHTML = ''; $('#scope-stage').textContent = ''; return; }
-    const rf = opt('opt-rf');
-    $('#stage-list').innerHTML = `<div class="stage-list"><div class="k-head"><span>STAGE · ${st.targets.length} TARGETS</span><span>par ${st.par} s</span></div>
+    const st = S.stage;
+    const box = $('#stage-list');
+    $('#range-new').textContent = st && S.mode === 'stage' ? 'Restart stage' : 'Next target';
+    if (!st || S.mode !== 'stage' || S.step !== 'shoot') { box.innerHTML = ''; $('#scope-stage').textContent = ''; return; }
+    box.innerHTML = `<div class="stage-list"><div class="k-head"><span>STAGE · ${st.targets.length} TARGETS</span><span>par ${st.par} s</span></div>
       ${st.targets.map((t, i) => `<div class="st-row${i === st.i && !st.over ? ' on' : ''}">
-        <span class="st-n">T${i + 1}</span><span>${rf ? t.yards + ' yd' : '?? yd'}</span><span>${t.plateIn}"</span>
+        <span class="st-n">T${i + 1}</span><span>${t.yards} yd${t.angleDeg ? ` ${t.angleDeg > 0 ? '▲' : '▼'}${Math.abs(t.angleDeg)}°` : ''}</span><span>${t.plateIn}"</span>
         <span class="st-r ${t.result === true ? 'hit' : t.result === false ? 'miss' : ''}">${t.result === true ? 'HIT' : t.result === false ? 'MISS' : i === st.i && !st.over ? '◀' : ''}</span></div>`).join('')}</div>`;
   }
 
   function stageShotLanded(hit) {
-    const st = R.stage;
+    const st = S.stage;
     st.targets[st.i].result = hit;
     renderStage();
     const next = st.i + 1;
-    if (next < st.targets.length && !st.over) setTimeout(() => { if (R.stage === st && !st.over) goStageTarget(next); }, 1100);
+    if (next < st.targets.length && !st.over) setTimeout(() => { if (S.stage === st && !st.over) goStageTarget(next); }, 1100);
     else finishStage();
   }
 
   function finishStage() {
-    const st = R.stage;
+    const st = S.stage;
     if (!st || st.over) return;
     st.over = true;
     const secs = st.start ? (performance.now() - st.start) / 1000 : 0;
@@ -317,15 +520,15 @@
     renderStage();
     $('#range-feedback').innerHTML = `<div class="verdict ${hits >= 3 ? 'hit' : 'miss'}">STAGE: ${hits}/${st.targets.length}</div>
       <div>Time ${secs.toFixed(1)} s ${inTime ? '(inside par)' : '(over par — unshot targets scored as misses)'}.</div>
-      <div class="actions"><button class="btn primary" id="stage-again">Run another stage</button></div>`;
+      <div class="actions"><button type="button" class="btn primary" id="stage-again">Run another stage</button></div>`;
     $('#stage-again').addEventListener('click', startStage);
+    $('#station-next').hidden = false;
     if (hits === st.targets.length) { L.confetti(); L.sfx.good(); }
     L.addXp(xp, 'stage complete');
   }
 
   // ------------------------------------------------------------ turrets
 
-  // 100 clicks (10 mil) per revolution; a tick every 2 clicks, a long tick every 20.
   function buildDial(svg) {
     let ticks = '';
     for (let j = 0; j < 50; j++) {
@@ -344,9 +547,10 @@
   }
 
   function setDial(axis, value, silent) {
-    const v = +B.roundToClick(value, CLICK).toFixed(1);
-    const prev = R.dial[axis];
-    R.dial[axis] = v;
+    const travel = S.rifle ? S.rifle.optic.travelMil : 30;
+    const v = +B.roundToClick(RANGE.clamp(value, axis === 'elev' ? -5 : -travel / 2, axis === 'elev' ? travel : travel / 2), CLICK).toFixed(1);
+    const prev = S.dial[axis];
+    S.dial[axis] = v;
     const el = $(`.turret[data-axis="${axis}"]`);
     $('input', el).value = v.toFixed(1);
     $('input', el).step = CLICK;
@@ -355,29 +559,25 @@
     const dirWord = axis === 'elev' ? (v > 0 ? 'UP' : v < 0 ? 'DOWN' : 'MIL') : (v > 0 ? 'RIGHT' : v < 0 ? 'LEFT' : 'MIL');
     const rev = axis === 'elev' && Math.abs(clicks) >= 100 ? ` · rev ${Math.floor(Math.abs(clicks) / 100) + 1}` : '';
     $('.dial-value', el).innerHTML = `<div>${Math.abs(v).toFixed(1)}<small>${dirWord + rev}</small></div>`;
-    if (!silent && v !== prev) L.sfx.click();
+    if (!silent && v !== prev) {
+      L.sfx.click();
+      if (!reduced()) { const d = $('.dial', el); d.classList.remove('tick'); void d.offsetWidth; d.classList.add('tick'); }
+    }
+    if (S.step === 'zero') renderHud();
   }
 
-  function nudge(axis, clicks) { setDial(axis, R.dial[axis] + clicks * CLICK); }
-
-  $$('.turret').forEach((el) => {
-    const axis = el.dataset.axis;
-    $$('button', el).forEach((b) => b.addEventListener('click', () => nudge(axis, +b.dataset.step)));
-    $('input', el).addEventListener('change', (e) => setDial(axis, parseFloat(e.target.value) || 0));
-    $('.dial', el).addEventListener('wheel', (e) => { e.preventDefault(); nudge(axis, e.deltaY < 0 ? 1 : -1); }, { passive: false });
-  });
+  function nudge(axis, clicks) { setDial(axis, S.dial[axis] + clicks * CLICK); }
 
   // ------------------------------------------------------- the shooter
 
   function level() {
-    if (!opt('opt-cant')) return;
-    R.cantTarget = L.gauss() * 0.25;
+    if (!S.toggles.cant) return;
+    S.cantTarget = L.gauss() * 0.25;
     L.sfx.click();
   }
 
-  // Breath control: a short hold steadies you, a long one makes you shake
   function breathFactor(now) {
-    const b = R.breath;
+    const b = S.breath;
     if (b.holding) {
       const t = (now - b.start) / 1000;
       if (t > 10) { releaseBreath(now); return 1.5; }
@@ -389,24 +589,26 @@
     return since < 3 ? 1.5 - since / 6 : 1;
   }
   function holdBreath() {
-    if (R.breath.holding) return;
-    R.breath.holding = true;
-    R.breath.start = performance.now();
+    if (S.breath.holding) return;
+    S.breath.holding = true;
+    S.breath.start = performance.now();
     $('#breath-btn').classList.add('on');
   }
   function releaseBreath(now) {
-    if (!R.breath.holding) return;
-    R.breath.holding = false;
-    R.breath.releasedAt = now || performance.now();
+    if (!S.breath.holding) return;
+    S.breath.holding = false;
+    S.breath.releasedAt = now || performance.now();
     $('#breath-btn').classList.remove('on');
   }
 
-  // Reticle sway in MIL: figure-8 hold wobble + breathing cycle, scaled by position
+  // Reticle sway in MIL: figure-8 wobble + breathing, scaled by position; bench-steady at the chrono/zero stations
   function sway(now) {
-    const A = POSITIONS[$('#opt-position').value] || 0.09;
+    const pos = RANGE.position(S.setup.position);
+    const A = S.step === 'shoot' ? pos.wobble : Math.min(pos.wobble, 0.06);
+    if (reduced()) return { x: 0, y: 0 };
     const t = now / 1000;
     const f = breathFactor(now);
-    const breathing = R.breath.holding ? 0 : Math.sin(t * 2 * Math.PI / 4.2) * 0.8;
+    const breathing = S.breath.holding ? 0 : Math.sin(t * 2 * Math.PI / 4.2) * 0.8;
     const x = A * f * (0.6 * Math.sin(1.3 * t + 0.7) + 0.25 * Math.sin(3.1 * t));
     const y = A * (f * (0.45 * Math.sin(2.1 * t + 1.9) + 0.2 * Math.sin(4.3 * t)) + breathing) + A * 0.08 * Math.max(0, Math.sin(t * 7.5)) ** 8;
     return { x, y };
@@ -414,84 +616,119 @@
 
   // ------------------------------------------------------------- fire
 
-  function shotInputs(extra) {
-    const p = L.profile, s = R.s, w = R.world;
-    const adv = opt('opt-adv');
-    return L.solverInput(p, Object.assign({
-      muzzleVelocityFps: +p.muzzleVelocityFps + s.mvOffset,
-      altitudeFt: w.altitudeFt, tempF: w.tempF, humidityPct: w.humidityPct, powderTempF: w.powderTempF,
-      shotAngleDeg: s.angle,
-      zeroAngleRad: s.zeroAngleRad,
+  function solveShot(extra) {
+    const r = S.rifle, w = S.world, t = S.target;
+    const adv = !!S.toggles.adv;
+    return B.solve(Object.assign({}, r.solverBase, {
+      tempSensitivity: 0, mvTempF: null,
+      altitudeFt: w.altitudeFt, tempF: w.tempF, humidityPct: w.humidityPct, stationPressureInHg: w.stationPressureInHg,
+      shotAngleDeg: t.angleDeg,
+      zeroAngleRad: r.zeroAngleRad,
       spinDrift: adv, aeroJump: adv, coriolis: adv,
       latitudeDeg: w.latitudeDeg, azimuthDeg: w.azimuthDeg,
-    }, extra));
+    }, extra), [t.yards]).rows[0];
+  }
+
+  /* Where the turrets really put the line of sight, including cant, tracking and boresight. */
+  function turretOffsets(dialE, dialW) {
+    const r = S.rifle;
+    const effE = (dialE + r.slip.elev) * (1 + r.trackErr);
+    const effW = (dialW + r.slip.wind) * (1 + r.trackErr);
+    const th = S.cant * Math.PI / 180;
+    const c = Math.cos(th), s = Math.sin(th);
+    return {
+      up: effE * c - effW * s + r.boreE * c - r.boreW * s,
+      right: effW * c + effE * s + r.boreW * c + r.boreE * s,
+    };
   }
 
   function fire() {
-    const s = R.s;
-    if (!s || R.flight || (R.stage && R.stage.over)) return;
-    if (R.stage && !R.stage.start) R.stage.start = performance.now();
-    const p = L.profile;
+    const t = S.target;
+    if (!t || S.flight || !S.rifle || (S.stage && S.mode === 'stage' && S.step === 'shoot' && S.stage.over)) return;
+    if (S.step === 'shoot' && S.mode === 'stage' && S.stage && !S.stage.start) S.stage.start = performance.now();
     const now = performance.now();
-    const w = pathWind(now);
-    const sd = +p.sdFps || 10;
-    const row = B.solve(shotInputs({
-      muzzleVelocityFps: +p.muzzleVelocityFps + s.mvOffset + L.gauss() * sd,
-      windMph: w.speed, windClock: w.clock,
-    }), [s.yards]).rows[0];
-
-    // Cant rotates the dialed correction (clockwise cant moves it right and down)
-    const th = R.cant * Math.PI / 180;
-    const eIn = milIn(R.dial.elev, s.yards);
-    const wIn = milIn(R.dial.wind, s.yards);
-    const dialUp = eIn * Math.cos(th) - wIn * Math.sin(th);
-    const dialRight = wIn * Math.cos(th) + eIn * Math.sin(th);
-
-    // Where the reticle was when the shot broke
+    const w = RANGE.pathWind(S.world, now, t.yards);
+    const sb = RANGE.shotBallistics(S.rifle, S.world, S.toggles, now);
+    const row = solveShot({ muzzleVelocityFps: sb.mv, windMph: w.speed, windClock: w.clock });
+    const pos = RANGE.position(S.setup.position);
+    const to = turretOffsets(S.dial.elev, S.dial.wind);
     const sw = sway(now);
-    // Precision = 5-shot group size; sigma ≈ size / 3 per axis
-    const sigmaIn = milIn(s.precisionMil, s.yards) / 3;
-    const upIn = row.dropIn + dialUp + milIn(sw.y, s.yards) + L.gauss() * sigmaIn;
-    const rightIn = row.windIn + dialRight + milIn(sw.x, s.yards) + L.gauss() * sigmaIn;
-    const hit = Math.hypot(upIn, rightIn) <= s.plateIn / 2;
+    const sig = sb.sigmaMil;
+    const up = toMil(row.dropIn, t.yards) + to.up + sb.dE + sw.y + L.gauss() * (pos.trigger + sig);
+    const right = toMil(row.windIn, t.yards) + to.right + sb.dW + sw.x + L.gauss() * (pos.trigger + sig);
+    const upIn = milIn(up, t.yards), rightIn = milIn(right, t.yards);
+    let hit;
+    if (t.kind === 'paper') hit = Math.abs(upIn) <= 15 && Math.abs(rightIn) <= 12;
+    else hit = t.shape === 'square' ? Math.max(Math.abs(upIn), Math.abs(rightIn)) <= t.plateIn / 2 : Math.hypot(upIn, rightIn) <= t.plateIn / 2;
 
-    R.flight = { start: now, tof: row.tofSec * 1000, upIn, rightIn, hit, dialE: R.dial.elev, dialW: R.dial.wind };
+    RANGE.recordShot(S.rifle, now);
+    S.flight = { start: now, tof: row.tofSec * 1000, up, right, upIn, rightIn, hit, dialE: S.dial.elev, dialW: S.dial.wind, mv: sb.mv, wind: w, cold: sb.coldBore, heat: sb.heat, powderT: sb.powderT };
     $('#fire-btn').disabled = true;
     L.sfx.shot();
-    R.recoilAt = now;
+    S.recoilAt = now;
     releaseBreath(now);
   }
 
   function land() {
-    const f = R.flight;
-    const s = R.s;
-    R.flight = null;
+    const f = S.flight, t = S.target;
+    S.flight = null;
     $('#fire-btn').disabled = false;
     $('#flight-bar').style.width = '0';
-    const up = toMil(f.upIn, s.yards);
-    const right = toMil(f.rightIn, s.yards);
-    const first = s.shotsHere === 0;
-    s.shotsHere++;
-    R.shotNo++;
-    const ss = R.session;
-    ss.shots++;
-    s.marks.push({ up, right, upIn: f.upIn, rightIn: f.rightIn, hit: f.hit, n: R.shotNo });
-    R.puffs.push({ up, right, t0: performance.now(), hit: f.hit });
+    const first = t.shotsHere === 0;
+    t.shotsHere++;
+    S.shotNo++;
+    const mark = { up: f.up, right: f.right, upIn: f.upIn, rightIn: f.rightIn, hit: f.hit, n: S.shotNo, paper: t.kind === 'paper' };
+    t.marks.push(mark);
+    const entry = { n: S.shotNo, station: S.step, yards: t.yards, angleDeg: t.angleDeg, dialE: f.dialE, dialW: f.dialW, up: f.up, right: f.right, hit: f.hit, mv: f.mv, wind: f.wind, cold: f.cold, heat: f.heat, powderT: f.powderT, lrf: t.lrf ? t.lrf.yards : null, plateIn: t.plateIn, kind: t.kind, known: !!t.known, stage: !!t.stage };
+    S.log.push(entry);
 
-    const soundDelay = opt('opt-delay') ? s.yards * 3 / 1125 : 0;
-    if (f.hit) {
-      ss.hits++;
-      ss.streak++;
-      if (ss.streak > R.best) { R.best = ss.streak; L.store.set('range.bestStreak', R.best); }
-      R.swing = { t0: performance.now(), amp: 0.22 + Math.min(0.2, s.plateIn / 120) };
+    if (S.step === 'chrono') landChrono(entry);
+    else if (S.step === 'zero') landZero(entry);
+    else landSteel(entry, first);
+    logRow(entry);
+    renderHud();
+  }
+
+  function landChrono(e) {
+    if (!e.hit) S.puffs.push({ up: e.up, right: e.right, t0: performance.now(), hit: false });
+    const v = RANGE.chronoRead(e.mv);
+    S.chrono.shots.push(v);
+    e.chrono = v;
+    L.sfx.click();
+    renderStation();
+    const st = RANGE.stats(S.chrono.shots);
+    $('#range-feedback').innerHTML = `<div class="verdict">${v} <small>fps</small></div><div class="hint">Shot ${st.n}${st.n > 1 ? ` · avg ${Math.round(st.avg)} · SD ${st.sd.toFixed(1)} · ES ${st.es}` : ''}. Write it down.</div>`;
+    setHud(`${v} fps`, 1200);
+  }
+
+  function landZero(e) {
+    if (!e.hit) S.puffs.push({ up: e.up, right: e.right, t0: performance.now(), hit: false });
+    renderStation();
+    const call = S.toggles.spotter ? `Spotter: <b class="mono">${e.up >= 0 ? 'high' : 'low'} ${Math.abs(e.up).toFixed(1)}</b>, <b class="mono">${e.right >= 0 ? 'right' : 'left'} ${Math.abs(e.right).toFixed(1)}</b>.` : (e.hit ? 'On paper. Read it against the grid.' : 'Off the paper. Look wider, or check the turrets.');
+    e.call = S.toggles.spotter ? `${fmt1(e.up)} / ${fmt1(e.right)}` : '';
+    $('#range-feedback').innerHTML = `<div class="verdict ${e.hit ? '' : 'miss'}">${e.hit ? 'ON PAPER' : 'OFF PAPER'}</div><div>${call}</div>`;
+    setHud(e.hit ? 'Paper' : 'Off paper', 900);
+  }
+
+  function landSteel(e, first) {
+    const t = S.target, ss = S.session;
+    ss.shots++;
+    const br = (ss.byRange[t.yards] = ss.byRange[t.yards] || { shots: 0, hits: 0, dialE: [], dialW: [], ups: [], rights: [], angleDeg: t.angleDeg });
+    br.shots++; br.dialE.push(e.dialE); br.dialW.push(e.dialW); br.ups.push(e.up); br.rights.push(e.right);
+    S.puffs.push({ up: e.up, right: e.right, t0: performance.now(), hit: e.hit });
+    const soundDelay = S.toggles.delay ? t.yards / RANGE.soundYps(S.world) : 0;
+    if (e.hit) {
+      ss.hits++; ss.streak++; br.hits++;
+      if (ss.streak > S.best) { S.best = ss.streak; L.store.set('range.bestStreak', S.best); }
+      S.swing = { t0: performance.now(), amp: 0.22 + Math.min(0.2, t.plateIn / 120) };
       if (first) ss.firstHits++;
       L.sfx.ding(soundDelay);
       setHud(`Impact · ding in ${soundDelay.toFixed(1)} s`, soundDelay * 1000 + 900);
-      const xp = 10 + Math.floor(s.yards / 100) + (first ? 15 : 0) + (ss.streak >= 3 ? 5 : 0) + (opt('opt-spotter') ? 0 : 5);
+      const xp = 10 + Math.floor(t.yards / 100) + (first ? 15 : 0) + (ss.streak >= 3 ? 5 : 0) + (S.toggles.spotter ? 0 : 5) + (t.known ? 0 : 5);
       setTimeout(() => {
         L.addXp(xp, first ? 'first-round hit!' : 'hit');
-        if (first && !R.stage) {
-          const r = scope.getBoundingClientRect();
+        if (first && S.mode !== 'stage') {
+          const r = $('#scope').getBoundingClientRect();
           L.confetti(r.left + r.width / 2, r.top + r.height / 2);
         }
       }, soundDelay * 1000);
@@ -500,26 +737,31 @@
       L.sfx.thud(soundDelay * 0.6);
       setHud('Miss · read the splash', 1200);
     }
-
-    const visible = Math.abs(up) < HALF_FOV && Math.abs(right) < HALF_FOV;
+    const visible = Math.abs(e.up) < halfFov() && Math.abs(e.right) < halfFov();
     let detail;
-    if (opt('opt-spotter')) {
-      const corrE = B.roundToClick(f.dialE - up, CLICK);
-      const corrW = B.roundToClick(f.dialW - right, CLICK);
-      detail = `<div>Spotter: <b class="mono">${up >= 0 ? 'high' : 'low'} ${Math.abs(up).toFixed(1)}</b>, <b class="mono">${right >= 0 ? 'right' : 'left'} ${Math.abs(right).toFixed(1)}</b>.</div>
-        ${f.hit ? '' : `<div class="hint" style="margin-top:4px">From this impact: elev <b class="mono">${corrE.toFixed(1)}</b>, wind <b class="mono">${corrW.toFixed(1)}</b>. Gusts, wobble and dispersion add noise.</div>`}`;
+    if (S.toggles.spotter) {
+      const corrE = B.roundToClick(e.dialE - e.up, CLICK);
+      const corrW = B.roundToClick(e.dialW - e.right, CLICK);
+      e.call = `${fmt1(e.up)} / ${fmt1(e.right)}`;
+      detail = `<div>Spotter: <b class="mono">${e.up >= 0 ? 'high' : 'low'} ${Math.abs(e.up).toFixed(1)}</b>, <b class="mono">${e.right >= 0 ? 'right' : 'left'} ${Math.abs(e.right).toFixed(1)}</b>.</div>
+        ${e.hit ? '' : `<div class="hint" style="margin-top:4px">Correct to elev <b class="mono">${corrE.toFixed(1)}</b>, wind <b class="mono">${corrW.toFixed(1)}</b> — then write what worked.</div>`}`;
     } else {
-      detail = f.hit ? '<div>Steel rang. Note your dope.</div>'
-        : `<div>${visible ? 'You caught the splash — read it against the reticle and correct.' : 'No splash seen in the scope. Check your dial, revolution and range.'}</div>`;
+      e.call = '';
+      detail = e.hit ? '<div>Steel rang. Write the dope that worked.</div>'
+        : `<div>${visible ? 'Splash on the berm — read it against the reticle before it settles.' : 'No splash seen in the scope. Check the revolution, the range and the wind.'}</div>`;
     }
-    $('#range-feedback').innerHTML = `<div class="verdict ${f.hit ? 'hit' : 'miss'}">${f.hit ? (first ? 'FIRST-ROUND HIT' : 'HIT') : 'MISS'}</div>${detail}`;
+    $('#range-feedback').innerHTML = `<div class="verdict ${e.hit ? 'hit' : 'miss'}">${e.hit ? (first ? 'FIRST-ROUND HIT' : 'HIT') : 'MISS'}</div>${detail}`;
+    if (S.mode === 'stage' && S.stage) stageShotLanded(e.hit);
+  }
 
+  function logRow(e) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${R.shotNo}</td><td>${s.yards}</td><td>${f.dialE.toFixed(1)}</td><td>${f.dialW.toFixed(1)}</td>` +
-      `<td>${up.toFixed(2)} / ${right.toFixed(2)}</td><td style="color:var(--${f.hit ? 'good' : 'bad'})">${f.hit ? 'hit' : 'miss'}</td>`;
+    const station = e.station === 'chrono' ? 'Chrono' : e.station === 'zero' ? 'Zero' : (e.stage ? 'Stage' : e.known ? 'KD' : 'UKD');
+    const result = e.station === 'chrono' ? `${e.chrono} fps` : e.station === 'zero' ? (e.hit ? 'paper' : 'off') : (e.hit ? 'hit' : 'miss');
+    const cls = e.station === 'chrono' ? 'var(--info)' : e.hit ? 'var(--good)' : 'var(--bad)';
+    tr.innerHTML = `<td>${e.n}</td><td>${station}</td><td>${e.station === 'shoot' && e.lrf == null && !e.known ? '?' : (e.lrf != null ? e.lrf : e.yards)}${e.angleDeg ? `<small> ${e.angleDeg > 0 ? '▲' : '▼'}${Math.abs(e.angleDeg)}°</small>` : ''}</td><td>${e.dialE.toFixed(1)}</td><td>${e.dialW.toFixed(1)}</td><td>${e.call || '–'}</td><td style="color:${cls}">${result}</td>`;
     $('#shot-log tbody').prepend(tr);
-    renderHud();
-    if (R.stage) stageShotLanded(f.hit);
+    $('#shot-log-sum').textContent = `· ${S.log.length} rounds`;
   }
 
   let hudTimer = 0;
@@ -531,389 +773,336 @@
     if (ms) hudTimer = setTimeout(() => el.classList.remove('show'), ms);
   }
 
-  // Break the true solution into the layers a card doesn't include
-  function reveal() {
-    const s = R.s, w = R.world;
-    if (!s) return;
-    const p = L.profile;
-    const mw = meanWind();
-    const adv = opt('opt-adv');
-    const solveAt = (extra) => B.solve(L.solverInput(p, Object.assign({ windMph: mw.speed, windClock: mw.clock }, extra)), [s.yards]).rows[0];
-    const today = { altitudeFt: w.altitudeFt, tempF: w.tempF, humidityPct: w.humidityPct, powderTempF: w.powderTempF };
-    const withAngle = Object.assign({}, today, { shotAngleDeg: s.angle });
-    const withMv = Object.assign({}, withAngle, { muzzleVelocityFps: +p.muzzleVelocityFps + s.mvOffset, zeroAngleRad: s.zeroAngleRad });
-    const withAdv = Object.assign({}, withMv, { spinDrift: adv, aeroJump: adv, coriolis: adv, latitudeDeg: w.latitudeDeg, azimuthDeg: w.azimuthDeg });
+  // ------------------------------------------------------------ debrief
+
+  function renderDebrief() {
+    const r = S.rifle, w = S.world, ss = S.session;
+    if (!r) { $('#debrief').innerHTML = '<p class="hint">No session yet.</p>'; return; }
+    const now = performance.now();
+    const chrono = RANGE.stats(S.chrono.shots);
+    const powderNow = RANGE.powderTempF(w, now);
+    const mvNow = r.mvRef + r.load.tempSens * (powderNow - 59);
+    const zeroResid = residualZero();
+    const tile = (l, v, u) => `<div class="tile"><div class="label">${l}</div><div class="value">${v}<small>${u || ''}</small></div></div>`;
+    const pct = ss.shots ? Math.round(ss.hits / ss.shots * 100) : 0;
+
+    // Per-range truth vs what you dialed
+    const ranges = Object.keys(ss.byRange).map(Number).sort((a, b) => a - b);
+    const rows = ranges.map((y) => {
+      const br = ss.byRange[y];
+      const sol = trueDope(y, br.angleDeg);
+      const avg = (a) => a.reduce((p, q) => p + q, 0) / a.length;
+      return `<tr><td>${y}${br.angleDeg ? ` <small>${br.angleDeg > 0 ? '▲' : '▼'}${Math.abs(br.angleDeg)}°</small>` : ''}</td>
+        <td class="mono"><b>${sol.elev.toFixed(1)}</b></td><td class="mono">${avg(br.dialE).toFixed(1)}</td>
+        <td class="mono"><b>${fmt1(sol.wind)}</b></td><td class="mono">${fmt1(avg(br.dialW))}</td>
+        <td class="mono">${sol.windMph.toFixed(0)} @ ${(Math.round(sol.windClock * 2) / 2) || 12}</td>
+        <td class="mono" style="color:var(--${br.hits ? 'good' : 'bad'})">${br.hits}/${br.shots}</td></tr>`;
+    }).join('');
+
+    // Layers: what a box-data solver would say vs the truth, at the farthest range engaged
+    const farY = ranges.length ? ranges[ranges.length - 1] : kdLanes()[Math.min(3, kdLanes().length - 1)].yards;
+    const layers = layerTable(farY, ss.byRange[farY] ? ss.byRange[farY].angleDeg : 0);
+
+    const xp = Math.min(60, ss.hits * 2 + ranges.length * 5 + (chrono.n >= 5 ? 10 : 0) + (Math.abs(zeroResid.e) < 0.15 && Math.abs(zeroResid.w) < 0.15 ? 10 : 0));
+    if (!S.debriefed) { S.debriefed = true; if (xp) L.addXp(xp, 'session debrief'); }
+
+    $('#debrief').innerHTML = `
+      <div class="card-title"><h3>Debrief · ${esc(r.cart.name)} · ${esc(w.loc.name)}</h3><span class="chip">${S.setup.preset}</span></div>
+      <div class="tiles">
+        ${tile('Rounds', r.rounds)}${tile('Steel hits', `${ss.hits}/${ss.shots}`, ` ${pct}%`)}${tile('First-round', `${ss.firstHits}/${ss.targets}`)}${tile('Best streak', S.best)}
+      </div>
+      <h3 style="margin-top:18px">What you measured vs the truth</h3>
+      <div class="table-wrap"><table class="tbl text">
+        <thead><tr><th>Item</th><th>You measured</th><th>Truth</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td>Muzzle velocity</td><td class="mono">${chrono.n ? `${Math.round(chrono.avg)} fps (n=${chrono.n})` : 'not chronographed'}</td><td class="mono">${Math.round(mvNow)} fps now · ${r.mvRef} @ 59°F</td><td>Box said ${r.boxMv}. Powder ${Math.round(powderNow)}°F × ${r.load.tempSens} fps/°F.</td></tr>
+          <tr><td>Velocity SD</td><td class="mono">${chrono.n > 1 ? chrono.sd.toFixed(1) : '–'}</td><td class="mono">${r.sdFps.toFixed(1)} fps</td><td>Small strings under-estimate SD; 10+ shots is honest.</td></tr>
+          <tr><td>Zero</td><td class="mono">slipped ${fmt1(r.slip.elev)} / ${fmt1(r.slip.wind)}</td><td class="mono">residual ${fmt2(zeroResid.e)} / ${fmt2(zeroResid.w)} mil</td><td>${Math.abs(zeroResid.e) < 0.1 && Math.abs(zeroResid.w) < 0.1 ? 'Tight zero.' : 'A zero error rides along to every distance.'}</td></tr>
+          <tr><td>Scope tracking</td><td class="mono">assumed 0.1 mil/click</td><td class="mono">${r.trackErr ? `${(r.trackErr * 100).toFixed(1)}% ${r.trackErr > 0 ? 'over' : 'under'}` : 'true'}</td><td>${r.trackErr ? `10 mil dialed moves ${(10 * (1 + r.trackErr)).toFixed(2)} mil. Tall-target test it.` : 'Clicks are honest.'}</td></tr>
+          <tr><td>Cold bore</td><td>–</td><td class="mono">${S.toggles.coldBore ? `${fmt2(r.coldBore.e)} / ${fmt2(r.coldBore.w)} mil, ${Math.round(r.coldBore.mv)} fps` : 'off'}</td><td>First shot of the day (and after a long pause).</td></tr>
+          <tr><td>Barrel heat</td><td>–</td><td class="mono">${S.toggles.heat ? `walks ${(0.035 * r.contour * 10).toFixed(2)} mil per 10 rapid rounds` : 'off'}</td><td>Peak heat ${Math.max(0, ...S.log.map((e) => e.heat || 0)).toFixed(1)} rounds-worth this session.</td></tr>
+          <tr><td>Rangefinder</td><td class="mono">${S.lrfBad} bad return${S.lrfBad === 1 ? '' : 's'}</td><td>–</td><td>Re-lase small far plates; a jump of 20+ yd is the berm.</td></tr>
+          <tr><td>Air</td><td class="mono">${w.tempF}°F · ${w.stationPressureInHg.toFixed(2)}" · ${w.humidityPct}%</td><td class="mono">DA ${Math.round(w.atm.densityAltitudeFt)} ft</td><td>${esc(w.loc.terrain)}</td></tr>
+        </tbody></table></div>
+      ${rows ? `<h3 style="margin-top:18px">True dope from your zero vs what you dialed</h3>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Yds</th><th>True elev</th><th>You</th><th>True wind</th><th>You</th><th>Avg wind</th><th>Hits</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+      <p class="hint">"True" uses today's air, your real MV, the average wind the bullet flew through and everything switched on. Gusts move single shots around it.</p>` : '<p class="hint" style="margin-top:14px">No steel engaged this session.</p>'}
+      <h3 style="margin-top:18px">What changed at ${farY} yd, layer by layer</h3>
+      ${layers}
+      <div class="actions" style="margin-top:14px">
+        <button type="button" class="btn primary" id="debrief-again">Shoot more</button>
+        <button type="button" class="btn" id="debrief-new">New day, same rifle</button>
+        <button type="button" class="btn" id="debrief-setup">Change setup</button>
+        <button type="button" class="btn" id="debrief-print">Print blank data book</button>
+      </div>`;
+    $('#debrief-again').addEventListener('click', () => setStep('shoot'));
+    $('#debrief-new').addEventListener('click', () => { S.world = null; S.debriefed = false; startSession(); });
+    $('#debrief-setup').addEventListener('click', () => { S.debriefed = false; setStep('setup'); previewWorld(); });
+    $('#debrief-print').addEventListener('click', printSheet);
+  }
+
+  /* The dial that centres the group at `yards` in mean conditions, from the shooter's own zero. */
+  function trueDope(yards, angleDeg) {
+    const r = S.rifle, w = S.world;
+    const mw = RANGE.meanWind(w, yards);
+    const powderT = RANGE.powderTempF(w, performance.now());
+    const adv = !!S.toggles.adv;
+    const row = B.solve(Object.assign({}, r.solverBase, {
+      muzzleVelocityFps: r.mvRef + r.load.tempSens * (powderT - 59), tempSensitivity: 0, mvTempF: null,
+      altitudeFt: w.altitudeFt, tempF: w.tempF, humidityPct: w.humidityPct, stationPressureInHg: w.stationPressureInHg,
+      shotAngleDeg: angleDeg || 0, zeroAngleRad: r.zeroAngleRad,
+      windMph: mw.speed, windClock: mw.clock,
+      spinDrift: adv, aeroJump: adv, coriolis: adv, latitudeDeg: w.latitudeDeg, azimuthDeg: w.azimuthDeg,
+    }), [yards]).rows[0];
+    const k = 1 + r.trackErr;
+    return {
+      elev: B.roundToClick(-(toMil(row.dropIn, yards) + r.boreE) / k - r.slip.elev, CLICK),
+      wind: B.roundToClick(-(toMil(row.windIn, yards) + r.boreW) / k - r.slip.wind, CLICK),
+      windMph: mw.speed, windClock: mw.clock,
+    };
+  }
+
+  function residualZero() {
+    const r = S.rifle;
+    const k = 1 + r.trackErr;
+    // group centre at the zero range with the turrets reading 0.0, today
+    const w = S.world;
+    const row = B.solve(Object.assign({}, r.solverBase, {
+      tempSensitivity: 0, mvTempF: null, windMph: 0,
+      altitudeFt: w.altitudeFt, tempF: w.tempF, humidityPct: w.humidityPct, stationPressureInHg: w.stationPressureInHg,
+      zeroAngleRad: r.zeroAngleRad,
+    }), [+S.setup.zeroYd]).rows[0];
+    return { e: toMil(row.dropIn, +S.setup.zeroYd) + r.boreE + r.slip.elev * k, w: toMil(row.windIn, +S.setup.zeroYd) + r.boreW + r.slip.wind * k };
+  }
+
+  function layerTable(yards, angleDeg) {
+    const r = S.rifle, w = S.world;
+    const mw = RANGE.meanWind(w, yards);
+    const powderT = RANGE.powderTempF(w, performance.now());
+    const box = { muzzleVelocityFps: r.boxMv, altitudeFt: 0, tempF: 59, humidityPct: 0, stationPressureInHg: null, windMph: mw.speed, windClock: mw.clock, tempSensitivity: 0, mvTempF: null, shotAngleDeg: 0 };
     const steps = [
-      ['Your card (card conditions, flat)', {}],
-      ["Today's weather + powder temp", today],
-      ['Shot angle', withAngle],
-      ['Zero set at home + MV error', withMv],
-      ['Spin drift, Coriolis, aero jump', withAdv],
+      ['Box velocity, standard day, perfect zero', box],
+      ['Your real MV (at 59°F)', { muzzleVelocityFps: r.mvRef }],
+      ["Today's air + powder temperature", { altitudeFt: w.altitudeFt, tempF: w.tempF, humidityPct: w.humidityPct, stationPressureInHg: w.stationPressureInHg, muzzleVelocityFps: r.mvRef + r.load.tempSens * (powderT - 59) }],
+      ['Shot angle', { shotAngleDeg: angleDeg || 0 }],
+      ['Spin drift, Coriolis, aero jump', S.toggles.adv ? { spinDrift: true, aeroJump: true, coriolis: true, latitudeDeg: w.latitudeDeg, azimuthDeg: w.azimuthDeg } : {}],
     ];
+    let acc = Object.assign({}, r.solverBase, { zeroAngleRad: null });
     let prev = null;
-    const rows = steps.map(([name, extra]) => {
-      const r = solveAt(extra);
-      const e = toMil(-r.dropIn, s.yards), wd = toMil(-r.windIn, s.yards);
+    const trs = steps.map(([name, extra]) => {
+      acc = Object.assign({}, acc, extra);
+      const row = B.solve(acc, [yards]).rows[0];
+      const e = -toMil(row.dropIn, yards), wd = -toMil(row.windIn, yards);
       const de = prev ? e - prev.e : null, dw = prev ? wd - prev.w : null;
       prev = { e, w: wd };
-      const fmtD = (d) => (d == null ? '' : `${d >= 0 ? '+' : ''}${d.toFixed(2)}`);
-      return `<tr><td>${name}</td><td class="mono">${fmtD(de)}</td><td class="mono">${fmtD(dw)}</td><td class="mono"><b>${L.fmtClick(e, CLICK)}</b></td><td class="mono"><b>${L.fmtClick(wd, CLICK)}</b></td></tr>`;
+      const d = (v) => (v == null ? '' : fmt2(v));
+      return `<tr><td>${name}</td><td class="mono">${d(de)}</td><td class="mono">${d(dw)}</td><td class="mono"><b>${L.fmtClick(e, CLICK)}</b></td><td class="mono"><b>${L.fmtClick(wd, CLICK)}</b></td></tr>`;
     });
-    $('#whatchanged').innerHTML = `<div class="table-wrap"><table class="tbl text">
+    const k = 1 + r.trackErr;
+    const zr = residualZero();
+    const eFinal = (prev.e - zr.e) / k, wFinal = (prev.w - zr.w) / k;
+    trs.push(`<tr><td>Your zero residual + scope tracking</td><td class="mono">${fmt2(eFinal - prev.e)}</td><td class="mono">${fmt2(wFinal - prev.w)}</td><td class="mono"><b>${L.fmtClick(eFinal, CLICK)}</b></td><td class="mono"><b>${L.fmtClick(wFinal, CLICK)}</b></td></tr>`);
+    return `<div class="table-wrap"><table class="tbl text">
       <thead><tr><th>Layer</th><th>Δ elev</th><th>Δ wind</th><th>Elev mil</th><th>Wind mil</th></tr></thead>
-      <tbody>${rows.join('')}</tbody></table></div>
-      <p class="hint">True range ${s.yards} yd${opt('opt-rf') ? ` (rangefinder read ${s.rfYards})` : ''} · average wind ${mw.speed.toFixed(1)} mph from ${(Math.round(mw.clock * 2) / 2) || 12} o'clock ·
-      DA ${Math.round(w.atm.densityAltitudeFt)} ft · powder ${w.powderTempF}°F${s.mvOffset ? ` · hidden MV error ${s.mvOffset > 0 ? '+' : ''}${s.mvOffset} fps` : ''}.
-      Gusts move the wind around this average; your position adds wobble.</p>`;
-    $('#whatchanged-card').hidden = false;
-    $('#whatchanged-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      <tbody>${trs.join('')}</tbody></table></div>
+      <p class="hint">Average wind ${mw.speed.toFixed(1)} mph from ${(Math.round(mw.clock * 2) / 2) || 12} o'clock. The last row is what your turret must read.</p>`;
   }
 
-  $('#fire-btn').addEventListener('click', fire);
-  $('#range-new').addEventListener('click', () => { if (R.stage) startStage(); else newTarget(); L.sfx.click(); });
-  $('#range-reveal').addEventListener('click', reveal);
-  $('#range-reset').addEventListener('click', () => { setDial('elev', 0); setDial('wind', 0); });
-  $('#level-btn').addEventListener('click', level);
-  const bb = $('#breath-btn');
-  bb.addEventListener('pointerdown', (e) => { e.preventDefault(); holdBreath(); });
-  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => bb.addEventListener(ev, () => releaseBreath()));
-  $$('#range-settings input, #range-settings select').forEach((el) => el.addEventListener('change', () => {
-    $$('#range-preset button').forEach((b) => b.classList.remove('on'));
-    if (R.stage) { startStage(); return; }
-    if (['opt-weather', 'opt-gusts'].includes(el.id)) newWorld();
-    else if (['opt-position', 'opt-call', 'opt-rf', 'opt-spotter', 'opt-delay'].includes(el.id)) renderBrief();
-    else newTarget();
-  }));
+  // ------------------------------------------------------------ print
 
-  document.addEventListener('keydown', (e) => {
-    if (L.currentTab !== 'range' || e.metaKey || e.ctrlKey || e.altKey) return;
-    const tag = (e.target.tagName || '').toUpperCase();
-    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
-      if (e.key === 'Enter' && e.target.closest('.turret')) { e.target.dispatchEvent(new Event('change')); fire(); }
-      return;
-    }
-    const k = e.key;
-    // Enter keeps its normal meaning on a focused button; Space always fires
-    if ((tag === 'BUTTON' || tag === 'SUMMARY') && k === 'Enter') return;
-    const mult = e.shiftKey ? 5 : 1;
-    if (k === 'ArrowUp') nudge('elev', mult);
-    else if (k === 'ArrowDown') nudge('elev', -mult);
-    else if (k === 'ArrowRight') nudge('wind', mult);
-    else if (k === 'ArrowLeft') nudge('wind', -mult);
-    else if (k === ' ' || k === 'Enter' || k === 'f' || k === 'F') { if (tag === 'BUTTON') e.target.blur(); fire(); }
-    else if (k === 'b' || k === 'B') { if (!e.repeat) holdBreath(); }
-    else if (k === 'l' || k === 'L') level();
-    else if (k === 'n' || k === 'N') { if (R.stage) startStage(); else newTarget(); }
-    else if (k === '0') { setDial('elev', 0); setDial('wind', 0); }
-    else return;
-    e.preventDefault();
-  });
-  document.addEventListener('keyup', (e) => { if (e.key === 'b' || e.key === 'B') releaseBreath(); });
-
-  // ------------------------------------------------------------ drawing
-
-  function fitCanvas(cv) {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const w = Math.round(cv.clientWidth * dpr);
-    const h = Math.round(cv.clientHeight * dpr);
-    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
-    return dpr;
+  function buildSheet() {
+    readSetupForm();
+    const st = S.setup;
+    const cart = RANGE.cartridge(st.cart), load = RANGE.load(st.load), rifle = RANGE.rifle(st.rifle), optic = RANGE.optic(st.optic);
+    const lanes = RANGE.kdLanes(cart, S.world ? S.world.loc.maxYd : cart.maxYd);
+    const step = cart.id === '22lr' ? 25 : 50;
+    const yds = [];
+    for (let y = cart.id === '22lr' ? 25 : 100; y <= lanes[lanes.length - 1].yards; y += step) yds.push(y);
+    const blank = '<span class="pl"></span>';
+    const line = (l) => `<div class="pf"><span>${l}</span>${blank}</div>`;
+    $('#range-print-sheet').innerHTML = `
+      <div class="ps-head"><div><div class="ps-tag">DATA BOOK · MIL</div><h1>${esc(cart.name)}</h1></div><div class="ps-meta">Date ______ · Location ________________</div></div>
+      <div class="ps-grid3">
+        ${line('Ammo')}${line('Rifle')}${line('Barrel / twist')}
+        ${line('Optic')}${line('Sight height')}${line('Zero')}
+        ${line('Chrono avg (fps)')}${line('SD / ES')}${line('Ammo temp')}
+        ${line('Air temp')}${line('Station press.')}${line('Humidity / DA')}
+      </div>
+      <p class="ps-note">Chosen setup: ${esc(load.brand)} ${esc(load.name)} · ${esc(rifle.name)} ${st.barrelIn}" 1:${st.twistIn} · ${esc(optic.name)} · sight ${(+st.sightHeightIn).toFixed(1)}" · zero ${st.zeroYd} yd. Box velocity is a starting point only.</p>
+      <div class="ps-cols">
+        <div>
+          <h2>Chronograph string</h2>
+          <table class="ps-tbl"><thead><tr><th>#</th><th>fps</th><th>#</th><th>fps</th></tr></thead><tbody>
+            ${[1, 2, 3, 4, 5].map((i) => `<tr><td>${i}</td><td></td><td>${i + 5}</td><td></td></tr>`).join('')}
+            <tr><td colspan="2">Average</td><td colspan="2">SD / ES</td></tr></tbody></table>
+          <h2>Zero</h2>
+          <div class="ps-zero"><div class="ps-paper"></div><div>Group ____ mil<br>Centre ↑ ____ → ____<br>Dialed ____ / ____<br>Set zero at ______</div></div>
+        </div>
+        <div>
+          <h2>Dope</h2>
+          <table class="ps-tbl ps-dope"><thead><tr><th>Yds</th><th>Elev</th><th>5 mph</th><th>10 mph</th><th>15 mph</th><th>Confirmed / notes</th></tr></thead><tbody>
+            ${yds.map((y) => `<tr><td>${y}</td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
+          </tbody></table>
+        </div>
+      </div>
+      <h2>Wind &amp; notes</h2>
+      <div class="ps-notes">${'<div></div>'.repeat(6)}</div>
+      <div class="ps-foot">Full-value wind = 3 / 9 o'clock. range (yd) = size (in) × 27.78 ÷ mil. Hold into the wind.</div>`;
   }
 
-  function drawScope(now) {
-    const s = R.s;
-    const dpr = fitCanvas(scope);
-    const S = scope.width;
-    if (!S || !s) return;
-    const ctx = sctx;
-    const cx = S / 2, cy = S / 2;
-    const px = (S / 2) / HALF_FOV;
-    const toPx = (inches) => toMil(inches, s.yards) * px;
-
-    R.cant += (R.cantTarget - R.cant) * 0.08; // leveling eases in
-
-    let jy = 0, jx = 0;
-    if (R.recoilAt && now - R.recoilAt < 260 && !L.reducedMotion()) {
-      const k = 1 - (now - R.recoilAt) / 260;
-      jy = -S * 0.06 * k * k;
-      jx = S * 0.01 * Math.sin(now / 15) * k;
-    }
-    const sw = sway(now);
-
-    ctx.save();
-    ctx.clearRect(0, 0, S, S);
-    ctx.beginPath(); ctx.arc(cx, cy, S / 2, 0, Math.PI * 2); ctx.clip();
-    // The world moves opposite to where the reticle wanders, and tilts against cant
-    ctx.translate(cx + jx - sw.x * px, cy + jy + sw.y * px);
-    ctx.rotate(-R.cant * Math.PI / 180);
-    ctx.translate(-cx, -cy);
-
-    const groundY = Math.min(S * 1.2, cy + toPx(40));
-    const sky = ctx.createLinearGradient(0, 0, 0, S);
-    sky.addColorStop(0, '#8fb0c6'); sky.addColorStop(1, '#d6e2e6');
-    ctx.fillStyle = sky; ctx.fillRect(-S, -S, S * 3, S * 3);
-
-    const treeTop = Math.min(groundY - S * 0.05, S * 0.28);
-    ctx.fillStyle = '#3d5a3c';
-    ctx.beginPath();
-    ctx.moveTo(-S, groundY);
-    R.trees.forEach((h, i) => ctx.lineTo(-S * 0.3 + i / (R.trees.length - 1) * S * 1.6, treeTop - h * S * 0.07));
-    ctx.lineTo(S * 2, groundY);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = 'rgba(30, 50, 32, 0.5)';
-    ctx.fillRect(-S, treeTop + S * 0.03, S * 3, groundY - treeTop);
-
-    const ground = ctx.createLinearGradient(0, groundY, 0, S * 1.3);
-    ground.addColorStop(0, '#8c7a50'); ground.addColorStop(0.12, '#7c8a4c'); ground.addColorStop(1, '#556236');
-    ctx.fillStyle = ground; ctx.fillRect(-S, groundY, S * 3, S * 2);
-    ctx.fillStyle = '#9a8657';
-    ctx.beginPath(); ctx.ellipse(cx, groundY, toPx(70), toPx(9) + 4, 0, Math.PI, 0); ctx.fill();
-    ctx.strokeStyle = 'rgba(40, 55, 25, 0.55)';
-    ctx.lineWidth = Math.max(1, S / 400);
-    R.tufts.forEach((t) => {
-      const x = -S * 0.2 + t.x * S * 1.4, y = groundY + 6 + t.y * (S * 1.1 - groundY);
-      const h = t.h * S * 0.018;
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - h * 0.3, y - h); ctx.moveTo(x, y); ctx.lineTo(x + h * 0.3, y - h); ctx.stroke();
-    });
-
-    // Mirage tracks the mid-range crosswind: boils when calm, runs with wind, fades above ~12 mph
-    const mid = zoneWind(now, 1);
-    const cross = Math.sin(mid.clock * Math.PI / 6) * mid.speed;
-    const boil = Math.max(0, 1 - Math.abs(cross) / 3);
-    const fade = Math.max(0.15, 1 - Math.abs(cross) / 16);
-    R.mirage.forEach((m) => {
-      m.x -= cross * 0.00018 * (1 + m.len * 4);
-      if (m.x < -0.3) m.x += 1.6;
-      if (m.x > 1.3) m.x -= 1.6;
-      const y = m.y * S + Math.sin(now / 300 + m.ph) * 2 - boil * ((now / 40 + m.ph * 50) % 20);
-      ctx.strokeStyle = `rgba(255,255,255,${(0.05 + 0.05 * Math.sin(now / 500 + m.ph) ** 2) * fade})`;
-      ctx.lineWidth = S * 0.004;
-      ctx.beginPath();
-      for (let i = 0; i <= 10; i++) {
-        const xx = (m.x + m.len * i / 10) * S;
-        const yy = y + Math.sin(i * 0.9 + now / 180 + m.ph) * S * 0.003;
-        if (i) ctx.lineTo(xx, yy); else ctx.moveTo(xx, yy);
-      }
-      ctx.stroke();
-    });
-
-    // target stand + plate
-    const pr = toPx(s.plateIn / 2);
-    const chain = Math.max(pr * 0.5, 3);
-    const barY = cy - pr - chain;
-    const postX = pr * 1.7 + 2;
-    ctx.strokeStyle = '#5b4630';
-    ctx.lineWidth = Math.max(2, pr * 0.16);
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(cx - postX, groundY); ctx.lineTo(cx - postX, barY);
-    ctx.lineTo(cx + postX, barY); ctx.lineTo(cx + postX, groundY);
-    ctx.stroke();
-
-    let ang = 0;
-    if (R.swing.amp) {
-      const t = (now - R.swing.t0) / 1000;
-      ang = R.swing.amp * Math.exp(-t * 1.6) * Math.sin(t * 9);
-      if (t > 4) R.swing.amp = 0;
-    }
-    ctx.save();
-    ctx.translate(cx, barY);
-    ctx.rotate(ang);
-    ctx.strokeStyle = '#2c2c2c';
-    ctx.lineWidth = Math.max(1, pr * 0.05);
-    ctx.beginPath();
-    ctx.moveTo(-pr * 0.45, 0); ctx.lineTo(-pr * 0.45, chain + pr * 0.2);
-    ctx.moveTo(pr * 0.45, 0); ctx.lineTo(pr * 0.45, chain + pr * 0.2);
-    ctx.stroke();
-    ctx.translate(0, chain + pr);
-    const plate = ctx.createRadialGradient(-pr * 0.3, -pr * 0.3, pr * 0.1, 0, 0, pr);
-    plate.addColorStop(0, '#ffffff'); plate.addColorStop(1, '#cfd3d6');
-    ctx.fillStyle = plate;
-    ctx.beginPath(); ctx.arc(0, 0, pr, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = Math.max(1, pr * 0.04); ctx.stroke();
-    s.marks.filter((m) => m.hit).forEach((m) => {
-      const x = toPx(m.rightIn), y = -toPx(m.upIn);
-      const r = Math.max(2.5, pr * 0.1);
-      ctx.fillStyle = 'rgba(70,72,76,0.85)';
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(70,72,76,0.5)'; ctx.lineWidth = 1;
-      for (let k = 0; k < 6; k++) {
-        const a = k * 1.05 + m.n;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * r * 2.2, y + Math.sin(a) * r * 2.2); ctx.stroke();
-      }
-    });
-    ctx.restore();
-
-    // misses: spotter rings with shot numbers (shown only when a spotter is calling)
-    if (opt('opt-spotter')) {
-      ctx.font = `600 ${Math.round(11 * dpr)}px JetBrains Mono, monospace`;
-      s.marks.forEach((m, i) => {
-        if (m.hit) return;
-        const last = i === s.marks.length - 1;
-        const x = cx + m.right * px, y = cy - m.up * px;
-        ctx.strokeStyle = last ? '#ef4444' : 'rgba(239,68,68,0.5)';
-        ctx.lineWidth = 2 * dpr;
-        ctx.beginPath(); ctx.arc(x, y, (last ? 6 : 4.5) * dpr, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = last ? '#ef4444' : 'rgba(239,68,68,0.6)';
-        ctx.fillText(String(m.n), x + 8 * dpr, y - 7 * dpr);
-      });
-    }
-
-    R.puffs = R.puffs.filter((p) => now - p.t0 < 1300);
-    R.puffs.forEach((p) => {
-      const k = (now - p.t0) / 1300;
-      const x = cx + p.right * px, y = cy - p.up * px;
-      const r = (8 + k * 34) * dpr;
-      ctx.fillStyle = p.hit ? `rgba(255,240,200,${0.7 * (1 - k)})` : `rgba(150,120,80,${0.55 * (1 - k)})`;
-      ctx.beginPath(); ctx.arc(x, y - k * 10 * dpr, r, 0, Math.PI * 2); ctx.fill();
-    });
-    ctx.restore();
-
-    // --- mil reticle (fixed to the scope)
-    ctx.save();
-    ctx.beginPath(); ctx.arc(cx, cy, S / 2, 0, Math.PI * 2); ctx.clip();
-    ctx.strokeStyle = 'rgba(10,10,10,0.92)';
-    ctx.fillStyle = 'rgba(10,10,10,0.92)';
-    const edge = HALF_FOV * 0.82 * px;
-    ctx.lineWidth = 4 * dpr;
-    ctx.beginPath();
-    ctx.moveTo(0, cy); ctx.lineTo(cx - edge, cy);
-    ctx.moveTo(S, cy); ctx.lineTo(cx + edge, cy);
-    ctx.moveTo(cx, S); ctx.lineTo(cx, cy + edge);
-    ctx.stroke();
-    ctx.lineWidth = Math.max(1, dpr);
-    ctx.beginPath();
-    ctx.moveTo(cx - edge, cy); ctx.lineTo(cx + edge, cy);
-    ctx.moveTo(cx, 0); ctx.lineTo(cx, cy + edge);
-    ctx.stroke();
-    ctx.font = `600 ${Math.round(10 * dpr)}px JetBrains Mono, monospace`;
-    for (let v = 0.5; v < HALF_FOV * 0.82; v += 0.5) {
-      const major = v % 1 === 0;
-      const len = (major ? 7 : 3.5) * dpr;
-      [-1, 1].forEach((sg) => {
-        const d = sg * v * px;
-        ctx.beginPath();
-        ctx.moveTo(cx + d, cy - len); ctx.lineTo(cx + d, cy + len);
-        ctx.moveTo(cx - len, cy + d); ctx.lineTo(cx + len, cy + d);
-        ctx.stroke();
-      });
-      if (major) {
-        ctx.fillText(String(v), cx + v * px - 3 * dpr, cy + 18 * dpr);
-        ctx.fillText(String(v), cx + 10 * dpr, cy + v * px + 4 * dpr);
-      }
-    }
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath(); ctx.arc(cx, cy, 2.2 * dpr, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(10,10,10,0.8)';
-    ctx.fillText('MIL', 12 * dpr, cy - 10 * dpr);
-
-    const vg = ctx.createRadialGradient(cx, cy, S * 0.36, cx, cy, S * 0.5);
-    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)');
-    ctx.fillStyle = vg; ctx.fillRect(0, 0, S, S);
-
-    // scope-mounted bubble level: the bubble floats to the high side
-    if (opt('opt-cant')) {
-      const vw = S * 0.2, vh = S * 0.035, vx = cx - vw / 2, vy = S * 0.83;
-      ctx.fillStyle = 'rgba(20,30,20,0.85)';
-      ctx.beginPath(); ctx.roundRect(vx - 4 * dpr, vy - 4 * dpr, vw + 8 * dpr, vh + 8 * dpr, 8 * dpr); ctx.fill();
-      ctx.fillStyle = Math.abs(R.cant) < 0.5 ? '#c7e86b' : '#e8c36b';
-      ctx.beginPath(); ctx.roundRect(vx, vy, vw, vh, vh / 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = dpr;
-      ctx.beginPath(); ctx.moveTo(cx - vh * 0.7, vy); ctx.lineTo(cx - vh * 0.7, vy + vh); ctx.moveTo(cx + vh * 0.7, vy); ctx.lineTo(cx + vh * 0.7, vy + vh); ctx.stroke();
-      const bx = cx - Math.max(-1, Math.min(1, R.cant / 4)) * (vw / 2 - vh / 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.beginPath(); ctx.ellipse(bx, vy + vh / 2, vh * 0.6, vh * 0.36, 0, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.restore();
+  function printSheet() {
+    buildSheet();
+    document.body.classList.add('print-range');
+    setTimeout(() => window.print(), 30);
   }
 
-  function drawFlags(now) {
-    const dpr = fitCanvas(flags);
-    const W = flags.width, H = flags.height;
-    if (!W || !R.world) return;
-    const ctx = fctx;
-    ctx.clearRect(0, 0, W, H);
-    const spots = [{ x: 0.16, k: 1, z: 0, name: 'NEAR' }, { x: 0.5, k: 0.82, z: 1, name: 'MID' }, { x: 0.82, k: 0.66, z: 2, name: 'FAR' }];
-    spots.forEach((sp) => {
-      const w = zoneWind(now, sp.z);
-      const sinC = Math.sin(w.clock * Math.PI / 6);
-      const baseX = sp.x * W;
-      const groundY = H * 0.72;
-      const topY = groundY - H * 0.6 * sp.k;
-      ctx.strokeStyle = '#3b3b3b';
-      ctx.lineWidth = 2 * dpr * sp.k;
-      ctx.beginPath(); ctx.moveTo(baseX, groundY); ctx.lineTo(baseX, topY); ctx.stroke();
-      const sp01 = Math.min(1, w.speed / 18);
-      const droop = (1 - sp01) * 1.25;
-      const dir = sinC > 0.05 ? -1 : sinC < -0.05 ? 1 : (Math.cos(w.clock * Math.PI / 6) > 0 ? 1 : -1);
-      const len = W * 0.12 * sp.k * Math.max(0.3, Math.abs(sinC));
-      const wid = 12 * dpr * sp.k;
-      const n = 12;
-      const top = [], bot = [];
-      for (let i = 0; i <= n; i++) {
-        const q = i / n;
-        const wave = Math.sin(now / (110 - sp01 * 50) - q * 6 + sp.z * 2.4) * q * 4 * dpr * (0.4 + sp01);
-        const ax = baseX + dir * Math.cos(droop) * len * q;
-        const ay = topY + Math.sin(droop) * len * q + wave;
-        const hw = wid * (1 - q * 0.7);
-        top.push([ax, ay]);
-        bot.push([ax - dir * Math.sin(droop) * hw, ay + Math.cos(droop) * hw]);
-      }
-      ctx.fillStyle = '#ef6c2f';
-      ctx.beginPath();
-      top.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-      bot.reverse().forEach(([x, y]) => ctx.lineTo(x, y));
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.font = `700 ${Math.round(9 * dpr)}px Inter, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(sp.name, baseX, H - 6 * dpr);
-    });
+  // ------------------------------------------------------------ zoom
+
+  function renderZoom() {
+    const zooms = (S.rifle ? S.rifle.optic : RANGE.optic(S.setup.optic)).zooms;
+    $('#scope-zoom').innerHTML = zooms.map((z, i) => `<button type="button" class="${i === S.zoomIdx ? 'on' : ''}" data-z="${i}">${z}×</button>`).join('');
+    $$('#scope-zoom button').forEach((b) => b.addEventListener('click', () => { S.zoomIdx = +b.dataset.z; renderZoom(); L.sfx.click(); }));
   }
+  function cycleZoom() {
+    const n = (S.rifle ? S.rifle.optic : RANGE.optic(S.setup.optic)).zooms.length;
+    S.zoomIdx = (S.zoomIdx + 1) % n;
+    renderZoom(); L.sfx.click();
+  }
+
+  // ------------------------------------------------------------ frame loop
 
   function frame(now) {
-    if (L.currentTab === 'range' && R.s) {
-      if (R.flight) {
-        const k = Math.min(1, (now - R.flight.start) / R.flight.tof);
-        $('#flight-bar').style.width = (k * 100) + '%';
-        setHud(`Bullet in flight · ${((now - R.flight.start) / 1000).toFixed(2)} s`);
-        if (k >= 1) land();
+    if (L.currentTab === 'range') {
+      if (S.step === 'setup') {
+        if (now - kestrelAt > 1000) renderKestrel(now);
+        RANGE.drawFlags($('#flags'), S.world, now, reduced());
+      } else if (S.target && S.step !== 'debrief') {
+        if (S.flight) {
+          const k = Math.min(1, (now - S.flight.start) / S.flight.tof);
+          $('#flight-bar').style.width = (k * 100) + '%';
+          setHud(`Bullet in flight · ${((now - S.flight.start) / 1000).toFixed(2)} s`);
+          if (k >= 1) land();
+        }
+        if (S.step === 'shoot' && S.mode === 'stage' && S.stage) {
+          const st = S.stage;
+          if (st.start && !st.over) {
+            const t = (now - st.start) / 1000;
+            $('#scope-stage').textContent = `T${st.i + 1}/${st.targets.length} · ${t.toFixed(1)} / ${st.par} s`;
+            if (t > st.par && !S.flight) finishStage();
+          } else $('#scope-stage').textContent = st.over ? 'Stage over' : `T${st.i + 1}/${st.targets.length} · clock starts on first shot`;
+        } else $('#scope-stage').textContent = S.step === 'chrono' ? 'CHRONO · ' + S.setup.zeroYd + ' yd' : S.step === 'zero' ? 'ZERO · ' + S.setup.zeroYd + ' yd' : '';
+        if (S.breath.holding) setHud(`Holding breath · ${((now - S.breath.start) / 1000).toFixed(1)} s`);
+        if (now - kestrelAt > 1000) renderKestrel(now);
+        S.cant += (S.cantTarget - S.cant) * 0.08;
+        RANGE.drawScope($('#scope'), {
+          target: S.target, halfFov: halfFov(), zoomX: zoomX(), sway: sway(now), cant: S.cant, recoilAt: S.recoilAt,
+          recoil: S.rifle ? Math.min(1.6, S.rifle.cart.recoil * 12 / S.rifle.cls.weightLb) : 0.6,
+          marks: S.target.marks, puffs: S.puffs, swing: S.swing, spotter: S.toggles.spotter && S.step === 'shoot',
+          bubble: S.toggles.cant && S.step === 'shoot', world: S.world, sky: S.world.sky, reduced: reduced(),
+        }, now);
+        RANGE.drawFlags($('#flags'), S.world, now, reduced());
       }
-      if (R.stage && R.stage.start && !R.stage.over) {
-        const t = (now - R.stage.start) / 1000;
-        $('#scope-stage').textContent = `T${R.stage.i + 1}/${R.stage.targets.length} · ${t.toFixed(1)} / ${R.stage.par} s`;
-        if (t > R.stage.par && !R.flight) finishStage();
-      } else if (R.stage) {
-        $('#scope-stage').textContent = R.stage.over ? 'Stage over' : `T${R.stage.i + 1}/${R.stage.targets.length} · clock starts on first shot`;
-      }
-      if (R.breath.holding) setHud(`Holding breath · ${((now - R.breath.start) / 1000).toFixed(1)} s`);
-      if (now - kestrelAt > 1000) renderKestrel(now);
-      drawScope(now);
-      drawFlags(now);
     }
     requestAnimationFrame(frame);
   }
 
-  function onShown() {
-    $$('.turret').forEach((el) => buildDial($('svg', el)));
-    $('#your-card-mini').innerHTML = L.cardHtml(L.profile, L.computeCard(L.profile), true);
-    if (!R.world || !R.s) newWorld();
-    else { setDial('elev', R.dial.elev, true); setDial('wind', R.dial.wind, true); renderBrief(); }
-    renderHud();
-    if (!R.running) { R.running = true; requestAnimationFrame(frame); }
+  // ------------------------------------------------------------ init
+
+  function ensureInit() {
+    if (S.inited) return;
+    RANGE = window.LRPS_RANGE;
+    if (!RANGE || !RANGE.newWorld || !RANGE.drawScope) return; // module scripts not loaded yet
+    S.inited = true;
+    S.setup = Object.assign({}, RANGE.DEFAULT_SETUP, L.store.get('range.setup', {}));
+    S.toggles = Object.assign({}, RANGE.PRESETS[S.setup.preset] || RANGE.PRESETS.training, L.store.get('range.toggles', {}));
+    buildSetupForm();
+    $$('#range-preset button').forEach((b) => b.classList.toggle('on', b.dataset.v === S.setup.preset));
+    renderSetupSummary();
+    previewWorld();
+    renderZoom();
+
+    $('#rig-form').addEventListener('change', (e) => {
+      const id = e.target.id;
+      if (id === 'rig-cart') { readSetupForm(); fillCartridgeDependents(); }
+      if (e.target.dataset.toggle) { readToggles(); $$('#range-preset button').forEach((b) => b.classList.remove('on')); S.setup.preset = 'custom'; }
+      readSetupForm();
+      renderSetupSummary();
+      if (['rig-loc', 'rig-sky'].includes(id) || e.target.dataset.toggle) previewWorld();
+      if (S.rifle && e.target.dataset.toggle) L.toast('Applies to the next shot');
+    });
+    L.seg($('#range-preset'), (v) => { setPreset(v); previewWorld(); });
+    $('#setup-go').addEventListener('click', startSession);
+    $('#range-print').addEventListener('click', printSheet);
+    $$('#r-steps button').forEach((b) => b.addEventListener('click', () => {
+      const s = b.dataset.step;
+      if (s === 'setup') { setStep('setup'); if (!S.world) previewWorld(); return; }
+      if (!S.rifle) { L.toast('Start a session first'); return; }
+      setStep(s);
+    }));
+    $('#station-next').addEventListener('click', () => {
+      if (S.step === 'chrono') setStep('zero');
+      else if (S.step === 'zero') setStep('shoot');
+      else setStep('debrief');
+      L.sfx.click();
+    });
+
+    $$('.turret').forEach((el) => {
+      const axis = el.dataset.axis;
+      buildDial($('svg', el));
+      $$('button', el).forEach((b) => b.addEventListener('click', () => nudge(axis, +b.dataset.step)));
+      $('input', el).addEventListener('change', (e) => setDial(axis, parseFloat(e.target.value) || 0));
+      $('.dial', el).addEventListener('wheel', (e) => { e.preventDefault(); nudge(axis, e.deltaY < 0 ? 1 : -1); }, { passive: false });
+    });
+    $('#fire-btn').addEventListener('click', fire);
+    $('#range-new').addEventListener('click', nextTarget);
+    $('#range-reset').addEventListener('click', () => { setDial('elev', 0); setDial('wind', 0); });
+    $('#level-btn').addEventListener('click', level);
+    const bb = $('#breath-btn');
+    bb.addEventListener('pointerdown', (e) => { e.preventDefault(); holdBreath(); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => bb.addEventListener(ev, () => releaseBreath()));
+
+    document.addEventListener('keydown', (e) => {
+      if (L.currentTab !== 'range' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+        if (e.key === 'Enter' && e.target.closest('.turret')) { e.target.dispatchEvent(new Event('change')); fire(); }
+        return;
+      }
+      if (S.step === 'setup' || S.step === 'debrief') return;
+      const k = e.key;
+      if ((tag === 'BUTTON' || tag === 'SUMMARY') && k === 'Enter') return;
+      const mult = e.shiftKey ? 5 : 1;
+      if (k === 'ArrowUp') nudge('elev', mult);
+      else if (k === 'ArrowDown') nudge('elev', -mult);
+      else if (k === 'ArrowRight') nudge('wind', mult);
+      else if (k === 'ArrowLeft') nudge('wind', -mult);
+      else if (k === ' ' || k === 'Enter' || k === 'f' || k === 'F') { if (tag === 'BUTTON') e.target.blur(); fire(); }
+      else if (k === 'b' || k === 'B') { if (!e.repeat) holdBreath(); }
+      else if (k === 'l' || k === 'L') level();
+      else if (k === 'n' || k === 'N') nextTarget();
+      else if (k === 'r' || k === 'R') lase();
+      else if (k === 'z' || k === 'Z' || k === '+' || k === '=' || k === '-') cycleZoom();
+      else if (k === '0') { setDial('elev', 0); setDial('wind', 0); }
+      else return;
+      e.preventDefault();
+    });
+    document.addEventListener('keyup', (e) => { if (e.key === 'b' || e.key === 'B') releaseBreath(); });
+    window.addEventListener('beforeprint', () => { if (L.currentTab === 'range') { buildSheet(); document.body.classList.add('print-range'); } });
+    window.addEventListener('afterprint', () => document.body.classList.remove('print-range'));
   }
 
-  // Restore the last preset's toggles
-  const savedPreset = L.store.get('range.preset', 'training');
-  Object.entries(PRESETS[savedPreset] || PRESETS.training).forEach(([k, v]) => {
-    if (k === 'position') $('#opt-position').value = v; else $('#' + k).checked = v;
-  });
-  if (savedPreset === 'realistic') {
-    $('#opt-plate').value = 'random';
-    $$('#range-preset button').forEach((b) => b.classList.toggle('on', b.dataset.v === 'realistic'));
+  function onShown() {
+    ensureInit();
+    if (!S.inited) return;
+    if (!S.world) previewWorld();
+    setStep(S.step);
+    if (S.rifle) { setDial('elev', S.dial.elev, true); setDial('wind', S.dial.wind, true); }
+    renderHud();
+    if (!S.running) { S.running = true; requestAnimationFrame(frame); }
   }
 
   L.onTab('range', onShown);
-  // A changed card (e.g. today's weather loaded) keeps the current target
-  L.onProfile(() => { if (L.currentTab === 'range') { $('#your-card-mini').innerHTML = L.cardHtml(L.profile, L.computeCard(L.profile), true); } });
+  window.addEventListener('DOMContentLoaded', ensureInit);
 })();

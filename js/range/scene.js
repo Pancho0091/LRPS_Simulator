@@ -216,7 +216,7 @@
 
   /* A paper zero target: 1" grid, orange centre, bullet holes. */
   function drawPaper(ctx, st, cx, cy, groundY, toPx, px, dpr) {
-    const w = toPx(18), h = toPx(24);
+    const w = toPx(24), h = toPx(30);
     const top = cy - h / 2;
     // stand
     ctx.strokeStyle = '#6b5a3e';
@@ -229,12 +229,12 @@
     // 1-inch grid, every 5" bold
     const inch = toPx(1);
     ctx.lineWidth = Math.max(0.5, dpr * 0.5);
-    for (let i = -9; i <= 9; i++) {
+    for (let i = -12; i <= 12; i++) {
       const bold = i % 5 === 0;
       ctx.strokeStyle = bold ? 'rgba(40,40,40,0.5)' : 'rgba(40,40,40,0.16)';
       ctx.beginPath(); ctx.moveTo(cx + i * inch, top); ctx.lineTo(cx + i * inch, top + h); ctx.stroke();
     }
-    for (let i = -12; i <= 12; i++) {
+    for (let i = -15; i <= 15; i++) {
       const bold = i % 5 === 0;
       ctx.strokeStyle = bold ? 'rgba(40,40,40,0.5)' : 'rgba(40,40,40,0.16)';
       ctx.beginPath(); ctx.moveTo(cx - w / 2, cy + i * inch); ctx.lineTo(cx + w / 2, cy + i * inch); ctx.stroke();
@@ -278,8 +278,8 @@
     ctx.moveTo(cx, 0); ctx.lineTo(cx, cy + edge);
     ctx.stroke();
     ctx.font = `600 ${Math.round(10 * dpr)}px JetBrains Mono, monospace`;
-    const minor = hf > 8 ? 1 : 0.5;
-    const labelEvery = hf > 8 ? 2 : 1;
+    const minor = hf > 15 ? 2 : hf > 8 ? 1 : 0.5;
+    const labelEvery = hf > 15 ? 4 : hf > 8 ? 2 : 1;
     for (let v = minor; v < hf * 0.82; v += minor) {
       const major = Math.abs(v % 1) < 1e-9;
       const len = (major ? 7 : 3.5) * dpr * (hf > 8 ? 0.8 : 1);
@@ -297,7 +297,7 @@
     }
     // Christmas-tree hold dots under the centre, every 0.5 mil
     ctx.fillStyle = 'rgba(10,10,10,0.6)';
-    for (let v = 1; v < hf * 0.8; v += 1) {
+    for (let v = 1; v < hf * 0.8 && hf <= 8; v += 1) {
       for (let hx = 0.5; hx <= Math.min(v * 0.5, hf * 0.5); hx += 0.5) {
         [-1, 1].forEach((sg) => { ctx.beginPath(); ctx.arc(cx + sg * hx * px, cy + v * px, 1.1 * dpr, 0, Math.PI * 2); ctx.fill(); });
       }
@@ -312,7 +312,7 @@
     ctx.fillStyle = vg; ctx.fillRect(0, 0, S, S);
 
     if (st.bubble) {
-      const vw = S * 0.2, vh = S * 0.035, vx = cx - vw / 2, vy = S * 0.83;
+      const vw = S * 0.2, vh = S * 0.035, vx = cx - vw / 2, vy = S * 0.79;
       ctx.fillStyle = 'rgba(20,30,20,0.85)';
       ctx.beginPath(); ctx.roundRect(vx - 4 * dpr, vy - 4 * dpr, vw + 8 * dpr, vh + 8 * dpr, 8 * dpr); ctx.fill();
       ctx.fillStyle = Math.abs(st.cant) < 0.5 ? '#c7e86b' : '#e8c36b';
