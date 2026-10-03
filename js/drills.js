@@ -17,7 +17,6 @@
   };
 
   L.seg($('#drill-type'), (v) => { st.type = v; newDrill(); });
-  L.seg($('#drill-unit'), (v) => { st.unit = v; newDrill(); });
   $('#drill-new').addEventListener('click', newDrill);
 
   function renderStats() {
@@ -135,7 +134,7 @@
     }
     ranges.sort((a, b) => a - b);
     const sol = B.solve(L.solverInput(load, { windMph: 10, windClock: 3 }), ranges).rows;
-    const k = unit === 'MOA' ? B.IN_PER_MOA_100 : B.IN_PER_MIL_100;
+    const k = B.IN_PER_MIL_100;
     const tol = click / 2;
     const cells = [];
     const body = sol.map((r, i) => {

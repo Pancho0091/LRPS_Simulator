@@ -51,7 +51,6 @@
     render();
   });
 
-  L.seg($('#lab-unit'), (v) => { state.unit = v; render(); });
   $('#lab-pin').addEventListener('click', () => { baseline = compute(state); render(); L.toast('Baseline pinned'); });
   $('#lab-clear').addEventListener('click', () => { baseline = null; render(); });
 
@@ -98,7 +97,7 @@
     const u = state.unit;
     const res = compute(state);
     const b = baseline;
-    const dec = u === 'MOA' ? 1 : 2;
+    const dec = 2;
     $('#lab-tiles').innerHTML =
       tile('Elevation @1000', metric(res, 'elev', u), u, b && metric(b, 'elev', u), dec) +
       tile('Wind @1000', Math.abs(metric(res, 'wind', u)), u, b && Math.abs(metric(b, 'wind', u)), dec) +
@@ -206,7 +205,7 @@
     const after = Math.abs(metric(compute(state), c.metric, state.unit));
     const truth = after > before ? 'up' : 'down';
     const right = truth === guess;
-    const dec = state.unit === 'MOA' ? 1 : 2;
+    const dec = 2;
     $('#challenge-answer').innerHTML = `
       <div class="answer ${right ? 'right' : 'wrong'}">
         <b>${right ? 'Correct.' : 'Not quite.'}</b>

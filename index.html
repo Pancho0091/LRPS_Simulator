@@ -21,7 +21,8 @@
       <div>LRPS Dope Sim<small>Long-range precision</small></div>
     </div>
     <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>Learn</button>
+      <button class="tab active" data-tab="academy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></svg>Academy</button>
+      <button class="tab" data-tab="lab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>Lab</button>
       <button class="tab" data-tab="build"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Build Card</button>
       <button class="tab" data-tab="drill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Drills</button>
       <button class="tab" data-tab="range"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Range</button>
@@ -38,15 +39,34 @@
 
   <main>
     <!-- ================================================== LEARN -->
-    <section id="tab-learn" class="panel active">
+    <!-- ================================================== ACADEMY -->
+    <section id="tab-academy" class="panel active">
       <div class="page-head">
         <div>
-          <div class="eyebrow">Step 1 · Understand the engine</div>
+          <div class="eyebrow">Start here</div>
+          <h2>Academy</h2>
+          <p>Ballistics from first principles, optics, how to write a dope card, what gear and ammo to use, and field craft.
+            Every lesson leads with the governing rule, then the exceptions, then a way to test it.</p>
+        </div>
+      </div>
+      <div class="academy">
+        <aside class="ac-side card">
+          <div id="ac-progress"></div>
+          <select id="ac-select" aria-label="Lesson"></select>
+          <nav id="ac-nav"></nav>
+        </aside>
+        <article class="ac-main card" id="ac-main"></article>
+      </div>
+    </section>
+
+    <section id="tab-lab" class="panel">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Experiment</div>
           <h2>Ballistics Lab</h2>
           <p>A dope card is a precomputed lookup table: <code>f(range, conditions) → (elevation, wind)</code>.
             Move the sliders and watch how each input reshapes the trajectory.</p>
         </div>
-        <div class="seg" id="lab-unit"><button data-v="MIL" class="on">MIL</button><button data-v="MOA">MOA</button></div>
       </div>
 
       <div class="grid-2">
@@ -69,89 +89,7 @@
 
       <div class="challenge" id="challenge"></div>
 
-      <div style="margin-top:28px">
-        <div class="eyebrow">Reference</div>
-        <h2 style="margin-bottom:8px">Rules of the dope card</h2>
-
-        <details class="ref" open>
-          <summary><span class="num">01</span>The system: inputs → solver → card</summary>
-          <div class="body">
-            <pre class="code">FIXED PER RIFLE/LOAD               VARY PER SHOT                 ON THE CARD
-───────────────────────────────    ──────────────────────────    ─────────────────────────
-muzzle velocity (MV)               range to target               elevation  (MIL or MOA)
-ballistic coefficient (BC, G1/G7)  wind speed + direction        turret clicks
-sight height, zero range           density altitude (DA)         wind value per mph bracket
-turret unit + click size           shot angle                    time of flight / velocity
-        │                                   │                              ▲
-        └──────────► point-mass solver ◄────┘──────────────────────────────┘
-                     (drag × gravity × wind integrated over time)</pre>
-          </div>
-        </details>
-
-        <details class="ref">
-          <summary><span class="num">02</span>Variables and their sensitivity</summary>
-          <div class="body table-wrap">
-            <table class="tbl text">
-              <thead><tr><th>Variable</th><th>Effect on dope</th><th>Sensitivity</th></tr></thead>
-              <tbody>
-                <tr><td>Range</td><td>Drop grows faster than linearly: the bullet slows down, so it spends more time falling each yard.</td><td>Dominant</td></tr>
-                <tr><td>Muzzle velocity</td><td>Faster = less time of flight = less drop and less drift.</td><td>High. ±25 fps ≈ ±0.1–0.2 mil at 800+ yd</td></tr>
-                <tr><td>BC</td><td>Higher BC = retains velocity = flatter at long range. Barely matters inside 300 yd.</td><td>Grows with range</td></tr>
-                <tr><td>Density altitude</td><td>Thinner air (hot, high, low pressure) = less drag = less drop.</td><td>Medium. ~0.15 mil per 1000 ft DA at 1000 yd</td></tr>
-                <tr><td>Wind</td><td>Drift is roughly linear in crosswind speed: 5 mph is half of 10 mph.</td><td>Largest source of misses</td></tr>
-                <tr><td>Shot angle</td><td>Gravity only acts across the line of sight with factor cos(angle), so you need <i>less</i> elevation going up OR down.</td><td>Small below ~15°</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </details>
-
-        <details class="ref">
-          <summary><span class="num">03</span>Conversion rules (the arithmetic on the card)</summary>
-          <div class="body">
-            <pre class="code">1 MIL  at Y yards = 3.6   × (Y / 100) inches
-1 MOA  at Y yards = 1.047 × (Y / 100) inches
-
-correction_in_MIL = inches / (3.6   × Y/100)
-correction_in_MOA = inches / (1.047 × Y/100)
-
-clicks = round(correction / click_size)        // 0.1 MIL or 0.25 MOA typical
-
-wind_for_speed S = wind_value_10mph × (S / 10)  // linear scaling
-wind_for_clock C = full_value × sin(C × 30°)    // 3 & 9 = full, 12 & 6 = zero
-  1:30 / 4:30 ≈ 0.7 value     1 / 2 o'clock ≈ 0.5 / 0.87 value</pre>
-          </div>
-        </details>
-
-        <details class="ref">
-          <summary><span class="num">04</span>Exceptions: where the simple rules break</summary>
-          <div class="body table-wrap">
-            <table class="tbl text">
-              <thead><tr><th>Exception</th><th>Cause</th><th>What to do</th></tr></thead>
-              <tbody>
-                <tr><td>MOA vs "shooter's MOA" (IPHY)</td><td>True MOA is 1.047 in/100 yd; some scopes use 1.000.</td><td>Know which your turret is. At 1000 yd the difference is ~1.4 in per MOA dialed.</td></tr>
-                <tr><td>Transonic zone</td><td>Near Mach 1 (~1125 fps) the drag curve spikes and the bullet can destabilise. Solver accuracy degrades.</td><td>Mark the range where velocity &lt; ~1340 fps (Mach 1.2) on the card. Trust field data past it.</td></tr>
-                <tr><td>Solver ≠ reality</td><td>Chronograph error, BC that differs from the box, scope tracking error.</td><td>"True" the card: shoot at long range, adjust MV (or BC) until predictions match impacts.</td></tr>
-                <tr><td>Wind is not one number</td><td>Wind at the muzzle, midrange and target differ; gusts.</td><td>The card gives you <i>brackets</i> (5/10/15 mph). Your wind call picks the bracket.</td></tr>
-                <tr><td>Spin drift</td><td>Gyroscopic effect pushes right-twist bullets right, growing with time of flight.</td><td>Small (&lt;0.2 mil inside 800 yd). Some shooters fold it into the card's wind zero.</td></tr>
-                <tr><td>Card made for one DA</td><td>Drop changes with air density.</td><td>Make one card per typical DA band (e.g. 0 / 3000 / 6000 ft), or recompute on the day.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </details>
-
-        <details class="ref">
-          <summary><span class="num">05</span>Code analog</summary>
-          <div class="body">
-            <pre class="code">// The card is a memoised function with a coarse key and interpolation.
-const card = precompute(solver, ranges = [100, 150, ... 1000], conditions = today);
-function dope(range, windMph, clock) {
-  const elev = interpolate(card.elev, range);                 // between rows
-  const wind = interpolate(card.wind10, range) * windMph/10 * sin(clock*30°);
-  return { elev: roundToClick(elev), wind: roundToClick(wind) };
-}</pre>
-          </div>
-        </details>
-      </div>
+      <p class="hint" style="margin-top:16px">The rules behind these charts are taught step by step in the <a data-goto="academy">Academy</a>.</p>
     </section>
 
     <!-- ================================================== BUILD -->
@@ -172,7 +110,7 @@ function dope(range, windMph, clock) {
         <form id="profile-form" class="no-print stack" autocomplete="off" onsubmit="return false">
           <div class="card">
             <div class="card-title"><h3>Rifle &amp; load</h3></div>
-            <div class="field"><label for="preset">Preset</label><select id="preset"></select></div>
+            <div class="field"><label for="preset">Rifle system</label><select id="preset"></select></div>
             <div class="field"><label>Profile name</label><input name="name" type="text"></div>
             <div class="field-row">
               <div class="field"><label>Muzzle vel. (fps)</label><input name="muzzleVelocityFps" type="number" step="5"></div>
@@ -188,11 +126,24 @@ function dope(range, windMph, clock) {
             </div>
           </div>
           <div class="card">
-            <div class="card-title"><h3>Scope</h3></div>
+            <div class="card-title"><h3>Bullet, barrel &amp; ammo</h3></div>
             <div class="field-row">
-              <div class="field"><label>Turret unit</label><select name="unit"><option value="MIL">MIL</option><option value="MOA">MOA</option></select></div>
-              <div class="field"><label>Click size</label><input name="clickSize" type="number" step="0.05"></div>
+              <div class="field"><label>Diameter (in)</label><input name="bulletDiameterIn" type="number" step="0.001"></div>
+              <div class="field"><label>Length (in)</label><input name="bulletLengthIn" type="number" step="0.01"></div>
             </div>
+            <div class="field-row">
+              <div class="field"><label>Twist (1:x in)</label><input name="twistIn" type="number" step="0.5"></div>
+              <div class="field"><label>Ammo SD (fps)</label><input name="sdFps" type="number" step="1"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Chrono temp (°F)</label><input name="mvTempF" type="number" step="1"></div>
+              <div class="field"><label>Temp sens. (fps/°F)</label><input name="tempSensitivity" type="number" step="0.1"></div>
+            </div>
+            <p class="hint" style="margin:0">MV is adjusted by temp sensitivity × (card temp − chrono temp). Twist and bullet size give the stability factor (Sg), which drives spin drift.</p>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3>Scope</h3></div>
+            <p class="hint" style="margin:0">MIL reticle and turrets, 0.1 mil per click, 10 mil per revolution — the precision-rifle standard.</p>
           </div>
           <div class="card">
             <div class="card-title"><h3>Conditions</h3></div>
@@ -204,7 +155,7 @@ function dope(range, windMph, clock) {
               <div class="field"><label>Humidity (%)</label><input name="humidityPct" type="number" step="5"></div>
               <div class="field"><label>Shot angle (°)</label><input name="shotAngleDeg" type="number" step="1"></div>
             </div>
-            <label class="check"><input name="spinDrift" type="checkbox"> Spin drift column (right twist)</label>
+            <label class="check"><input name="spinDrift" type="checkbox"> Spin drift column (right twist, from Sg)</label>
           </div>
           <div class="card">
             <div class="card-title"><h3>Card layout</h3></div>
@@ -243,7 +194,6 @@ function dope(range, windMph, clock) {
             <button data-v="interp">Interpolate</button>
             <button data-v="wind">Wind call</button>
           </div>
-          <div class="seg" id="drill-unit"><button data-v="MIL" class="on">MIL</button><button data-v="MOA">MOA</button></div>
         </div>
         <div class="right">
           <span class="pill-stat fire" title="Perfect problems in a row"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2s5 4.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 1-3.5s.5 2.5 2.5 2.5C10.5 7 12 2 12 2z"/></svg><span id="drill-streak">0</span></span>
@@ -261,9 +211,13 @@ function dope(range, windMph, clock) {
         <div>
           <div class="eyebrow">Step 4 · Put it to work</div>
           <h2>Range</h2>
-          <p>Range the target, read the flags and mirage, dial from your card, send it. The ding arrives late because sound travels back at ~1125 fps.</p>
+          <p>Shoot with <b>your</b> card in real conditions: today's weather, angles, wind that differs near and far, your position's wobble.
+            Training mode keeps it simple; Realistic mode takes the helpers away.</p>
         </div>
-        <p class="hint" style="max-width:340px"><kbd>↑</kbd><kbd>↓</kbd> elevation · <kbd>←</kbd><kbd>→</kbd> wind · <kbd>Shift</kbd> ×5 · <kbd>Space</kbd> fire · <kbd>N</kbd> new target · <kbd>0</kbd> reset dials</p>
+        <div class="range-modes">
+          <div class="seg" id="range-preset"><button data-v="training" class="on">Training</button><button data-v="realistic">Realistic</button></div>
+          <div class="seg" id="range-mode"><button data-v="free" class="on">Free fire</button><button data-v="stage">PRS stage</button></div>
+        </div>
       </div>
 
       <div class="grid-range">
@@ -271,9 +225,16 @@ function dope(range, windMph, clock) {
           <div class="scope-wrap">
             <canvas id="scope" aria-label="Rifle scope view"></canvas>
             <div class="scope-hud" id="scope-hud"></div>
+            <div class="scope-stage" id="scope-stage"></div>
           </div>
           <div class="flight-bar"><span id="flight-bar"></span></div>
           <div class="hud" id="range-hud"></div>
+          <p class="hint keys"><kbd>↑</kbd><kbd>↓</kbd> elevation · <kbd>←</kbd><kbd>→</kbd> wind · <kbd>Shift</kbd> ×5 · <kbd>Space</kbd> fire ·
+            <kbd>B</kbd> hold breath · <kbd>L</kbd> level · <kbd>N</kbd> new target · <kbd>0</kbd> reset dials</p>
+          <div class="card" style="margin-top:16px" id="whatchanged-card" hidden>
+            <h3>What changed vs your card</h3>
+            <div id="whatchanged"></div>
+          </div>
           <div class="card" style="margin-top:16px">
             <details class="plain" open>
               <summary>Your dope card</summary>
@@ -297,6 +258,8 @@ function dope(range, windMph, clock) {
           <div class="card">
             <div class="brief" id="range-brief"></div>
             <div class="flags-wrap"><canvas id="flags"></canvas></div>
+            <div class="kestrel" id="kestrel"></div>
+            <div id="stage-list"></div>
           </div>
           <div class="card">
             <div class="turrets">
@@ -314,6 +277,10 @@ function dope(range, windMph, clock) {
               </div>
             </div>
             <div class="actions">
+              <button type="button" class="btn" id="level-btn">Level rifle</button>
+              <button type="button" class="btn" id="breath-btn">Hold breath</button>
+            </div>
+            <div class="actions" style="margin-top:8px">
               <button type="button" class="btn primary big" id="fire-btn" style="flex:1">Send it</button>
               <button type="button" class="btn" id="range-new">New target</button>
             </div>
@@ -324,14 +291,31 @@ function dope(range, windMph, clock) {
             <div class="feedback" id="range-feedback" style="margin-top:12px"></div>
           </div>
           <div class="card">
-            <details class="plain">
+            <details class="plain" id="range-settings">
               <summary>Range settings</summary>
+              <div class="field"><label for="opt-position">Position</label>
+                <select id="opt-position">
+                  <option value="bench">Bench / sandbags</option>
+                  <option value="prone-bag">Prone · bipod + rear bag</option>
+                  <option value="prone">Prone · bipod only</option>
+                  <option value="barricade">Barricade</option>
+                  <option value="kneeling">Kneeling · tripod</option>
+                  <option value="standing">Standing · tripod</option>
+                </select>
+              </div>
+              <label class="check"><input type="checkbox" id="opt-weather"> Range-day weather differs from card</label>
+              <label class="check"><input type="checkbox" id="opt-angle"> Uphill / downhill shots</label>
+              <label class="check"><input type="checkbox" id="opt-rf" checked> Laser rangefinder (off = mil the target)</label>
+              <label class="check"><input type="checkbox" id="opt-call" checked> Wind call given</label>
+              <label class="check"><input type="checkbox" id="opt-spotter" checked> Spotter calls impacts</label>
+              <label class="check"><input type="checkbox" id="opt-gusts" checked> Gusting wind, varies near/far</label>
+              <label class="check"><input type="checkbox" id="opt-cant"> Cant (use the bubble level)</label>
+              <label class="check"><input type="checkbox" id="opt-adv"> Spin drift, Coriolis, aerodynamic jump</label>
               <label class="check"><input type="checkbox" id="opt-truing"> Hidden MV error (truing practice)</label>
-              <label class="check"><input type="checkbox" id="opt-gusts" checked> Gusting wind</label>
               <label class="check"><input type="checkbox" id="opt-delay" checked> Realistic sound delay</label>
               <div class="field-row" style="margin-top:8px">
-                <div class="field"><label>Precision (MOA)</label><input type="number" id="opt-precision" value="0.75" step="0.25" min="0"></div>
-                <div class="field"><label>Plate (in)</label><input type="number" id="opt-plate" value="12" step="1" min="2"></div>
+                <div class="field"><label>Rifle precision (mil, 5-shot)</label><input type="number" id="opt-precision" value="0.2" step="0.05" min="0"></div>
+                <div class="field"><label>Plate</label><select id="opt-plate"><option value="random">Random</option><option>8</option><option>10</option><option selected>12</option><option>18</option></select></div>
               </div>
             </details>
           </div>
@@ -345,6 +329,8 @@ function dope(range, windMph, clock) {
 
   <script src="js/ballistics.js"></script>
   <script src="js/common.js"></script>
+  <script src="js/academy-content.js"></script>
+  <script src="js/academy.js"></script>
   <script src="js/lab.js"></script>
   <script src="js/build.js"></script>
   <script src="js/drills.js"></script>

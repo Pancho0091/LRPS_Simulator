@@ -49,6 +49,8 @@
       `<div class="tile"><div class="label">${label}</div><div class="value">${value}<small>${unit}</small></div></div>`;
     $('#build-tiles').innerHTML =
       tile('Density altitude', Math.round(lastCard.atmosphere.densityAltitudeFt), 'ft') +
+      tile('Stability Sg', lastCard.sg.toFixed(2), lastCard.sg < 1 ? 'unstable' : lastCard.sg < 1.4 ? 'marginal' : 'stable') +
+      (Math.round(lastCard.mv) !== +p.muzzleVelocityFps ? tile('MV at card temp', Math.round(lastCard.mv), 'fps') : '') +
       tile(`Elev @${last.yards}`, L.fmtClick(last.elev, +p.clickSize), p.unit) +
       tile('Turret clicks', last.clicks, 'clk') +
       tile('Transonic', trans ? trans.yards : `>${last.yards}`, 'yd') +
@@ -81,10 +83,6 @@
     const p = Object.assign(readForm(), preset);
     fillForm(p);
     L.setProfile(p);
-  });
-
-  form.unit.addEventListener('change', () => {
-    form.clickSize.value = L.clickFor(form.unit.value);
   });
 
   $('#print-card').addEventListener('click', () => {

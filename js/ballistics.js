@@ -64,6 +64,7 @@
   const GRAIN_KG = 6.479891e-5;
   const BC_SI = 703.0696; // 1 lb/in^2 in kg/m^2
   const G = 9.80665;
+  const EARTH_RATE = 7.2921159e-5; // rad/s
 
   // Angular units: inches subtended per 100 yards
   const IN_PER_MOA_100 = 1.0472; // true MOA
@@ -127,6 +128,17 @@
     const wx = -windSpeed * Math.cos(theta); // from 12 o'clock = headwind = -x
     const wz = -windSpeed * Math.sin(theta); // from 3 o'clock pushes left = -z
 
+    // Earth's rotation vector in the shot frame (x downrange, y up, z right).
+    // Azimuth is degrees clockwise from true north.
+    let ox = 0, oy = 0, oz = 0;
+    if (p.coriolis) {
+      const lat = (p.latitudeDeg || 0) * Math.PI / 180;
+      const az = (p.azimuthDeg || 0) * Math.PI / 180;
+      ox = EARTH_RATE * Math.cos(lat) * Math.cos(az);
+      oy = EARTH_RATE * Math.sin(lat);
+      oz = -EARTH_RATE * Math.cos(lat) * Math.sin(az);
+    }
+
     const v0 = p.muzzleVelocityFps * FT;
     let x = 0, y = -p.sightHeightIn * IN, z = 0;
     let vx = v0 * Math.cos(launchAngle), vy = v0 * Math.sin(launchAngle), vz = 0;
@@ -142,7 +154,11 @@
       const vr = Math.sqrt(rx * rx + ry * ry + rz * rz);
       const cd = cdAt(table, vr / atm.speedOfSound);
       const d = k * cd * vr;
-      return [-d * rx + gx, -d * ry + gy, -d * rz];
+      // Coriolis acceleration: -2 (omega x v)
+      const cx = -2 * (oy * vz_ - oz * vy_);
+      const cy = -2 * (oz * vx_ - ox * vz_);
+      const cz = -2 * (ox * vy_ - oy * vx_);
+      return [-d * rx + gx + cx, -d * ry + gy + cy, -d * rz + cz];
     }
 
     while (x < maxX && si < targets.length && t < 20) {
@@ -176,7 +192,7 @@
    * zero range. Zeroing is done in zero conditions with no wind or angle.
    */
   function solveZeroAngle(p, atm) {
-    const zp = Object.assign({}, p, { windMph: 0, shotAngleDeg: 0 });
+    const zp = Object.assign({}, p, { windMph: 0, shotAngleDeg: 0, coriolis: false });
     let lo = -0.01, hi = 0.05;
     for (let i = 0; i < 50; i++) {
       const mid = (lo + hi) / 2;
@@ -191,6 +207,31 @@
     if (!sg || tof <= 0) return 0;
     const dir = twist === 'left' ? -1 : 1;
     return dir * 1.25 * (sg + 1.2) * Math.pow(tof, 1.83);
+  }
+
+  /*
+   * Miller twist rule gyroscopic stability factor (Sg).
+   * Sg < 1 is unstable, 1–1.4 marginal, > 1.4 is the usual target.
+   */
+  function millerStability({ bulletWeightGr, bulletDiameterIn, bulletLengthIn, twistIn, muzzleVelocityFps, tempF = 59, pressureInHg = 29.92 }) {
+    if (!(bulletDiameterIn > 0 && bulletLengthIn > 0 && twistIn > 0)) return null;
+    const t = twistIn / bulletDiameterIn;
+    const l = bulletLengthIn / bulletDiameterIn;
+    const base = 30 * bulletWeightGr / (t * t * Math.pow(bulletDiameterIn, 3) * l * (1 + l * l));
+    const fv = Math.pow((muzzleVelocityFps || 2800) / 2800, 1 / 3);
+    const fa = (tempF + 460) / (59 + 460) * (29.92 / pressureInHg);
+    return base * fv * fa;
+  }
+
+  /*
+   * Litz's aerodynamic-jump estimate: vertical deflection in MOA per mph
+   * of crosswind. Right twist: wind from the left throws the shot up,
+   * wind from the right throws it down.
+   */
+  function aeroJumpMoaPerMph(sg, bulletLengthIn, bulletDiameterIn) {
+    if (!sg || !(bulletLengthIn > 0 && bulletDiameterIn > 0)) return 0;
+    const l = bulletLengthIn / bulletDiameterIn;
+    return Math.max(0, 0.01 * sg - 0.0024 * l + 0.032);
   }
 
   function inchesToMoa(inches, yards) { return yards > 0 ? inches / (IN_PER_MOA_100 * yards / 100) : 0; }
@@ -215,8 +256,20 @@
     windClock: 3,
     shotAngleDeg: 0,
     spinDrift: false,
-    sg: 1.5,
+    sg: null,          // null = compute from twist and bullet dimensions (falls back to 1.5)
     twist: 'right',
+    twistIn: null,
+    bulletLengthIn: null,
+    bulletDiameterIn: null,
+    aeroJump: false,
+    coriolis: false,
+    latitudeDeg: 0,
+    azimuthDeg: 0,
+    // Powder temperature sensitivity: MV changes by tempSensitivity fps per °F
+    // of difference between powder temperature and the chronograph temperature.
+    tempSensitivity: 0,
+    mvTempF: null,
+    powderTempF: null,
     zeroAngleRad: null,
   };
 
@@ -229,6 +282,23 @@
   function solve(input, ranges) {
     const p = Object.assign({}, DEFAULTS, input);
     const atm = atmosphere(p);
+    if (p.tempSensitivity && p.mvTempF != null) {
+      const powder = p.powderTempF != null ? p.powderTempF : p.tempF;
+      p.muzzleVelocityFps += p.tempSensitivity * (powder - p.mvTempF);
+    }
+    const sg = p.sg != null ? p.sg : (millerStability({
+      bulletWeightGr: p.bulletWeightGr,
+      bulletDiameterIn: p.bulletDiameterIn,
+      bulletLengthIn: p.bulletLengthIn,
+      twistIn: p.twistIn,
+      muzzleVelocityFps: p.muzzleVelocityFps,
+      tempF: p.tempF,
+      pressureInHg: atm.pressurePa / 3386.389,
+    }) || 1.5);
+    const twistDir = p.twist === 'left' ? -1 : 1;
+    // Crosswind component in mph, + = from the right
+    const crossMph = (p.windMph || 0) * Math.sin(((p.windClock || 0) % 12) / 12 * 2 * Math.PI);
+    const ajMoa = p.aeroJump ? -twistDir * aeroJumpMoaPerMph(sg, p.bulletLengthIn, p.bulletDiameterIn) * crossMph : 0;
     const zeroAtm = p.zeroAtmosphere ? atmosphere(p.zeroAtmosphere) : atm;
     // A fixed zeroAngleRad models a rifle whose zero was set with a
     // different load or velocity than the one being fired now.
@@ -240,11 +310,14 @@
     return {
       atmosphere: atm,
       zeroAngleRad: angle,
+      sg,
+      muzzleVelocityFps: p.muzzleVelocityFps,
+      aeroJumpMoa: ajMoa,
       rows: samples.map((s, i) => {
         const yards = ranges[i];
-        const dropIn = s.y / IN; // negative = below line of sight
+        const dropIn = s.y / IN + moaToInches(ajMoa, yards); // negative = below line of sight
         let windIn = s.z / IN;
-        if (p.spinDrift) windIn += spinDriftIn(p.sg, s.t, p.twist);
+        if (p.spinDrift) windIn += spinDriftIn(sg, s.t, p.twist);
         const vFps = s.v / FT;
         const energyFtLb = 0.5 * massKg * s.v * s.v * 0.737562;
         // Correction = what you must dial to bring the impact back to the
@@ -279,7 +352,7 @@
 
   const api = {
     G1, G7, DRAG_TABLES, DEFAULTS,
-    cdAt, atmosphere, densityAltitude, solve, spinDriftIn,
+    cdAt, atmosphere, densityAltitude, solve, spinDriftIn, millerStability, aeroJumpMoaPerMph,
     inchesToMoa, inchesToMil, moaToInches, milToInches, toClicks, roundToClick,
     IN_PER_MOA_100, IN_PER_MIL_100,
   };

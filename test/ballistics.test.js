@@ -81,3 +81,46 @@ test('fixed zero angle: a faster load fired through the same zero hits high', ()
   const [fast] = solve({ zeroAngleRad, muzzleVelocityFps: 2760 }, [600]);
   assert.ok(fast.dropIn > same.dropIn);
 });
+
+const SYS = Object.assign({}, LOAD, { bulletDiameterIn: 0.264, bulletLengthIn: 1.37, twistIn: 8 });
+
+test('Miller stability for 6.5 mm 140 gr in 1:8 twist is in the stable band', () => {
+  const sg = B.millerStability(Object.assign({ tempF: 59, pressureInHg: 29.92 }, SYS));
+  assert.ok(sg > 1.5 && sg < 2.0, `sg ${sg}`);
+  const slow = B.millerStability(Object.assign({}, SYS, { twistIn: 10 }));
+  assert.ok(slow < 1.2, 'a slower twist is less stable');
+});
+
+test('Coriolis: northern hemisphere deflects right; shooting east hits high', () => {
+  const base = { windMph: 0, coriolis: true, latitudeDeg: 45 };
+  const [plain] = B.solve(Object.assign({}, LOAD, { windMph: 0 }), [1000]).rows;
+  const [north] = B.solve(Object.assign({}, LOAD, base, { azimuthDeg: 0 }), [1000]).rows;
+  const [east] = B.solve(Object.assign({}, LOAD, base, { azimuthDeg: 90 }), [1000]).rows;
+  const [west] = B.solve(Object.assign({}, LOAD, base, { azimuthDeg: 270 }), [1000]).rows;
+  assert.ok(north.windIn > 1 && north.windIn < 6, `north drift ${north.windIn}`);
+  assert.ok(east.dropIn > plain.dropIn && west.dropIn < plain.dropIn);
+  const [south] = B.solve(Object.assign({}, LOAD, base, { latitudeDeg: -45 }), [1000]).rows;
+  assert.ok(south.windIn < 0, 'southern hemisphere deflects left');
+});
+
+test('aerodynamic jump: right twist, wind from the left throws the shot up', () => {
+  const w = { windMph: 10, windClock: 9 };
+  const [noAj] = B.solve(Object.assign({}, SYS, w), [600]).rows;
+  const [aj] = B.solve(Object.assign({}, SYS, w, { aeroJump: true }), [600]).rows;
+  assert.ok(aj.dropIn > noAj.dropIn);
+  const [ajRight] = B.solve(Object.assign({}, SYS, w, { aeroJump: true, windClock: 3 }), [600]).rows;
+  assert.ok(ajRight.dropIn < noAj.dropIn);
+});
+
+test('powder temperature sensitivity: hot ammo leaves the muzzle faster', () => {
+  const t = { tempSensitivity: 1, mvTempF: 59 };
+  const cold = B.solve(Object.assign({}, LOAD, t, { windMph: 0, tempF: 20 }), [800]);
+  const hot = B.solve(Object.assign({}, LOAD, t, { windMph: 0, tempF: 100 }), [800]);
+  assert.equal(Math.round(cold.muzzleVelocityFps), 2710 - 39);
+  assert.equal(Math.round(hot.muzzleVelocityFps), 2710 + 41);
+});
+
+test('spin drift uses the computed stability factor', () => {
+  const [r] = B.solve(Object.assign({}, SYS, { windMph: 0, spinDrift: true }), [1000]).rows;
+  assert.ok(r.windIn > 5 && r.windIn < 20, `spin drift ${r.windIn} in`);
+});

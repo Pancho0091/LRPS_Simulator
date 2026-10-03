@@ -28,15 +28,24 @@
 
   // ------------------------------------------------------------ profile
 
+  /*
+   * Rifle systems: cartridge + bullet + typical barrel. Values are typical
+   * published figures (factory or common handload, 24–27" barrels); your
+   * rifle's chronographed MV is what matters.
+   */
   L.PRESETS = [
-    { name: '6.5 Creedmoor 140 ELD-M', muzzleVelocityFps: 2710, bc: 0.326, dragModel: 'G7', bulletWeightGr: 140 },
-    { name: '.308 Win 175 SMK', muzzleVelocityFps: 2600, bc: 0.243, dragModel: 'G7', bulletWeightGr: 175 },
-    { name: '6mm Creedmoor 108 ELD-M', muzzleVelocityFps: 2960, bc: 0.283, dragModel: 'G7', bulletWeightGr: 108 },
-    { name: '.300 Win Mag 215 Hybrid', muzzleVelocityFps: 2850, bc: 0.354, dragModel: 'G7', bulletWeightGr: 215 },
-    { name: '.223 Rem 77 TMK', muzzleVelocityFps: 2750, bc: 0.205, dragModel: 'G7', bulletWeightGr: 77 },
+    { name: '.223 Rem 77 TMK', cartridge: '.223 Remington', bullet: '77 gr Sierra TMK', muzzleVelocityFps: 2750, bc: 0.210, dragModel: 'G7', bulletWeightGr: 77, bulletDiameterIn: 0.224, bulletLengthIn: 1.0, twistIn: 7, tempSensitivity: 0.9, sdFps: 12 },
+    { name: '6mm Creedmoor 108 ELD-M', cartridge: '6mm Creedmoor', bullet: '108 gr Hornady ELD-M', muzzleVelocityFps: 2960, bc: 0.270, dragModel: 'G7', bulletWeightGr: 108, bulletDiameterIn: 0.243, bulletLengthIn: 1.2, twistIn: 7.5, tempSensitivity: 0.6, sdFps: 9 },
+    { name: '6.5 Creedmoor 140 ELD-M', cartridge: '6.5 Creedmoor', bullet: '140 gr Hornady ELD-M', muzzleVelocityFps: 2710, bc: 0.326, dragModel: 'G7', bulletWeightGr: 140, bulletDiameterIn: 0.264, bulletLengthIn: 1.37, twistIn: 8, tempSensitivity: 0.6, sdFps: 10 },
+    { name: '6.5 PRC 147 ELD-M', cartridge: '6.5 PRC', bullet: '147 gr Hornady ELD-M', muzzleVelocityFps: 2910, bc: 0.351, dragModel: 'G7', bulletWeightGr: 147, bulletDiameterIn: 0.264, bulletLengthIn: 1.42, twistIn: 8, tempSensitivity: 0.7, sdFps: 10 },
+    { name: '.308 Win 175 SMK', cartridge: '.308 Winchester', bullet: '175 gr Sierra MatchKing', muzzleVelocityFps: 2600, bc: 0.243, dragModel: 'G7', bulletWeightGr: 175, bulletDiameterIn: 0.308, bulletLengthIn: 1.24, twistIn: 10, tempSensitivity: 1.0, sdFps: 12 },
+    { name: '.300 Win Mag 215 Hybrid', cartridge: '.300 Winchester Magnum', bullet: '215 gr Berger Hybrid', muzzleVelocityFps: 2850, bc: 0.354, dragModel: 'G7', bulletWeightGr: 215, bulletDiameterIn: 0.308, bulletLengthIn: 1.58, twistIn: 10, tempSensitivity: 1.1, sdFps: 12 },
+    { name: '.300 PRC 225 ELD-M', cartridge: '.300 PRC', bullet: '225 gr Hornady ELD-M', muzzleVelocityFps: 2810, bc: 0.391, dragModel: 'G7', bulletWeightGr: 225, bulletDiameterIn: 0.308, bulletLengthIn: 1.555, twistIn: 8, tempSensitivity: 0.8, sdFps: 11 },
+    { name: '.338 Lapua 300 Hybrid', cartridge: '.338 Lapua Magnum', bullet: '300 gr Berger Hybrid', muzzleVelocityFps: 2750, bc: 0.419, dragModel: 'G7', bulletWeightGr: 300, bulletDiameterIn: 0.338, bulletLengthIn: 1.8, twistIn: 9.4, tempSensitivity: 1.0, sdFps: 12 },
   ];
 
-  L.DEFAULT_PROFILE = Object.assign({}, L.PRESETS[0], {
+  L.DEFAULT_PROFILE = Object.assign({}, L.PRESETS[2], {
+    mvTempF: 59,
     sightHeightIn: 1.9,
     zeroYards: 100,
     unit: 'MIL',
@@ -52,7 +61,18 @@
     windBrackets: '5, 10, 15',
   });
 
-  L.profile = Object.assign({}, L.DEFAULT_PROFILE, L.store.get('profile.v1', {}));
+  // Older saved profiles lack the system fields: fill them from the matching preset.
+  (function loadProfile() {
+    const saved = L.store.get('profile.v1', {});
+    const preset = L.PRESETS.find((x) => x.name === saved.name) || {};
+    L.profile = Object.assign({}, L.DEFAULT_PROFILE, preset, saved);
+    ['bulletDiameterIn', 'bulletLengthIn', 'twistIn', 'tempSensitivity', 'sdFps'].forEach((k) => {
+      if (saved[k] == null && preset[k] != null) L.profile[k] = preset[k];
+    });
+    // The app is MIL-only: 0.1 mil clicks
+    L.profile.unit = 'MIL';
+    L.profile.clickSize = 0.1;
+  })();
   const profileListeners = [];
   L.onProfile = (fn) => profileListeners.push(fn);
   L.setProfile = (p) => {
@@ -68,9 +88,10 @@
     return s.includes('.') ? s.split('.')[1].length : 0;
   };
   L.fmtClick = (value, click) => B.roundToClick(value, click).toFixed(L.decimalsFor(click));
-  L.clickFor = (unit) => (unit === 'MOA' ? 0.25 : 0.1);
-  L.toUnit = (inches, yards, unit) => (unit === 'MOA' ? B.inchesToMoa(inches, yards) : B.inchesToMil(inches, yards));
-  L.fromUnit = (value, yards, unit) => (unit === 'MOA' ? B.moaToInches(value, yards) : B.milToInches(value, yards));
+  // The app works in MIL only (0.1 mil clicks); the unit argument is kept for call-site clarity.
+  L.clickFor = () => 0.1;
+  L.toUnit = (inches, yards) => B.inchesToMil(inches, yards);
+  L.fromUnit = (value, yards) => B.milToInches(value, yards);
   L.rand = (min, max) => min + Math.random() * (max - min);
   L.randInt = (min, max) => Math.floor(L.rand(min, max + 1));
   L.pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -104,6 +125,11 @@
     tempF: +p.tempF,
     humidityPct: +p.humidityPct,
     shotAngleDeg: +p.shotAngleDeg,
+    bulletDiameterIn: +p.bulletDiameterIn || null,
+    bulletLengthIn: +p.bulletLengthIn || null,
+    twistIn: +p.twistIn || null,
+    tempSensitivity: +p.tempSensitivity || 0,
+    mvTempF: p.mvTempF != null && p.mvTempF !== '' ? +p.mvTempF : null,
     spinDrift: false,
   }, extra || {});
 
@@ -123,14 +149,14 @@
         elev,
         clicks: B.toClicks(elev, +p.clickSize),
         winds: winds.map((w) => L.toUnit(-w.rows[i].windIn, r.yards, p.unit)),
-        spin: p.spinDrift ? L.toUnit(-B.spinDriftIn(1.5, r.tofSec, 'right'), r.yards, p.unit) : null,
+        spin: p.spinDrift ? L.toUnit(-B.spinDriftIn(base.sg, r.tofSec, 'right'), r.yards, p.unit) : null,
         velocityFps: r.velocityFps,
         mach: r.mach,
         tofSec: r.tofSec,
         energyFtLb: r.energyFtLb,
       };
     });
-    return { rows, brackets, atmosphere: base.atmosphere };
+    return { rows, brackets, atmosphere: base.atmosphere, sg: base.sg, mv: base.muzzleVelocityFps };
   };
 
   /* Render a dope card. `compact` drops the header, velocity and TOF columns. */
@@ -406,7 +432,8 @@
   const tabListeners = {};
   L.onTab = (name, fn) => { (tabListeners[name] = tabListeners[name] || []).push(fn); };
   L.showTab = (name) => {
-    if (!$('#tab-' + name)) name = 'learn';
+    if (name === 'learn') name = 'lab';
+    if (!$('#tab-' + name)) name = 'academy';
     $$('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
     $$('.panel').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
     L.currentTab = name;
@@ -417,7 +444,16 @@
     L.showTab(btn.dataset.tab);
     window.scrollTo({ top: 0 });
   }));
-  window.addEventListener('DOMContentLoaded', () => L.showTab((location.hash || '#learn').slice(1)));
+  window.addEventListener('DOMContentLoaded', () => L.showTab((location.hash || '#academy').slice(1)));
+  // Any element with data-goto="tab" navigates to that tab
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-goto]');
+    if (!a) return;
+    e.preventDefault();
+    history.replaceState(null, '', '#' + a.dataset.goto);
+    L.showTab(a.dataset.goto);
+    window.scrollTo({ top: 0 });
+  });
 
   /* Segmented control helper: calls onChange(value) on selection. */
   L.seg = (el, onChange) => {
@@ -463,16 +499,19 @@
 
     let svg = '';
     if (o.shadeFrom != null && o.shadeFrom < xMax) {
-      svg += `<rect class="shade" x="${X(o.shadeFrom)}" y="${P.t}" width="${X(xMax) - X(o.shadeFrom)}" height="${H - P.t - P.b}"/>`;
+      const to = Math.min(xMax, o.shadeTo != null ? o.shadeTo : xMax);
+      svg += `<rect class="shade" x="${X(o.shadeFrom)}" y="${P.t}" width="${X(to) - X(o.shadeFrom)}" height="${H - P.t - P.b}"/>`;
       svg += `<text class="shade-label" x="${X(o.shadeFrom) + 6}" y="${P.t + 14}">transonic</text>`;
     }
     for (let v = yMin; v <= yMax + step / 2; v += step) {
       svg += `<line class="grid-line" x1="${P.l}" x2="${W - P.r}" y1="${Y(v)}" y2="${Y(v)}"/>`;
       svg += `<text class="axis-text" x="${P.l - 8}" y="${Y(v) + 4}" text-anchor="end">${(+v.toFixed(4)).toFixed(dec)}</text>`;
     }
-    const xStep = xMax > 1000 ? 200 : xMax > 500 ? 100 : 50;
-    for (let x = 0; x <= xMax; x += xStep) {
-      svg += `<text class="axis-text" x="${X(x)}" y="${H - P.b + 18}" text-anchor="middle">${x}</text>`;
+    const xStep = o.xStep || (xMax > 1000 ? 200 : xMax > 500 ? 100 : 50);
+    const xFmt = o.xFmt || ((v) => v);
+    for (let i = 0; i * xStep <= xMax + 1e-9; i++) {
+      const x = i * xStep;
+      svg += `<text class="axis-text" x="${X(x)}" y="${H - P.b + 18}" text-anchor="middle">${xFmt(x)}</text>`;
     }
     if (yMin < 0 && yMax > 0) svg += `<line class="zero-line" x1="${P.l}" x2="${W - P.r}" y1="${Y(0)}" y2="${Y(0)}"/>`;
     svg += `<text class="axis-label" x="${W - P.r}" y="${H - 4}" text-anchor="end">${o.xLabel || 'yards'}</text>`;
