@@ -22,6 +22,13 @@
   --radius: 14px;
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --illus-bg1: #f3f6fb;
+  --illus-bg2: #e6edf7;
+  --illus-blob: #dfe8ff;
+  --illus-blob2: #ffe9d6;
+  --illus-floor: #ffffff;
+  --illus-grid: #e3e9f2;
+  --illus-ink: #2b3445;
   color-scheme: light;
 }
 
@@ -46,6 +53,13 @@
     --bad-soft: rgba(248, 113, 113, 0.14);
     --warn: #fbbf24;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.35);
+    --illus-bg1: #1a2330;
+    --illus-bg2: #141b24;
+    --illus-blob: #22304a;
+    --illus-blob2: #2f2a26;
+    --illus-floor: #253142;
+    --illus-grid: #2e3b4f;
+    --illus-ink: #d9e2ee;
     color-scheme: dark;
   }
 }
@@ -69,6 +83,13 @@
   --bad-soft: rgba(248, 113, 113, 0.14);
   --warn: #fbbf24;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.35);
+  --illus-bg1: #1a2330;
+  --illus-bg2: #141b24;
+  --illus-blob: #22304a;
+  --illus-blob2: #2f2a26;
+  --illus-floor: #253142;
+  --illus-grid: #2e3b4f;
+  --illus-ink: #d9e2ee;
   color-scheme: dark;
 }
 
@@ -635,6 +656,15 @@ details.path-mod.locked { opacity: 0.7; }
 .lt-items a.lt-recap { border-left: 3px solid var(--accent-2); }
 .lt-items a.lt-quiz { border-left: 3px solid #a78bfa; }
 .ac-body h4, .ac-body .callout, .ac-body .widget, .recap, .quiz { scroll-margin-top: 90px; }
+
+figure.illus { margin: 16px 0 20px; }
+figure.illus svg.iso-svg { width: 100%; height: auto; display: block; border-radius: 18px; box-shadow: var(--shadow); }
+figure.illus figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; padding: 0 4px; }
+figure.illus figcaption b { color: var(--text); }
+.path-thumb { flex: none; width: 112px; border-radius: 12px; overflow: hidden; align-self: center; }
+.path-thumb svg { width: 100%; height: auto; display: block; }
+@media (max-width: 560px) { .path-thumb { display: none; } }
+.map-hero-art { margin: 0 0 18px; }
 
 /* =========================================================== drills */
 .drill-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 16px; }

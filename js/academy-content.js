@@ -72,7 +72,7 @@ increasingly steeply. That is why elevation at 1000 yd is not twice the value at
         title: 'Drag, BC and G1 vs G7',
         mins: 6,
         html: `
-<div class="callout rule"><b>Rule:</b> Drag depends on the bullet's shape and its <b>Mach number</b>. A drag model (G1, G7) is the drag curve of
+<div class="callout rule"><b>Rule:</b> Drag depends on the bullet's shape and its <b>Mach number</b> (speed as a multiple of the speed of sound). A drag model (G1, G7) is the drag curve of
 a reference projectile; the <b>ballistic coefficient (BC)</b> scales that curve to your bullet. Higher BC = less deceleration.</div>
 <pre class="code">deceleration = air_density × v² × Cd(Mach) × π/8 / (BC × 703.07)   // BC in lb/in²</pre>
 <div data-widget="drag-curves"></div>
@@ -183,7 +183,7 @@ they can turn an edge hit into a miss on a small plate.</div>
 </tbody></table>
 <div data-widget="coriolis"></div>
 <div class="callout tip"><b>Practical:</b> many shooters fold spin drift into their wind zero (e.g. "hold 0.1 L at 800, 0.2 L at 1000 in no wind").
-Coriolis matters at extreme range or for small targets; your solver handles it if you give it latitude and azimuth.</div>`,
+Coriolis matters at extreme range or for small targets; your solver handles it if you give it latitude and azimuth (compass direction of fire).</div>`,
         quiz: [
           { q: 'In the northern hemisphere, Coriolis pushes the bullet…', options: ['Left', 'Right', 'Only up'], answer: 1, why: 'Northern hemisphere deflection is to the right regardless of direction.' },
           { q: 'Right-twist barrel, wind from the right (3 o\'clock). Aerodynamic jump sends the shot…', options: ['High', 'Low', 'Nowhere'], answer: 1, why: 'For right twist: wind from left = high, wind from right = low.' },
@@ -197,7 +197,8 @@ Coriolis matters at extreme range or for small targets; your solver handles it i
 <div class="callout rule"><b>Rule:</b> A bullet is gyroscopically stable when its spin overpowers the aerodynamic force trying to flip it.
 The <b>stability factor Sg</b> (Miller formula) captures this: <b>&lt; 1.0 unstable · 1.0–1.4 marginal · &gt; 1.4 good · ~1.5+ for full BC</b>.</div>
 <pre class="code">Sg = 30·m / (t² · d³ · l · (1 + l²)) × (V/2800)^(1/3) × (T+460)/519 × 29.92/P
-m = weight (gr)   d = diameter (in)   l = length (calibers)   t = twist (calibers)</pre>
+m = weight (gr)   d = diameter (in)   l = length (calibers)   t = twist (calibers)
+"calibers" = measured in bullet diameters (e.g. a 1.4" long, .264" bullet is 5.3 calibers)</pre>
 <div data-widget="stability"></div>
 <ul>
 <li><b>Longer bullets need faster twist</b> — length matters more than weight. Monolithic copper bullets are long for their weight.</li>
@@ -251,7 +252,7 @@ parts are named after it (a "20 MOA" scope base). The one rule: never mix units 
         title: 'Reticles: FFP vs SFP and reticle styles',
         mins: 5,
         html: `
-<div class="callout rule"><b>Rule:</b> In a <b>first focal plane (FFP)</b> scope the reticle grows and shrinks with the image, so its subtensions are
+<div class="callout rule"><b>Rule:</b> In a <b>first focal plane (FFP)</b> scope the reticle grows and shrinks with the image, so its subtensions (the angle each mark covers) are
 correct at every magnification. In a <b>second focal plane (SFP)</b> scope they are correct only at one magnification (usually max).</div>
 <table class="tbl text">
 <thead><tr><th></th><th>FFP</th><th>SFP</th></tr></thead>
@@ -310,7 +311,7 @@ Metric: <code>range (m) = size (mm) / mils</code>.</div>
 <table class="tbl text">
 <thead><tr><th>Error source</th><th>Effect</th></tr></thead>
 <tbody>
-<tr><td>0.1 mil reading error on a small target</td><td>Huge: a 12" plate at 600 yd is 0.56 mil; reading 0.5 gives 667 yd</td></tr>
+<tr><td>0.1 mil reading error on a small target</td><td>Huge: a 12" plate at 600 yd is 0.56 mil; reading 0.46 gives ~725 yd</td></tr>
 <tr><td>Wrong assumed target size</td><td>Proportional range error</td></tr>
 <tr><td>SFP scope not at calibrated power</td><td>Wrong by the magnification ratio</td></tr>
 </tbody></table>
@@ -581,7 +582,7 @@ same place. Spend on barrel, optic and support before cosmetics.</div>
         mins: 6,
         html: `
 <div class="callout rule"><b>Rule:</b> Every cartridge is a trade-off between <b>wind performance</b> (BC + velocity), <b>recoil</b> (can you spot your hits?),
-<b>barrel life</b> and <b>ammo cost/availability</b>. The table below is computed live by this app's solver at sea level, 10 mph full-value wind.</div>
+<b>barrel life</b> and <b>ammo cost/availability</b>. The table below is computed live by this app's solver at sea level, 10 mph full-value (straight-across) wind.</div>
 <div data-widget="cartridge-table"></div>
 <table class="tbl text">
 <thead><tr><th>Category</th><th>Examples</th><th>Best for</th></tr></thead>
@@ -608,7 +609,7 @@ same place. Spend on barrel, optic and support before cosmetics.</div>
 <thead><tr><th>Type</th><th>What it is</th><th>Strengths</th><th>Watch out</th></tr></thead>
 <tbody>
 <tr><td>OTM / HPBT match</td><td>Open-tip match, hollow point from jacket forming, boat tail</td><td>Very consistent, the precision standard</td><td>Open tip is not designed to expand</td></tr>
-<tr><td>Secant ogive (VLD)</td><td>Very sharp nose profile</td><td>Highest BC</td><td>Sensitive to seating depth (jump)</td></tr>
+<tr><td>Secant ogive (VLD)</td><td>Very sharp nose profile</td><td>Highest BC</td><td>Sensitive to seating depth (jump — the gap between bullet and rifling)</td></tr>
 <tr><td>Tangent ogive</td><td>Gentle nose curve</td><td>Forgiving of seating depth</td><td>Lower BC</td></tr>
 <tr><td>Hybrid ogive</td><td>Tangent near the bearing surface, secant at the front</td><td>High BC <i>and</i> forgiving</td><td>Longer — needs twist</td></tr>
 <tr><td>Polymer / aluminum tip</td><td>Tip closes the meplat (e.g. ELD-M, A-Tip style)</td><td>More uniform BC bullet to bullet</td><td>—</td></tr>

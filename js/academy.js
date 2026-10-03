@@ -101,6 +101,7 @@
           so lessons unlock in order: pass a lesson's quiz to open the next.</p></div>
         <button class="btn primary big" id="ac-continue">${started ? 'Continue' : 'Start'}: ${nx.title} →</button>
       </div>
+      ${window.ISO && ISO.registry.module.course ? `<div class="map-hero-art">${figureHtml(ISO.registry.module.course(), '')}</div>` : ''}
       <div class="toc-tools"><h3>Table of contents</h3>
         <span><button class="btn" id="toc-expand">Expand all</button> <button class="btn" id="toc-collapse">Collapse all</button></span></div>
       <div class="path">${MODULES.map((m, k) => {
@@ -118,6 +119,7 @@
         }).join('');
         return `<details class="path-mod ${status.toLowerCase().replace(' ', '-')}"${openMod ? ' open' : ''}>
           <summary>
+            ${moduleThumb(m)}
             <span class="path-num">${m.reference ? '★' : modComplete(m) ? CHECK : unlocked ? num(m) : LOCK}</span>
             <span class="path-body">
               <span class="path-top"><b>${m.reference ? '' : `Module ${num(m)} · `}${m.title}</b><span class="path-status">${status}</span></span>
@@ -173,11 +175,48 @@
       const w = WIDGETS[el.dataset.widget];
       if (w) w(el);
     });
+    renderFigures(l);
     renderQuiz(l);
     renderNav(l, prev, next);
     renderLessonToc();
     renderSide();
     if (!noScroll) $('#tab-academy').scrollIntoView({ block: 'start' });
+  }
+
+  // Isometric illustrations registered in js/illus/*.js (ISO.lesson / ISO.module)
+  function figureHtml(svg, caption) {
+    return `<figure class="illus">${svg}${caption ? `<figcaption>${caption}</figcaption>` : ''}</figure>`;
+  }
+  function renderFigures(l) {
+    const ISO = window.ISO;
+    if (!ISO) return;
+    const body = $('#ac-main .ac-body');
+    let figs = ISO.registry.lesson[l.id] || [];
+    if (!figs.length && ISO.registry.module[l.m.id]) figs = [{ draw: ISO.registry.module[l.m.id], caption: '' }];
+    figs.forEach((f) => {
+      let svg;
+      try { svg = f.draw(); } catch (e) { console.error('illustration failed', l.id, e); return; }
+      const html = figureHtml(svg, f.caption);
+      const rule = $('.callout.rule', body);
+      if (f.at === 'top' || (!rule && f.at !== 'end')) body.insertAdjacentHTML('afterbegin', html);
+      else if (f.at === 'end') body.insertAdjacentHTML('beforeend', html);
+      else if (f.at && f.at.startsWith('before:') && $(f.at.slice(7), body)) $(f.at.slice(7), body).insertAdjacentHTML('beforebegin', html);
+      else if (f.at && f.at.startsWith('after:') && $(f.at.slice(6), body)) $(f.at.slice(6), body).insertAdjacentHTML('afterend', html);
+      else {
+        // after the rule, keeping figures in registration order
+        const prevFigs = [];
+        let n = rule.nextElementSibling;
+        while (n && n.matches('figure.illus')) { prevFigs.push(n); n = n.nextElementSibling; }
+        (prevFigs[prevFigs.length - 1] || rule).insertAdjacentHTML('afterend', html);
+      }
+    });
+  }
+
+  function moduleThumb(m) {
+    const ISO = window.ISO;
+    const draw = ISO && ISO.registry.module[m.id];
+    if (!draw) return '';
+    try { return `<span class="path-thumb">${draw()}</span>`; } catch (e) { return ''; }
   }
 
   // "In this lesson": the rule, each section heading, widgets, recap, quiz

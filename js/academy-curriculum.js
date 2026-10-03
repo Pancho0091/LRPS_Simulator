@@ -29,15 +29,15 @@ An accident needs <i>every</i> rule to fail at the same time — so you follow a
 <thead><tr><th>#</th><th>Rule</th><th>What it prevents</th></tr></thead>
 <tbody>
 <tr><td>1</td><td>Treat every firearm as if it is loaded</td><td>"I thought it was empty" — the most common cause of accidents</td></tr>
-<tr><td>2</td><td>Never let the muzzle point at anything you are not willing to destroy</td><td>If rule 1 fails, nobody is in the line of fire</td></tr>
+<tr><td>2</td><td>Never let the muzzle (the open front end of the barrel) point at anything you are not willing to destroy</td><td>If rule 1 fails, nobody is in the line of fire</td></tr>
 <tr><td>3</td><td>Keep your finger off the trigger until your sights are on the target and you have decided to shoot</td><td>Unintended discharges from startle, stumbling or gripping</td></tr>
 <tr><td>4</td><td>Be sure of your target and what is beyond it</td><td>Hitting the wrong thing; bullets travel well over a mile</td></tr>
 </tbody></table>
 <h4>Range basics</h4>
 <ul>
 <li><b>Eye and ear protection, always.</b> A rifle shot is roughly 150–170 dB; hearing damage starts well below that and is permanent.</li>
-<li><b>Cold range</b> = nobody shoots, actions open, chamber flags in, people may go downrange. <b>Hot range</b> = shooting allowed. Obey "cease fire" instantly.</li>
-<li>Transport rifles unloaded with the action open or a <b>chamber flag</b> inserted.</li>
+<li><b>Cold range</b> = nobody shoots, actions (the rifle's loading mechanism) open, chamber flags in, people may go downrange. <b>Hot range</b> = shooting allowed. Obey "cease fire" instantly.</li>
+<li>Transport rifles unloaded with the action open or a <b>chamber flag</b> (a bright insert that shows the chamber is empty) inserted.</li>
 <li>Only shoot where a proper <b>backstop</b> (berm) stops every bullet, including misses.</li>
 </ul>
 <div class="callout analog"><b>Technical analog:</b> the four rules are redundant guards around one dangerous operation.
@@ -71,7 +71,7 @@ An accident needs <i>every</i> rule to fail at the same time — so you follow a
 <ul>
 <li><b>Precision</b> = how tight your group is (shots land close to each other).</li>
 <li><b>Accuracy</b> = how close the group's center is to where you aimed.</li>
-<li>A precise rifle with wrong data shoots tight groups in the wrong place. A dope card fixes accuracy; equipment and skill fix precision.</li>
+<li>A precise rifle with wrong data shoots tight groups in the wrong place. A dope card (your table of scope adjustments for each distance) fixes accuracy; equipment and skill fix precision.</li>
 </ul>
 <div class="callout analog"><b>Technical analog:</b> like a tolerance stack-up or a latency budget. Errors add up (roughly as the square root of the sum of squares),
 so the biggest single error dominates — fix that one first.</div>
@@ -166,7 +166,7 @@ unit <b>and its typical range</b>, so a wrong number looks wrong instantly.</div
 <tr><td>Twist rate</td><td>1:x inches</td><td>1:7 – 1:12</td><td>1:8 = one full turn of rifling every 8 inches</td></tr>
 <tr><td>Aim adjustments</td><td>milliradians (MIL)</td><td>0 – 15 MIL</td><td>The angle unit of this whole app</td></tr>
 </tbody></table>
-<div class="callout analog"><b>Technical analog:</b> units are <b>types</b>. Adding yards to meters or using a G1 number in a G7 field is a type error —
+<div class="callout analog"><b>Technical analog:</b> units are <b>types</b>. Adding yards to meters or using a G1 number in a G7 field (two different drag-rating scales, module 07) is a type error —
 the math runs, the answer is silently wrong.</div>`,
         recap: ['Bullets in grains, speed in fps, distance in yards (or meters — not both).', 'Twist 1:8 = one turn per 8 inches.', 'Aim adjustments are angles in MIL.'],
         quiz: [
@@ -349,7 +349,7 @@ the shot and a rigid lock</b> mean more consistency — which is why most precis
         title: 'The barrel: rifling, twist, length, contour',
         mins: 6,
         terms: ['Lands & grooves', 'Chamber', 'Throat', 'Crown', 'Contour'],
-        builds: 'Uses: rifling (01), twist rate (01)',
+        builds: 'Uses: rifling (00), twist rate (01)',
         html: `
 <div class="callout rule"><b>Rule:</b> The barrel is the single biggest contributor to a rifle's precision. It must spin the bullet at the right rate,
 release it identically every time, and stay consistent as it heats up.</div>
@@ -383,7 +383,7 @@ Fit comes before features.</div>
 <table class="tbl text">
 <thead><tr><th>Component</th><th>Options</th><th>What to look for</th></tr></thead>
 <tbody>
-<tr><td>Stock</td><td>Wood, composite, or metal <b>chassis</b></td><td>Rigid, action bedded or in an aluminium block</td></tr>
+<tr><td>Stock</td><td>Wood, composite, or metal <b>chassis</b></td><td>Rigid, action bedded (precisely fitted, often with epoxy) or in an aluminium block</td></tr>
 <tr><td>Adjustability</td><td>Length of pull (LOP), cheek riser height</td><td>Natural head position, eye centered behind the scope</td></tr>
 <tr><td>Rails</td><td>ARCA (dovetail) and Picatinny</td><td>Mount bipods, tripods, bags quickly</td></tr>
 <tr><td>Trigger</td><td>Single-stage or two-stage, adjustable weight</td><td>Clean break, ~1.5–3 lb, no creep</td></tr>
@@ -409,7 +409,7 @@ Pick the discipline first; it tells you the platform.</div>
 <tr><td>Hunting</td><td>One shot, often moving, carry all day</td><td>Light bolt action (7–10 lb), sporter barrel</td></tr>
 <tr><td>PRS / NRL (centerfire)</td><td>Timed stages from props and barricades, 300–1,200 yd</td><td>Heavy chassis bolt gun (14–18 lb), 6 mm / 6.5 mm, brake</td></tr>
 <tr><td>NRL Hunter</td><td>Field positions, rangefinding, carry-weight limits</td><td>Mid-weight hunting-style precision rifle</td></tr>
-<tr><td>Rimfire (NRL22 / PRS Rimfire)</td><td>PRS-style stages at 25–300 yd</td><td>.22 LR bolt rifle in a chassis</td></tr>
+<tr><td>Rimfire (NRL22 / PRS Rimfire)</td><td>PRS-style stages, mostly 25–100 yd (some matches farther)</td><td>.22 LR bolt rifle in a chassis</td></tr>
 <tr><td>F-Class</td><td>Prone, front rest + rear bag, 300–1,000 yd, scored rings</td><td>Very heavy, long barrel, high magnification</td></tr>
 <tr><td>Benchrest</td><td>Smallest groups from a bench</td><td>Single-shot specialist rifles</td></tr>
 <tr><td>ELR (extreme long range)</td><td>1,500 – 3,500+ yd</td><td>.375/.416-class magnums, 25+ lb</td></tr>
@@ -502,7 +502,7 @@ advanced skill. Only ever use published load data from reputable manuals, start 
 <tr><td>Cartridge</td><td>Must match your barrel exactly</td></tr>
 <tr><td>Bullet weight & type</td><td>Match / OTM for precision; check your twist can stabilise it</td></tr>
 <tr><td>BC</td><td>Use the G7 value for long boat-tail bullets</td></tr>
-<tr><td>MV + test barrel</td><td>Your barrel length and chamber give a different MV — chronograph it</td></tr>
+<tr><td>MV + test barrel</td><td>Your barrel length and chamber give a different MV — chronograph it (measure it with a velocity-measuring device)</td></tr>
 <tr><td>Lot number</td><td>Buy one lot in bulk; re-check MV when the lot changes</td></tr>
 </tbody></table>`,
         recap: ['Box = spec sheet; MV and BC are starting points.', 'Use G7 BC for modern match bullets.', 'Stick to one lot and re-measure when it changes.'],
@@ -537,7 +537,7 @@ replaceable primer in the center of the base. That one design choice decides cos
 <tr><td>Best for</td><td>Training fundamentals, wind reading</td><td>Long-range precision</td></tr>
 </tbody></table>
 <div class="callout warn"><b>Exception:</b> .22 LR leaves the muzzle near the speed of sound (~1,050–1,250 fps). Subsonic and high-velocity .22 behave differently,
-and supersonic rounds go transonic almost immediately — one reason .22 drifts so much in wind.</div>`,
+and supersonic rounds go transonic (slow into the unsteady zone around the speed of sound, module 07) almost immediately — one reason .22 drifts so much in wind.</div>`,
         recap: ['Rimfire: primer in the rim, cheap, low power, not reloadable.', 'Centerfire: central primer, powerful, reloadable.', '.22 LR is the best-value trainer.'],
         quiz: [
           { q: 'Where is the primer in a centerfire cartridge?', options: ['In the rim', 'In the center of the base', 'In the bullet'], answer: 1, why: 'Hence "centerfire".' },
@@ -655,7 +655,7 @@ not the one with the most energy. Skill grows with rounds fired.</div>
 <tr><td>Barrel life</td><td>More practice before a rebarrel</td></tr>
 <tr><td>Cost per round</td><td>More rounds = more learning</td></tr>
 </tbody></table>
-<div class="callout try"><b>Verify:</b> load each system on <a data-goto="build">Build Card</a> and compare the 1,000 yd wind hold and transonic range.</div>`,
+<div class="callout try"><b>Verify:</b> load each system on <a data-goto="build">Build Card</a> and compare the 1,000 yd wind hold and transonic range (the distance where the bullet slows to near the speed of sound).</div>`,
         recap: ['Pick for practice volume, low recoil and consistent ammo.', '.22 LR trainer + 6.5 Creedmoor or .308 is a classic path.'],
         quiz: [
           { q: 'Best first priority for a learning cartridge?', options: ['Maximum energy', 'Low recoil and affordable, consistent ammo', 'Longest name'], answer: 1, why: 'Skill comes from many well-observed shots.' },

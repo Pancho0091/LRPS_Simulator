@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Illustration gallery (dev)</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    body { padding: 20px; }
+    .g { display: grid; grid-template-columns: repeat(auto-fill, minmax(520px, 1fr)); gap: 18px; }
+    .g h4 { margin: 0 0 6px; font: 600 13px var(--mono); color: var(--muted); }
+  </style>
+</head>
+<body>
+  <h2>Illustration gallery <small class="muted">(dev only — not deployed)</small></h2>
+  <p class="hint">?only=lessonId,moduleId filters. Engine self-test first.</p>
+  <div class="g" id="g"></div>
+  <script src="../js/iso.js"></script>
+  <script src="../js/illus/core.js"></script>
+  <script src="../js/illus/a.js"></script>
+  <script src="../js/illus/b.js"></script>
+  <script src="../js/illus/c.js"></script>
+  <script src="../js/illus/d.js"></script>
+  <script>
+    const g = document.getElementById('g');
+    const only = new URLSearchParams(location.search).get('only');
+    const want = only ? only.split(',') : null;
+    function add(name, svg, cap) {
+      const d = document.createElement('div');
+      d.innerHTML = `<h4>${name}</h4><figure class="illus">${svg}${cap ? `<figcaption>${cap}</figcaption>` : ''}</figure>`;
+      g.appendChild(d);
+    }
+    // Engine self-test: every primitive on every axis
+    if (!want || want.includes('selftest')) {
+      const s = ISO.scene({ w: 640, h: 360, origin: [300, 70], scale: 9 });
+      s.floor(-4, -4, 40, 30, { grid: 4 });
+      s.shadow(0, 0, 6, 6); s.box(0, 0, 0, 6, 6, 6, { color: ISO.C.blue });
+      s.lathe(10, 2, 3, [[0, 2], [8, 2], [10, 1.2], [12, 0]], { axis: 'x', color: ISO.C.brass });
+      s.lathe(2, 12, 2, [[0, 1.6], [10, 1.6]], { axis: 'y', color: ISO.C.coral });
+      s.lathe(20, 18, 0, [[0, 3], [5, 3], [5.5, 0]], { axis: 'z', color: ISO.C.green });
+      s.extrude([[0, 0], [10, 0], [10, 3], [4, 3], [2, 7], [0, 7]], 0, 2, { plane: 'xz', at: [14, 12, 0], color: ISO.C.purple });
+      s.extrude([[0, 0], [6, 0], [6, 4], [0, 4]], 0, 3, { plane: 'yz', at: [28, 0, 0], color: ISO.C.amber });
+      s.sphere(30, 20, 3, 3, { color: ISO.C.pink });
+      s.label([3, 3, 6], 'box', { dx: -50, dy: -30, n: 1 });
+      s.label([20, 2, 5], 'lathe x', { dx: 30, dy: -40, n: 2 });
+      s.label([20, 18, 5.5], 'lathe z', { dx: 40, dy: -30, n: 3, color: ISO.C.green });
+      add('selftest', s.svg(), 'Engine self-test: box, lathe (x/y/z), extrude (xz/yz), sphere, labels.');
+    }
+    const R = ISO.registry;
+    Object.entries(R.module).forEach(([id, draw]) => { if (!want || want.includes(id)) add('module: ' + id, draw()); });
+    Object.entries(R.lesson).forEach(([id, figs]) => figs.forEach((f, i) => { if (!want || want.includes(id)) add(`lesson: ${id} #${i + 1}`, f.draw(), f.caption); }));
+  </script>
+</body>
+</html>
