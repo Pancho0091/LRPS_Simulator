@@ -21,6 +21,12 @@
     s.raw(`<text transform="matrix(${m.join(',')},${q[0].toFixed(1)},${q[1].toFixed(1)})" font-size="${o.size || 12}" font-weight="${o.weight || 700}" fill="${o.color || C.ink}" text-anchor="${o.anchor || 'middle'}"${o.mono ? ' font-family="JetBrains Mono, monospace"' : ''}${o.opacity != null ? ` opacity="${o.opacity}"` : ''} dominant-baseline="central">${esc}</text>`);
   }
 
+  // Small numbered badge at a 3D point (screen-space circle)
+  function badge(s, p, t, color) {
+    const q = s.P(p);
+    s.raw(`<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="9" fill="${color}" stroke="#fff" stroke-width="1.5"/><text x="${q[0].toFixed(1)}" y="${(q[1] + 4.2).toFixed(1)}" text-anchor="middle" font-size="11.5" font-weight="800" fill="#fff">${t}</text>`, 5);
+  }
+
   // Box with a soft shadow under it
   function block(s, x, y, z, w, d, h, color, o) {
     if (!z) s.shadow(x - 0.3, y - 0.3, w + 0.6, d + 0.6, { opacity: 0.12 });
@@ -282,8 +288,8 @@
     if (opt.mag) obox(s, A(20, zb - 2.2), 2.6, 1.3, 2.4, C.black, ax3);
     lathe3(s, A(15.5, ax), U, [[0, 0.8], [11, 0.8]], { color: opt.metal, segments: 14 });
     lathe3(s, A(26.5, ax), U, [[0, opt.br * 1.45], [3, opt.br * 1.35], [opt.blen, opt.br]], { color: opt.metal, segments: 14 });
-    const knob = add3(A(21.6, ax - 0.9), W, 2.4);
-    if (opt.handle !== false) { s.line([A(21.6, ax), knob], { color: C.steel, width: 2.6 }); s.sphere(...knob, 0.55, { color: C.steel, rings: 5, segments: 10 }); }
+    const knob = add3(A(18.2, ax - 0.9), W, 2.4);
+    if (opt.handle !== false) { s.line([A(18.2, ax), knob], { color: C.steel, width: 2.6 }); s.sphere(...knob, 0.55, { color: C.steel, rings: 5, segments: 10 }); }
     let muz = 26.5 + opt.blen;
     if (opt.brake) { lathe3(s, A(muz, ax), U, [[0, opt.br * 1.5], [2.8, opt.br * 1.5]], { color: C.black, segments: 12 }); muz += 2.8; }
     const sz = ax + 1.6 + opt.scopeR * 1.2;
@@ -729,13 +735,17 @@
       // --- row 1: bolt action
       tile(s, add3([0, 0, 0], W, 0), T, 52, 3.6, 4);
       const r = hRifle(s, [0, 0, 0], { U: T, blen: 22 });
-      const kn = add3(r.knob, W, 0.6);
-      const up = add3(kn, Z, 2.8);
-      s.curve((t) => add3(add3(kn, Z, 2.6 * Math.sin(t * Math.PI / 2)), W, -0.8 * (1 - Math.cos(t * Math.PI / 2))), 0.15, 1, { color: C.blue, width: 3, arrow: true, arrowSize: 9, samples: 12 });
-      s.line([add3(add3(up, W, -0.8), T, -0.4), add3(add3(up, W, -0.8), T, -7)], { color: C.blue, width: 3, arrow: true, arrowSize: 9 });
-      s.line([add3(add3(kn, Z, 1.2), T, -7), add3(add3(kn, Z, 1.2), T, -1)], { color: C.green, width: 3, arrow: true, arrowSize: 9 });
-      s.curve((t) => add3(add3(add3(kn, T, -0.6), Z, 1.0 - 1.2 * t), W, 0.4 * t), 0, 1, { color: C.green, width: 3, arrow: true, arrowSize: 9, samples: 6 });
-      [['1', add3(add3(kn, T, 1.4), Z, 1.6)], ['2', add3(add3(up, T, -7.8), Z, 0)], ['3', add3(add3(kn, T, -8), Z, 1.2)], ['4', add3(add3(kn, T, -1.6), Z, -0.6)]].forEach(([t, p], i) => s.text3(p, t, { size: 14, weight: 800, color: i < 2 ? C.blue : '#239e6f', anchor: 'middle', dy: 5 }));
+      const P0 = add3(r.knob, W, 2.2);
+      const arr = (pts, col) => s.line(pts, { color: col, width: 3.4, arrow: true, arrowSize: 10 });
+      s.line([r.knob, P0], { color: C.steel, width: 1.2, dash: '2 3' });
+      arr([add3(P0, Z, 0.4), add3(P0, Z, 3.2)], C.blue);
+      arr([add3(add3(P0, Z, 3.8), T, -0.4), add3(add3(P0, Z, 3.8), T, -8)], C.blue);
+      arr([add3(add3(P0, Z, 2.0), T, -8), add3(add3(P0, Z, 2.0), T, -1.4)], C.green);
+      arr([add3(add3(P0, Z, 1.6), T, 1.0), add3(add3(P0, Z, -0.6), T, 1.0)], C.green);
+      badge(s, add3(add3(P0, Z, 1.8), T, -1.4), '1', C.blue);
+      badge(s, add3(add3(P0, Z, 5.2), T, -4.2), '2', C.blue);
+      badge(s, add3(add3(P0, Z, 0.6), T, -4.6), '3', '#239e6f');
+      badge(s, add3(add3(P0, Z, 0.5), T, 2.6), '4', '#239e6f');
       s.text3(r.A(0, 13), 'Bolt action', { size: 17, weight: 800, color: C.blue });
       s.text3(r.A(0, 13), '1 lift · 2 pull back · 3 push forward · 4 close — by hand', { size: 12.5, weight: 500, dy: 18 });
       // --- row 2: semi-auto (AR style) with the gas loop
@@ -757,13 +767,13 @@
       obox(s, A(15, ax + 2.2), 1, 1.1, 1.0, C.black, ax3); obox(s, A(23, ax + 2.2), 1, 1.1, 1.0, C.black, ax3);
       lathe3(s, A(11.5, ax + 3.6), T, [[0, 0.95], [2.5, 0.95], [3.5, 0.6], [12, 0.6], [13, 1.0], [15, 1.05]], { color: C.ink, segments: 14 });
       s.line([A(33, zb + 1), add3(A(31.5, 0), W, 1.8)], { color: C.gunmetal, width: 3 });
-      s.line([A(38, ax + 6.4), A(29, ax + 6.4)], { color: C.coral, width: 3, arrow: true, arrowSize: 10 });
-      s.line([add3(A(13.5, ax - 1.6), W, 1.8), add3(A(6.5, ax - 1.6), W, 1.8)], { color: C.blue, width: 3, arrow: true, arrowSize: 9 });
-      s.line([add3(A(6.5, ax - 3.1), W, 1.8), add3(A(13.5, ax - 3.1), W, 1.8)], { color: C.green, width: 3, arrow: true, arrowSize: 9 });
+      s.line([A(38.5, ax + 2.3), A(27.5, ax + 2.3)], { color: C.coral, width: 3, arrow: true, arrowSize: 10 });
+      s.line([add3(A(21, ax + 0.1), W, 1.15), add3(A(14, ax + 0.1), W, 1.15)], { color: C.blue, width: 3, arrow: true, arrowSize: 9 });
+      s.line([add3(A(14, ax - 2.2), W, 1.15), add3(A(21, ax - 2.2), W, 1.15)], { color: C.green, width: 3, arrow: true, arrowSize: 9 });
       s.text3(A(0, 13), 'Semi-automatic', { size: 17, weight: 800, color: C.coral });
       s.text3(A(0, 13), 'the fired round’s own gas cycles the bolt', { size: 12.5, weight: 500, dy: 18 });
-      s.label(A(34, ax + 1.6), 'Gas tapped from the barrel runs back', { dx: 30, dy: -46, n: 1, color: C.coral });
-      s.label(add3(A(10, ax - 1.6), W, 1.8), 'Carrier slams back, spring returns it', { dx: 40, dy: 66, n: 2, color: C.blue });
+      s.label(A(33, ax + 2.3), 'Gas tapped from the barrel runs back', { dx: 40, dy: -40, n: 1, color: C.coral });
+      s.label(add3(A(16, ax - 2.2), W, 1.15), 'Carrier slams back, spring returns it', { dx: 30, dy: 76, n: 2, color: C.blue });
       s.label(r.A(24, r.ax + 0.6), 'Locked shut during the shot', { dx: 70, dy: -40, n: '✓', color: C.green });
       return s.svg();
     },
@@ -821,7 +831,7 @@
         tile(s, o, T, 60, 2.8, 4);
         obox(s, A(0, 0), 6, 2.6, 3.4, C.gunmetal, ax3);
         lathe3(s, A(6, 2.2), T, [[0, 0.7], [3, 0.62], [len * 1.05, 0.48]], { color: C.gunmetal, segments: 14 });
-        s.text3(A(6 + len * 0.55, 2.2), len + '" barrel', { size: 13, weight: 800, anchor: 'middle', dy: -13, color: 'var(--illus-ink)' });
+        s.text3(A(6 + len * 0.5, 2.2), len + '" barrel', { size: 13, weight: 800, anchor: 'middle', dy: -18, color: 'var(--illus-ink)' });
         const bl = (v - 2300) / 25 * 0.5;
         obox(s, A(bx, 0), bl, 2.4, 1.8, col, ax3);
         s.text3(A(bx + bl + 0.8, 0.9), v.toLocaleString('en-US') + ' fps', { size: 14, weight: 800, dy: 6 });
@@ -854,9 +864,9 @@
       s.line([A(9, r.zb + 4.2), A(9, r.zb + 2.4)], { color: C.coral, width: 2.8, arrow: true, arrowSize: 8 });
       s.label(A(9, r.zb + 6.2), 'Cheek riser height', { dx: -20, dy: -50, n: 1, color: C.coral });
       s.label(A(1.2, r.sz + 0.6), 'Eye centred behind the scope', { dx: 130, dy: -60, n: 2, color: C.green });
-      s.label(r.trigger, 'Trigger: clean break, ~1.5–3 lb', { dx: 20, dy: 96, n: 3, color: C.ink });
-      s.label(r.mag, 'Detachable magazine', { dx: 120, dy: 50, n: 4, color: C.slate });
-      s.label(A(31, r.zb - 0.4), 'ARCA rail', { dx: 60, dy: 40, n: 5, color: C.slate });
+      s.label(r.trigger, 'Trigger: clean break, ~1.5–3 lb', { dx: 10, dy: 112, n: 3, color: C.ink });
+      s.label(r.mag, 'Detachable magazine', { dx: 40, dy: 70, n: 4, color: C.slate });
+      s.label(A(31, r.zb - 0.4), 'ARCA rail', { dx: 110, dy: 30, n: 5, color: C.slate });
       s.label(r.action, 'Rigid action bedding', { dx: 90, dy: -76, n: 6, color: C.blue });
       return s.svg();
     },
@@ -877,10 +887,10 @@
       rows.forEach(([name, sub, col, opt], i) => {
         const o = rowOff(18 * i);
         const A = (u, z) => along(o, T, u, z);
-        obox(s, A(-1, 0), 63, 5, 0.9, ISO.shade(col, 0.5), ax3);
+        obox(s, A(-1, 0), 62, 5, 0.9, ISO.shade(col, 0.5), ax3);
         hRifle(s, [o[0], o[1], 0.9], Object.assign({ U: T }, opt));
-        s.text3(A(64, 2), name, { size: 15, weight: 800, color: col === C.amber ? '#c9861c' : col, dy: -6 });
-        s.text3(A(64, 2), sub, { size: 11.5, weight: 500, dy: 10 });
+        s.text3(A(64, 3.5), name, { size: 15, weight: 800, color: col === C.amber ? '#c9861c' : col, dy: -6 });
+        s.text3(A(64, 3.5), sub, { size: 11.5, weight: 500, dy: 10 });
       });
       return s.svg();
     },
