@@ -4,12 +4,12 @@
 
 **Long-range precision shooting academy · ballistic solver · dope card builder · realistic range simulator**
 
-[![Version](https://img.shields.io/badge/version-v2.4.0-f59e0b?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
+[![Version](https://img.shields.io/badge/version-v2.5.0-f59e0b?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
 [![Updated](https://img.shields.io/badge/last%20updated-2026--10--03-6b7280?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
 [![Live](https://img.shields.io/badge/live-pancho0091.github.io%2FLRPS__Simulator-4ade80?style=for-the-badge&labelColor=0a0e0c)](https://pancho0091.github.io/LRPS_Simulator/)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-auto--deploy-222222?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Pancho0091/LRPS_Simulator/actions/workflows/pages.yml)
 [![JavaScript](https://img.shields.io/badge/JavaScript-vanilla%2C%20no%20build-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/docs/Web/JavaScript)
-[![Tests](https://img.shields.io/badge/node%3Atest-68%20passing-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](./test)
+[![Tests](https://img.shields.io/badge/node%3Atest-83%20passing-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](./test)
 [![License](https://img.shields.io/badge/License-MIT-3b82f6?style=for-the-badge&labelColor=0a0e0c)](./LICENSE)
 
 ### ▶ [Open the simulator](https://pancho0091.github.io/LRPS_Simulator/)
@@ -28,11 +28,11 @@ field solver would give you. The app is built around one idea: a dope card is a 
 `f(range, conditions) → (elevation, wind)`, and you learn it best by building one and then shooting with it.
 
 ```
-Academy  ──▶  Lab  ──▶  Build Card  ──▶  Drills  ──▶  Range
- 13 modules    sliders    your rifle        write it      chrono, zero,
- 57 lessons    predict    system + card     by hand       shoot a day
- pass to       reveal     print / CSV       graded        on your own
- unlock next                                              paper
+Academy  ──▶  Lab  ──▶  Build Card  ──▶  Drills  ──▶  Range  ──▶  Data Book
+ 13 modules    sliders    your rifle        write it      chrono, zero,   your REAL rifle:
+ 57 lessons    predict    system + card     by hand       shoot a day     record zero, chrono
+ pass to       reveal     print / CSV       graded        on your own     and field dope with
+ unlock next                                              paper           conditions stamped
 
 00 Safety ─▶ 01 Terms ─▶ 02 History ─▶ 03 Platforms ─▶ 04 Ammo ─▶ 05 Bullet types ─▶ 06 Calibers
    ─▶ 07 Ballistics ─▶ 08 Optics ─▶ 09 Equipment ─▶ 10 Positions ─▶ 11 Dope cards ─▶ 12 Field craft
@@ -41,7 +41,7 @@ Academy  ──▶  Lab  ──▶  Build Card  ──▶  Drills  ──▶  Ra
 Everything is in **MIL** — reticle, turrets (0.1 mil clicks), card, spotter calls.
 
 Static site, no build step, no dependencies. Every push to the deploy branch runs the solver tests and
-republishes to GitHub Pages. Course progress, XP and rank, your card, Range setup, the Range session in progress and preferences live in the browser's localStorage. The app makes no network request after it loads: fonts are self-hosted and a Content-Security-Policy pins every asset to the site itself.
+republishes to GitHub Pages. Course progress, XP and rank, your card, Range setup, the Range session in progress, your Data Book and preferences live in the browser's localStorage. The app makes no network request after it loads: fonts are self-hosted and a Content-Security-Policy pins every asset to the site itself.
 
 ---
 
@@ -57,7 +57,7 @@ republishes to GitHub Pages. Course progress, XP and rank, your card, Range setu
 | **Audio** | Web Audio API | Synthesized shot, steel ding, turret clicks — no audio files |
 | **Styling** | CSS custom properties | Light / dark themes, Inter + JetBrains Mono |
 | **Hosting** | GitHub Pages via Actions | `.github/workflows/pages.yml`, Node 22, deploys only if tests pass, cache-busted asset URLs |
-| **Testing** | `node:test` + Playwright | 68 physics/solver tests (`test/ballistics.test.js` + `test/physics-audit.test.js`): zero, wind linearity, DA, angle, stability, Coriolis direction, aero jump sign, temp sensitivity, Range rifle truth · 32-scenario browser smoke test (`npm run smoke`: every tab, the full Academy course, every Range mode, storage robustness, mobile, a11y, perf; Playwright installed globally or as a devDependency — it is not in `package.json`) |
+| **Testing** | `node:test` + Playwright | 83 tests (`test/ballistics.test.js`, `test/physics-audit.test.js`, `test/book.test.js`): zero, wind linearity, DA, angle, stability, Coriolis direction, aero jump sign, temp sensitivity, Range rifle truth, Data Book records / validation / merge / chrono stats · 34-scenario browser smoke test (`npm run smoke`: every tab, the full Academy course, every Range mode, the Data Book flows, storage robustness, mobile, a11y, perf; Playwright installed globally or as a devDependency — it is not in `package.json`) |
 
 ---
 
@@ -131,6 +131,22 @@ paper — the Range never shows a dope card or a solution while you shoot. A pri
 - **Debrief**: what you measured vs the truth (MV, SD, zero residual, tracking, cold bore, heat, bad LRF returns, air), **true dope from your zero vs what you dialed** per distance, and a layer-by-layer **"what changed"** table from box data on a standard day to the real rifle on the real day
 - **Keyboard**: `↑` `↓` elevation · `←` `→` wind · `Shift` ×5 · `Space` / `Enter` / `F` fire · `B` hold breath · `L` level · `R` lase · `N` next target · `Z` / `+` zoom in · `−` zoom out · `0` reset dials
 
+### Data Book
+
+The Range is a simulator with synthetic truth. The Data Book is for your **real rifle on a real range**: record what you measure so later
+phases can true the solver to your numbers and generate field cards. Phase 1 is **record only** — nothing is predicted.
+Governing rule: **identity on the rifle profile, measurements on the ammo lot, evidence on each row, and a snapshot of the conditions stored on every row — never recomputed later.**
+
+- **Rifle profiles** (name, barrel, twist, sight height, elevation travel, zero range, 0.1 mil clicks) and **ammo lots** per rifle (load, lot #, bullet, BC / drag model, chronograph string). Seed a lot from the Range catalogue's 18 factory loads and a rifle's travel from its optics, then edit
+- **Conditions panel** shared by every flow: altitude, temperature, station pressure (follows the altitude as standard until you touch it), humidity, and the **density altitude computed live** by the solver's own atmosphere — the number you write on the card. **Use GPS** fills the altitude from `navigator.geolocation` and degrades to a one-line hint when the API is absent, denied or insecure
+- **Three recording flows**, 1–2 taps per entry: **Zero** (range, group size, dial correction from mechanical zero, "Zero confirmed") · **Chrono** (tap-add velocities seeded from the last one, live avg / SD / ES / n, save writes the string to the session *and* to the lot) · **Field dope** (range, angle, dial E/W, wind mph + clock, HIT / HIGH / LOW / LEFT / RIGHT / MISS with an optional off-by mil, one tap to log; rows newest first, each carrying its own conditions snapshot)
+- **Steppers, not keyboards**: −/+ with a big number, 48 px targets, hold to repeat with acceleration, last value pre-filled; typing still works (`inputmode="decimal"`)
+- **Field mode**: high contrast, bigger type, fewer decorations, for gloves and bright sun. Light and dark themes
+- **Sessions list** per rifle (date, kind, place, DA, one-line summary); tap to reopen, print or delete. Deleting a rifle asks first and cascades; deleting a lot unlinks its sessions but keeps them
+- **Export / Import**: the whole book as `lrps-databook-YYYY-MM-DD.json`; import validates every record and **merges by id, never overwriting a newer record** — bad files leave the book untouched
+- **Print session**: a clean sheet with the rifle, lot, conditions and the session's rows plus blank card lines to write your own dope from
+- Stored under `lrps.book` (`{ v: 1, rifles, lots, sessions }`); the pure logic (`js/book/model.js`) is shared with the node tests
+
 ---
 
 ## Architecture
@@ -140,6 +156,7 @@ index.html                shell, tabs, static content
 fonts/                    Inter + JetBrains Mono (woff2, self-hosted)
 css/style.css             design tokens, light/dark themes, components
 css/range.css             Range tab: session stepper, stations, instruments, print sheet
+css/book.css              Data Book tab: steppers, conditions, flows, field mode, print sheet
 js/ballistics.js          solver (UMD — loads in the browser and in Node tests)
 js/common.js              profile store, unit helpers, card math, sound, XP, toasts, SVG chart
 js/iso.js                 isometric SVG engine: scene, solids, lathe/extrude, labels, registry
@@ -155,8 +172,11 @@ js/range.js               Range tab: session flow, stations, firing, debrief, pr
 js/range/data.js          Range catalogue: cartridges, loads, rifles, optics, positions, locations, toggles
 js/range/world.js         Range day, wind field, rifle truth, per-shot ballistics, rangefinder
 js/range/scene.js         Canvas rendering: scope view, reticle, level, mirage, wind flags
+js/book.js                Data Book tab: rifle/lot pickers, conditions + DA, zero/chrono/field flows, export/import, print
+js/book/model.js          Data Book model (UMD): record shapes, validation, merge, DA snapshot, chrono stats
 test/ballistics.test.js   node:test suite for the solver
 test/physics-audit.test.js physics audit: sign conventions, limits, degenerate inputs, Range rifle truth
+test/book.test.js         Data Book model: DA from conditions, chrono stats, validation, merge, record shapes
 scripts/smoke.js          Playwright browser smoke test
 dev/                      illustration gallery + screenshot helper (not deployed)
 ```
@@ -183,6 +203,7 @@ Validated against published numbers: 6.5 Creedmoor 140 gr ELD-M at 2710 fps, sea
 
 | Version | Date | Notes |
 |---|---|---|
+| **v2.5.0** | 2026-10-03 | **Data Book tab (Phase 1 — record only)**: rifle profiles and ammo lots for your real rifle, a conditions panel with live density altitude from the solver (GPS altitude optional), three recording flows — zero, chronograph string, field dope — with thumb-sized steppers, result buttons and a conditions snapshot stamped on every row; sessions list, Field mode for sunlight, JSON export / import with validation and newest-wins merge, printable session sheet. 15 model tests, 2 new smoke checks |
 | **v2.4.0** | 2026-10-03 | **Offline-clean**: the Range session survives a reload (day, hidden rifle truth, chronograph string, zero, dials, log, stage clock — restored to the step you were on). Fonts self-hosted; Content-Security-Policy header; no external request after load. Repository default branch is `main`. |
 | **v2.3.0** | 2026-10-03 | **QA release**: six-agent audit — physics, content, code review, browser QA, Range deep test, security. Fixed the aerodynamic-jump sign in the solver, lesson, figure and test. Range no longer resets on a tab switch or regenerates the day when a toggle changes; in-flight rounds are scored against the target they were fired at; stage one-shot enforcement. Build Card no longer crashes on out-of-range inputs; solver returns null-safe rows, accepts unsorted ranges and degenerate inputs; stored data is type-checked on load. Memoised illustrations, LRF realism (re-lase, beam divergence), flag calibration, example dope regenerated from the solver. Browser QA round two: focused buttons keep Space, zoom buttons follow the chosen optic, `−` zooms out, Review mode reachable on mobile, light-theme eyebrow contrast, toast de-dupe, preset clears when edited, tighter Build bounds. README, attribution and LICENSE; cache-busted deploys |
 | **v2.2.1** | 2026-10-03 | **Illustrations**: 73 isometric figures across every lesson and 15 module thumbnails from an in-house SVG engine (`js/iso.js`). **Range overhaul**: session stepper (Setup → Chronograph → Zero → Shoot → Debrief), 18 factory loads with box data, barrel length / twist, rifle and optic classes, 6 locations, a hidden rifle truth you measure with the chronograph and zero paper, dope written on your own paper with a printable data book, LRF / mil-it / PRS stage modes, layer-by-layer debrief. Physics audit test suite. Polish and `css/range.css` |
@@ -198,7 +219,7 @@ Validated against published numbers: 6.5 Creedmoor 140 gr ELD-M at 2710 fps, sea
 
 ```sh
 npm start          # python3 -m http.server 8000 → http://localhost:8000
-npm test           # 68 solver / physics tests (node:test, Node 18+; CI runs Node 22)
+npm test           # 83 solver / physics / data-book tests (node:test, Node 18+; CI runs Node 22)
 npm run smoke      # Playwright browser smoke test (scripts/smoke.js) — needs Playwright installed globally or as a devDependency
 ```
 

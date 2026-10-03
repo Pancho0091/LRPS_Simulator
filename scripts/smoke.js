@@ -26,7 +26,7 @@ function loadPlaywright() {
 const { chromium } = loadPlaywright();
 
 const APP_URL = pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href;
-const TABS = ['academy', 'lab', 'build', 'drill', 'range'];
+const TABS = ['academy', 'lab', 'build', 'drill', 'range', 'book'];
 const DESKTOP = { width: 1366, height: 1000 };
 const MOBILE = { width: 390, height: 844 };
 const T0 = Date.now();
@@ -130,6 +130,7 @@ const TAB_CONTENT = {
   build: '#card-output',
   drill: '#drill-body',
   range: '#kestrel',
+  book: '#book-main',
 };
 
 async function checkTabs(colorScheme) {
@@ -695,6 +696,8 @@ const SEEDS = {
   'range.setup partial with unknown ids': { 'lrps.range.setup': JSON.stringify({ cart: 'nope', load: 'zzz', barrelIn: 99, twistIn: 'x', rifle: 'q', optic: 'q', location: 'mars', sky: 'q', position: 'q', preset: 'weird' }) },
   'range.setup zeroYd garbage / toggles string': { 'lrps.range.setup': JSON.stringify({ zeroYd: 'abc', sightHeightIn: 'zz' }), 'lrps.range.toggles': '"x"', 'lrps.range.bestStreak': '"abc"' },
   'xp / counters garbage': { 'lrps.xp': '"abc"', 'lrps.lab.correct': '"abc"', 'lrps.drill.right': 'null', 'lrps.drill.total': '"x"', 'lrps.sound': '"off"' },
+  'book garbage / orphans / ui garbage': { 'lrps.book': JSON.stringify({ v: 9, rifles: 'x', lots: [{ id: 'l', rifleId: 'ghost' }], sessions: [null, { id: 's', rifleId: 'ghost', kind: 'field' }] }), 'lrps.book.ui': '[1,2]' },
+  'book invalid JSON / ui string': { 'lrps.book': '{{{', 'lrps.book.ui': '"x"' },
 };
 // Seeds that currently crash part of the app (reported as bugs; warnings here so the suite stays green until fixed)
 const KNOWN_BAD_SEEDS = {
@@ -1551,6 +1554,119 @@ async function checkPerf() {
   }, { reducedMotion: 'no-preference' });
 }
 
+// ------------------------------------------------------------ 14b. data book
+
+async function checkBook() {
+  await check('Data Book · rifle + lot, zero/chrono/field entries, DA, export/import round-trip, print, mobile 390 px no overflow, field mode', async ({ page, fail, info }) => {
+    await gotoTab(page, 'book');
+    if (!(await page.$('#book-main [data-act="new-rifle"]'))) fail('empty state: no "Add your rifle" button');
+    // rifle seeded from the optics catalogue, lot from the loads catalogue
+    await page.click('[data-act="new-rifle"]');
+    await page.selectOption('#be-optic', 'premium');
+    await setVal(page, '#be-name', 'Smoke rifle'); await setVal(page, '#be-barrelIn', 24); await setVal(page, '#be-twistIn', 8);
+    await page.click('#book-edit button[type="submit"]');
+    const rifleMeta = await page.$eval('.bk-picker .bk-meta', (e) => e.textContent);
+    if (!/35 mil travel/.test(rifleMeta)) fail(`rifle not seeded from the optic: "${rifleMeta}"`);
+    await page.click('[data-act="new-lot"]');
+    await page.selectOption('#be-load', 'horn-65-140');
+    if (!/140/.test(await page.$eval('#be-bulletGr', (e) => e.value))) fail('lot not pre-filled from the catalogue');
+    await page.click('#book-edit button[type="submit"]');
+    if (!/G7 0.326/.test(await page.$$eval('.bk-picker .bk-meta', (els) => els.map((e) => e.textContent).join(' ')))) fail('lot meta missing BC');
+    // conditions → DA from the solver's atmosphere
+    await setVal(page, '.bk-step-val[data-f="altFt"]', 5200); await setVal(page, '.bk-step-val[data-f="tempF"]', 84); await setVal(page, '.bk-step-val[data-f="humidityPct"]', 20);
+    const press = await page.$eval('.bk-step-val[data-f="pressureInHg"]', (e) => +e.value);
+    if (Math.abs(press - 24.71) > 0.05) fail(`standard pressure did not follow the altitude: ${press}`);
+    const da = await page.$eval('#book-da', (e) => +e.textContent.replace(/[^\d-]/g, ''));
+    const want = await page.evaluate(() => Math.round(window.LRPS.B.atmosphere({ altitudeFt: 5200, tempF: 84, humidityPct: 20, stationPressureInHg: 24.71 }).densityAltitudeFt));
+    if (Math.abs(da - want) > 5) fail(`DA readout ${da} ≠ solver ${want}`);
+    // zero flow
+    await page.click('#book-kind button[data-v="zero"]');
+    await setVal(page, '#book-place', 'Smoke range');
+    await setVal(page, '.bk-step-val[data-f="groupIn"]', 0.65);
+    await page.click('.bk-stp[data-stp="zDialE"][data-d="1"]');
+    await page.click('[data-act="zero-confirm"]');
+    if (!(await page.$('[data-act="zero-confirm"].on'))) fail('zero confirmed toggle did not light');
+    // chrono: tap-add, live stats, saved to the lot
+    await page.click('#book-kind button[data-v="chrono"]');
+    for (const v of [2698, 2712, 2705, 2719, 2701]) { await setVal(page, '.bk-step-val[data-f="fps"]', v); await page.click('[data-act="chrono-add"]'); }
+    const st = await page.$$eval('.bk-stats .value', (els) => els.map((e) => e.textContent));
+    if (st[0] !== '5' || !/^2707/.test(st[1]) || st[2] !== '8.5' || st[3] !== '21') fail(`chrono stats ${st}`);
+    await page.click('[data-act="chrono-save"]');
+    const lotChrono = await page.evaluate(() => JSON.parse(localStorage.getItem('lrps.book')).lots[0].chrono);
+    if (!lotChrono || lotChrono.fps.length !== 5 || lotChrono.tempF !== 84) fail(`lot chrono not written: ${JSON.stringify(lotChrono)}`);
+    // field dope: one tap per row, conditions snapshot on each row, newest first
+    await page.click('#book-kind button[data-v="field"]');
+    for (const [yd, e, w, res] of [[300, 1.2, 0.2, 'hit'], [600, 3.6, 0.6, 'low'], [850, 6.4, 1.1, 'hit']]) {
+      await setVal(page, '.bk-step-val[data-f="yd"]', yd); await setVal(page, '.bk-step-val[data-f="dialE"]', e); await setVal(page, '.bk-step-val[data-f="dialW"]', w);
+      await page.click(`[data-res="${res}"]`); await page.click('[data-act="field-log"]');
+    }
+    const rows = await page.$$eval('#book-rows .bk-row', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ')));
+    if (rows.length !== 3 || !/^\s*850/.test(rows[0]) || !/DA [\d,]+ ft/.test(rows[0])) fail(`field rows: ${JSON.stringify(rows)}`);
+    const book = await page.evaluate(() => JSON.parse(localStorage.getItem('lrps.book')));
+    const fieldS = book.sessions.find((s) => s.kind === 'field');
+    if (!fieldS || fieldS.shots.length !== 3 || fieldS.shots[1].result !== 'low' || typeof fieldS.shots[1].cond.daFt !== 'number') fail('field session not stored with a conditions snapshot per row');
+    if (book.sessions.length !== 3) fail(`expected 3 sessions, got ${book.sessions.length}`);
+    // hold-to-repeat accelerates
+    const b = await page.$('.bk-stp[data-stp="yd"][data-d="1"]'); const bb = await b.boundingBox();
+    await page.mouse.move(bb.x + 10, bb.y + 10); await page.mouse.down(); await sleep(1400); await page.mouse.up();
+    const yd = await page.$eval('.bk-step-val[data-f="yd"]', (e) => +e.value);
+    if (yd < 900) fail(`hold on + only reached ${yd} yd in 1.4 s`);
+    // export (real download) and import round trip; bad input leaves the book alone
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#book-export')]);
+    if (!/^lrps-databook-\d{4}-\d{2}-\d{2}\.json$/.test(dl.suggestedFilename())) fail(`download name ${dl.suggestedFilename()}`);
+    const text = await page.evaluate(() => window.LRPS.book.exportText());
+    const same = await page.evaluate((t) => window.LRPS.book.importText(t), text);
+    if (!same.ok || same.added !== 0 || same.kept !== 5) fail(`re-import of own export: ${JSON.stringify(same)}`);
+    const edited = JSON.parse(text); edited.sessions[0].place = 'Newer'; edited.sessions[0].updatedAt += 5000; edited.sessions.push({ id: 'junk' });
+    const newer = await page.evaluate((t) => window.LRPS.book.importText(t), JSON.stringify(edited));
+    if (!newer.ok || newer.updated !== 1 || newer.dropped !== 1) fail(`newer-wins merge: ${JSON.stringify(newer)}`);
+    const bad = await page.evaluate(() => window.LRPS.book.importText('{"rifles": 5}'));
+    const after = await page.evaluate(() => JSON.parse(localStorage.getItem('lrps.book')).sessions.length);
+    if (bad.ok || after !== 3) fail(`bad import changed the book: ${JSON.stringify(bad)} sessions=${after}`);
+    // print one session
+    await page.evaluate(() => { window.print = () => { window.__printed = true; }; });
+    await page.click('#book-print'); await sleep(80);
+    const pr = await page.evaluate(() => ({ printed: !!window.__printed, cls: document.body.classList.contains('print-book'), len: document.getElementById('book-print-sheet').innerHTML.length }));
+    if (!pr.printed || !pr.cls || pr.len < 500) fail(`print: ${JSON.stringify(pr)}`);
+    await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+    // delete the rifle cascades (dialog accepted)
+    page.once('dialog', (d) => d.accept());
+    await page.click('[data-act="edit-rifle"]'); await page.click('[data-act="delete-rifle"]'); await sleep(50);
+    const left = await page.evaluate(() => { const b = JSON.parse(localStorage.getItem('lrps.book')); return b.rifles.length + b.lots.length + b.sessions.length; });
+    if (left !== 0) fail(`cascade delete left ${left} records`);
+    // put the book back for the mobile pass
+    await page.evaluate((t) => window.LRPS.book.importText(t), text);
+    const seed = await page.evaluate(() => ({ book: localStorage.getItem('lrps.book'), ui: localStorage.getItem('lrps.book.ui') }));
+    // mobile: every flow and the editor, field mode on and off, no horizontal overflow
+    for (const field of [false, true]) {
+      const ui = JSON.parse(seed.ui); ui.field = field;
+      const m = await newPage({ viewport: MOBILE, colorScheme: field ? 'dark' : 'light', seed: { 'lrps.book': seed.book, 'lrps.book.ui': JSON.stringify(ui) } });
+      try {
+        await gotoTab(m.page, 'book');
+        const isField = await m.page.$eval('#tab-book', (e) => e.classList.contains('field'));
+        if (isField !== field) fail(`field mode class ${isField}, wanted ${field}`);
+        for (const view of ['field', 'zero', 'chrono', 'edit']) {
+          if (view === 'edit') await m.page.click('[data-act="edit-rifle"]'); else await m.page.click(`#book-kind button[data-v="${view}"]`);
+          const r = await measureOverflow(m.page, MOBILE.width);
+          if (r.scrollWidth > MOBILE.width) { fail(`mobile ${view} (field ${field}): scrollWidth ${r.scrollWidth}`); r.offenders.forEach((o) => fail(`  ${o}`)); }
+          // the stepper numbers must not be clipped
+          const clipped = await m.page.$$eval('.bk-step-val', (els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.dataset.f + '=' + e.value));
+          if (clipped.length) fail(`mobile ${view} (field ${field}): clipped stepper values ${clipped.join(', ')}`);
+        }
+        const small = await m.page.$$eval('#tab-book button, #tab-book input, #tab-book select', (els) => els.filter((e) => e.offsetParent && e.getBoundingClientRect().height < 36).map((e) => (e.id || e.className || e.tagName) + ':' + Math.round(e.getBoundingClientRect().height)));
+        if (small.length) fail(`mobile: tap targets under 36 px: ${[...new Set(small)].slice(0, 8).join(', ')}`);
+        if (m.errors.length) [...new Set(m.errors)].forEach((e) => fail(`mobile (field ${field}): ${e}`));
+      } finally { await m.context.close().catch(() => {}); }
+    }
+    // field-mode toggle persists
+    await page.click('#book-field-mode');
+    if (!(await page.$eval('#tab-book', (e) => e.classList.contains('field')))) fail('field mode toggle did not apply');
+    await gotoTab(page, 'book');
+    if (!(await page.$eval('#tab-book', (e) => e.classList.contains('field')))) fail('field mode not persisted across a reload');
+    info(`rifle + lot seeded from the catalogue, DA ${da} ft, zero confirmed, chrono 5 shots → lot, 3 dope rows with snapshots, hold → ${yd} yd, export ${dl.suggestedFilename()}, newest-wins import, print sheet ${pr.len} chars, cascade delete, mobile 4 views × 2 modes`);
+  });
+}
+
 // ------------------------------------------------------------ 15. accessibility
 
 async function checkA11y() {
@@ -1633,6 +1749,7 @@ async function checkA11y() {
     await checkBuildDeep();
     await checkDrillsDeep();
     await checkRangeDeep();
+    await checkBook();
     await checkPerf();
     await checkA11y();
   } finally {
