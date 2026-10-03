@@ -161,7 +161,7 @@
       return [-d * rx + gx + cx, -d * ry + gy + cy, -d * rz + cz];
     }
 
-    while (x < maxX && si < targets.length && t < 20) {
+    while (x < maxX && si < targets.length && t < 20 && vx > 0) {
       // Midpoint (RK2) step
       const a1 = accel(vx, vy, vz);
       const mvx = vx + a1[0] * dt / 2, mvy = vy + a1[1] * dt / 2, mvz = vz + a1[2] * dt / 2;
@@ -193,7 +193,9 @@
    */
   function solveZeroAngle(p, atm) {
     const zp = Object.assign({}, p, { windMph: 0, shotAngleDeg: 0, coriolis: false });
-    let lo = -0.01, hi = 0.05;
+    let lo = -0.01, hi = 0.12;
+    const top = integrate(zp, atm, hi, [p.zeroYards], p.zeroYards + 1);
+    if (!top.length || top[0].y < 0) return NaN; // no bore angle in range reaches the zero
     for (let i = 0; i < 50; i++) {
       const mid = (lo + hi) / 2;
       const s = integrate(zp, atm, mid, [p.zeroYards], p.zeroYards + 1);
@@ -225,8 +227,9 @@
 
   /*
    * Litz's aerodynamic-jump estimate: vertical deflection in MOA per mph
-   * of crosswind. Right twist: wind from the left throws the shot up,
-   * wind from the right throws it down.
+   * of crosswind. A crosswind yaws the nose into the wind; the spin then
+   * precesses that yaw vertically. Right twist: wind from the right (3
+   * o'clock) throws the shot HIGH, wind from the left (9 o'clock) LOW.
    */
   function aeroJumpMoaPerMph(sg, bulletLengthIn, bulletDiameterIn) {
     if (!sg || !(bulletLengthIn > 0 && bulletDiameterIn > 0)) return 0;
@@ -282,11 +285,12 @@
   function solve(input, ranges) {
     const p = Object.assign({}, DEFAULTS, input);
     const atm = atmosphere(p);
+    const zeroMv = p.muzzleVelocityFps;
     if (p.tempSensitivity && p.mvTempF != null) {
       const powder = p.powderTempF != null ? p.powderTempF : p.tempF;
       p.muzzleVelocityFps += p.tempSensitivity * (powder - p.mvTempF);
     }
-    const sg = p.sg != null ? p.sg : (millerStability({
+    const sgComputed = p.sg != null ? p.sg : millerStability({
       bulletWeightGr: p.bulletWeightGr,
       bulletDiameterIn: p.bulletDiameterIn,
       bulletLengthIn: p.bulletLengthIn,
@@ -294,26 +298,39 @@
       muzzleVelocityFps: p.muzzleVelocityFps,
       tempF: p.tempF,
       pressureInHg: atm.pressurePa / 3386.389,
-    }) || 1.5);
+    });
+    const sgEstimated = !(sgComputed > 0);
+    const sg = sgEstimated ? 1.5 : sgComputed;
     const twistDir = p.twist === 'left' ? -1 : 1;
     // Crosswind component in mph, + = from the right
     const crossMph = (p.windMph || 0) * Math.sin(((p.windClock || 0) % 12) / 12 * 2 * Math.PI);
-    const ajMoa = p.aeroJump ? -twistDir * aeroJumpMoaPerMph(sg, p.bulletLengthIn, p.bulletDiameterIn) * crossMph : 0;
+    // crossMph > 0 = wind from the right → right twist jumps up (+)
+    const ajMoa = p.aeroJump ? twistDir * aeroJumpMoaPerMph(sg, p.bulletLengthIn, p.bulletDiameterIn) * crossMph : 0;
     const zeroAtm = p.zeroAtmosphere ? atmosphere(p.zeroAtmosphere) : atm;
     // A fixed zeroAngleRad models a rifle whose zero was set with a
     // different load or velocity than the one being fired now.
-    const angle = p.zeroAngleRad != null ? p.zeroAngleRad : solveZeroAngle(p, zeroAtm);
-    const maxR = Math.max.apply(null, ranges);
-    const samples = integrate(p, atm, angle, ranges, maxR + 1);
+    const angle = p.zeroAngleRad != null ? p.zeroAngleRad
+      : solveZeroAngle(Object.assign({}, p, { muzzleVelocityFps: zeroMv }), zeroAtm);
+    // Samples must be ascending; sort a copy and map results back to the caller's order
+    const order = ranges.map((r, i) => i).sort((a, b) => ranges[a] - ranges[b]);
+    const sorted = order.map((i) => ranges[i]);
+    const degenerate = !(p.muzzleVelocityFps > 0 && p.bc > 0 && Number.isFinite(angle)) || !ranges.length;
+    const maxR = ranges.length ? Math.max.apply(null, ranges) : 0;
+    const sortedSamples = degenerate ? [] : integrate(p, atm, angle, sorted, maxR + 1);
+    const samples = new Array(ranges.length).fill(null);
+    sortedSamples.forEach((smp, k) => { samples[order[k]] = smp; });
     const massKg = p.bulletWeightGr * GRAIN_KG;
 
     return {
       atmosphere: atm,
       zeroAngleRad: angle,
       sg,
+      sgEstimated,
       muzzleVelocityFps: p.muzzleVelocityFps,
       aeroJumpMoa: ajMoa,
+      // rows[i] is null when the bullet never reached ranges[i]
       rows: samples.map((s, i) => {
+        if (!s) return null;
         const yards = ranges[i];
         const dropIn = s.y / IN + moaToInches(ajMoa, yards); // negative = below line of sight
         let windIn = s.z / IN;
@@ -343,7 +360,7 @@
 
   // Round a correction to the nearest turret click.
   function toClicks(value, clickSize) {
-    return Math.round(value / clickSize);
+    return Math.sign(value) * Math.round(Math.abs(value) / clickSize);
   }
 
   function roundToClick(value, clickSize) {

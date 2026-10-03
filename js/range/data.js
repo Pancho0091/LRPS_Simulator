@@ -64,9 +64,9 @@
   // precisionMil: typical 5-shot group size. contour: barrel heat POI-walk
   // factor. weightLb for recoil. coldBore: typical cold-bore shift magnitude.
   RANGE.RIFLES = [
-    { id: 'hunting', name: 'Factory hunting rifle', precisionMil: 0.32, contour: 1.0, weightLb: 8.5, coldBore: 0.3, desc: 'Pencil barrel, ~1.1 MOA. Walks as it heats; worst cold-bore shift.' },
-    { id: 'precision', name: 'Factory precision rifle', precisionMil: 0.2, contour: 0.45, weightLb: 12, coldBore: 0.18, desc: 'Heavy barrel in a chassis, ~0.7 MOA. Mild heat walk.' },
-    { id: 'custom', name: 'Custom match rifle', precisionMil: 0.12, contour: 0.25, weightLb: 15, coldBore: 0.1, desc: 'Match barrel and action, ~0.4 MOA. Nearly immune to heat.' },
+    { id: 'hunting', name: 'Factory hunting rifle', precisionMil: 0.32, contour: 1.0, weightLb: 8.5, coldBore: 0.3, desc: 'Pencil barrel, ~0.3 mil groups. Walks as it heats; worst cold-bore shift.' },
+    { id: 'precision', name: 'Factory precision rifle', precisionMil: 0.2, contour: 0.45, weightLb: 12, coldBore: 0.18, desc: 'Heavy barrel in a chassis, ~0.2 mil groups. Mild heat walk.' },
+    { id: 'custom', name: 'Custom match rifle', precisionMil: 0.12, contour: 0.25, weightLb: 15, coldBore: 0.1, desc: 'Match barrel and action, ~0.12 mil groups. Nearly immune to heat.' },
   ];
 
   /* ------------------------------------------------------------------ optic */
@@ -95,7 +95,7 @@
   RANGE.LOCATIONS = [
     { id: 'coastal', name: 'Coastal range', alt: 50, lat: 34, temp: [50, 84], hum: [55, 95], zoneK: [1, 1.05, 1.15], maxYd: 1000, terrain: 'Flat, open; wind steadier but stronger far out.' },
     { id: 'midwest', name: 'Midwest prairie', alt: 900, lat: 41, temp: [20, 95], hum: [30, 80], zoneK: [1, 1, 1], maxYd: 1200, terrain: 'Open prairie; honest, gusty wind end to end.' },
-    { id: 'desert', name: 'High desert', alt: 2500, lat: 33, temp: [60, 108], hum: [8, 30], zoneK: [0.9, 1.1, 1.2], maxYd: 1600, terrain: 'Hot, thin air, heavy mirage; dust devils at midday.' },
+    { id: 'desert', name: 'Desert range', alt: 2500, lat: 33, temp: [60, 108], hum: [8, 30], zoneK: [0.9, 1.1, 1.2], maxYd: 1600, terrain: 'Hot, thin air, heavy mirage; dust devils at midday.' },
     { id: 'mountain', name: 'Mountain valley', alt: 6200, lat: 39, temp: [25, 85], hum: [15, 55], zoneK: [0.6, 1.0, 1.3], maxYd: 1800, terrain: 'Sheltered firing line; the wind lives in the valley past 400 yd.' },
     { id: 'northern', name: 'Northern forest cut', alt: 1200, lat: 61, temp: [5, 70], hum: [40, 90], zoneK: [0.7, 1.0, 0.8], maxYd: 1000, terrain: 'Tree lines funnel the wind through the middle.' },
     { id: 'canyon', name: 'Canyon range', alt: 4100, lat: 36, temp: [40, 100], hum: [10, 40], zoneK: [1.2, 0.8, 1.1], maxYd: 1400, terrain: 'Wind swirls near the line and switches often.' },
@@ -109,7 +109,7 @@
 
   /* ---------------------------------------------------------------- helpers */
   RANGE.cartridge = (id) => RANGE.CARTRIDGES.find((c) => c.id === id) || RANGE.CARTRIDGES[3];
-  RANGE.load = (id) => RANGE.LOADS.find((l) => l.id === id) || RANGE.LOADS[5];
+  RANGE.load = (id) => RANGE.LOADS.find((l) => l.id === id) || RANGE.LOADS.find((l) => l.id === RANGE.DEFAULT_SETUP.load) || RANGE.LOADS[0];
   RANGE.loadsFor = (cartId) => RANGE.LOADS.filter((l) => l.cart === cartId);
   RANGE.rifle = (id) => RANGE.RIFLES.find((r) => r.id === id) || RANGE.RIFLES[1];
   RANGE.optic = (id) => RANGE.OPTICS.find((o) => o.id === id) || RANGE.OPTICS[0];
@@ -128,7 +128,7 @@
     const far = Math.min(cart.maxYd, maxYd || cart.maxYd);
     const yards = cart.kd ? cart.kd.filter((y) => y <= far) : (() => {
       const out = [];
-      for (let y = 100; y <= far; y += y < 600 ? 100 : 100) out.push(y);
+      for (let y = 100; y <= far; y += 100) out.push(y);
       return out;
     })();
     return yards.map((y) => ({ yards: y, plateIn: RANGE.platesFor(cart, y) }));

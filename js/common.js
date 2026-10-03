@@ -15,10 +15,16 @@
   // ------------------------------------------------------------ storage
 
   L.store = {
+    // Stored values are untrusted (the origin is shared): anything whose shape
+    // differs from the fallback is discarded.
     get(key, fallback) {
       try {
         const raw = localStorage.getItem('lrps.' + key);
-        return raw == null ? fallback : JSON.parse(raw);
+        if (raw == null) return fallback;
+        const v = JSON.parse(raw);
+        if (v == null) return fallback;
+        if (fallback != null && (typeof v !== typeof fallback || Array.isArray(v) !== Array.isArray(fallback))) return fallback;
+        return v;
       } catch (e) { return fallback; }
     },
     set(key, value) {
@@ -35,12 +41,12 @@
    */
   L.PRESETS = [
     { name: '.223 Rem 77 TMK', cartridge: '.223 Remington', bullet: '77 gr Sierra TMK', muzzleVelocityFps: 2750, bc: 0.210, dragModel: 'G7', bulletWeightGr: 77, bulletDiameterIn: 0.224, bulletLengthIn: 1.0, twistIn: 7, tempSensitivity: 0.9, sdFps: 12 },
-    { name: '6mm Creedmoor 108 ELD-M', cartridge: '6mm Creedmoor', bullet: '108 gr Hornady ELD-M', muzzleVelocityFps: 2960, bc: 0.270, dragModel: 'G7', bulletWeightGr: 108, bulletDiameterIn: 0.243, bulletLengthIn: 1.2, twistIn: 7.5, tempSensitivity: 0.6, sdFps: 9 },
+    { name: '6mm Creedmoor 108 ELD-M', cartridge: '6mm Creedmoor', bullet: '108 gr Hornady ELD-M', muzzleVelocityFps: 2960, bc: 0.270, dragModel: 'G7', bulletWeightGr: 108, bulletDiameterIn: 0.243, bulletLengthIn: 1.231, twistIn: 7.5, tempSensitivity: 0.6, sdFps: 9 },
     { name: '6.5 Creedmoor 140 ELD-M', cartridge: '6.5 Creedmoor', bullet: '140 gr Hornady ELD-M', muzzleVelocityFps: 2710, bc: 0.326, dragModel: 'G7', bulletWeightGr: 140, bulletDiameterIn: 0.264, bulletLengthIn: 1.37, twistIn: 8, tempSensitivity: 0.6, sdFps: 10 },
-    { name: '6.5 PRC 147 ELD-M', cartridge: '6.5 PRC', bullet: '147 gr Hornady ELD-M', muzzleVelocityFps: 2910, bc: 0.351, dragModel: 'G7', bulletWeightGr: 147, bulletDiameterIn: 0.264, bulletLengthIn: 1.42, twistIn: 8, tempSensitivity: 0.7, sdFps: 10 },
+    { name: '6.5 PRC 147 ELD-M', cartridge: '6.5 PRC', bullet: '147 gr Hornady ELD-M', muzzleVelocityFps: 2910, bc: 0.351, dragModel: 'G7', bulletWeightGr: 147, bulletDiameterIn: 0.264, bulletLengthIn: 1.44, twistIn: 8, tempSensitivity: 0.7, sdFps: 10 },
     { name: '.308 Win 175 SMK', cartridge: '.308 Winchester', bullet: '175 gr Sierra MatchKing', muzzleVelocityFps: 2600, bc: 0.243, dragModel: 'G7', bulletWeightGr: 175, bulletDiameterIn: 0.308, bulletLengthIn: 1.24, twistIn: 10, tempSensitivity: 1.0, sdFps: 12 },
-    { name: '.300 Win Mag 215 Hybrid', cartridge: '.300 Winchester Magnum', bullet: '215 gr Berger Hybrid', muzzleVelocityFps: 2850, bc: 0.354, dragModel: 'G7', bulletWeightGr: 215, bulletDiameterIn: 0.308, bulletLengthIn: 1.58, twistIn: 10, tempSensitivity: 1.1, sdFps: 12 },
-    { name: '.300 PRC 225 ELD-M', cartridge: '.300 PRC', bullet: '225 gr Hornady ELD-M', muzzleVelocityFps: 2810, bc: 0.391, dragModel: 'G7', bulletWeightGr: 225, bulletDiameterIn: 0.308, bulletLengthIn: 1.555, twistIn: 8, tempSensitivity: 0.8, sdFps: 11 },
+    { name: '.300 Win Mag 215 Hybrid', cartridge: '.300 Winchester Magnum', bullet: '215 gr Berger Hybrid', muzzleVelocityFps: 2850, bc: 0.354, dragModel: 'G7', bulletWeightGr: 215, bulletDiameterIn: 0.308, bulletLengthIn: 1.595, twistIn: 10, tempSensitivity: 1.1, sdFps: 12 },
+    { name: '.300 PRC 225 ELD-M', cartridge: '.300 PRC', bullet: '225 gr Hornady ELD-M', muzzleVelocityFps: 2810, bc: 0.391, dragModel: 'G7', bulletWeightGr: 225, bulletDiameterIn: 0.308, bulletLengthIn: 1.627, twistIn: 8, tempSensitivity: 0.8, sdFps: 11 },
     { name: '.338 Lapua 300 Hybrid', cartridge: '.338 Lapua Magnum', bullet: '300 gr Berger Hybrid', muzzleVelocityFps: 2750, bc: 0.419, dragModel: 'G7', bulletWeightGr: 300, bulletDiameterIn: 0.338, bulletLengthIn: 1.8, twistIn: 9.4, tempSensitivity: 1.0, sdFps: 12 },
   ];
 
@@ -69,6 +75,14 @@
     ['bulletDiameterIn', 'bulletLengthIn', 'twistIn', 'tempSensitivity', 'sdFps'].forEach((k) => {
       if (saved[k] == null && preset[k] != null) L.profile[k] = preset[k];
     });
+    // Coerce to the default's type so a tampered store can neither crash nor inject markup
+    Object.keys(L.DEFAULT_PROFILE).forEach((k) => {
+      const d = L.DEFAULT_PROFILE[k], v = L.profile[k];
+      if (typeof d === 'number') L.profile[k] = v !== '' && v !== null && Number.isFinite(+v) ? +v : d;
+      else if (typeof d === 'boolean') L.profile[k] = !!v;
+      else if (typeof d === 'string') L.profile[k] = typeof v === 'string' ? v.slice(0, 120) : d;
+    });
+    L.profile.dragModel = L.profile.dragModel === 'G1' ? 'G1' : 'G7';
     // The app is MIL-only: 0.1 mil clicks
     L.profile.unit = 'MIL';
     L.profile.clickSize = 0.1;
@@ -142,7 +156,9 @@
     const brackets = L.parseBrackets(p.windBrackets);
     const base = B.solve(L.solverInput(p, { windMph: 0 }), ranges);
     const winds = brackets.map((mph) => B.solve(L.solverInput(p, { windMph: mph, windClock: 3 }), ranges));
+    // Ranges the bullet never reaches (null rows) are dropped from the card
     const rows = base.rows.map((r, i) => {
+      if (!r || winds.some((w) => !w.rows[i])) return null;
       const elev = L.toUnit(-r.dropIn, r.yards, p.unit);
       return {
         yards: r.yards,
@@ -156,7 +172,7 @@
         energyFtLb: r.energyFtLb,
       };
     });
-    return { rows, brackets, atmosphere: base.atmosphere, sg: base.sg, mv: base.muzzleVelocityFps };
+    return { rows: rows.filter(Boolean), brackets, atmosphere: base.atmosphere, sg: base.sg, sgEstimated: base.sgEstimated, mv: base.muzzleVelocityFps };
   };
 
   /* Render a dope card. `compact` drops the header, velocity and TOF columns. */
@@ -178,14 +194,14 @@
         <div><div class="dope-tag">DOPE CARD · ${unit}</div><h3>${L.escapeHtml(p.name || 'Custom load')}</h3></div>
       </div>
       <div class="chips">
-        <span class="chip">MV <b>${p.muzzleVelocityFps}</b> fps</span>
-        <span class="chip">BC <b>${p.bc}</b> ${p.dragModel}</span>
-        <span class="chip">Zero <b>${p.zeroYards}</b> yd</span>
-        <span class="chip">Sight <b>${p.sightHeightIn}</b>"</span>
+        <span class="chip">MV <b>${+p.muzzleVelocityFps}</b> fps</span>
+        <span class="chip">BC <b>${+p.bc}</b> ${L.escapeHtml(p.dragModel)}</span>
+        <span class="chip">Zero <b>${+p.zeroYards}</b> yd</span>
+        <span class="chip">Sight <b>${+p.sightHeightIn}</b>"</span>
         <span class="chip">Click <b>${click}</b> ${unit}</span>
-        <span class="chip">Alt <b>${p.altitudeFt}</b> ft · <b>${p.tempF}</b>°F</span>
+        <span class="chip">Alt <b>${+p.altitudeFt}</b> ft · <b>${+p.tempF}</b>°F</span>
         <span class="chip">DA <b>${Math.round(atm.densityAltitudeFt)}</b> ft</span>
-        ${+p.shotAngleDeg ? `<span class="chip">Angle <b>${p.shotAngleDeg}</b>°</span>` : ''}
+        ${+p.shotAngleDeg ? `<span class="chip">Angle <b>${+p.shotAngleDeg}</b>°</span>` : ''}
       </div>`;
     return `
       <div class="${compact ? '' : 'dope-card'}">
@@ -329,6 +345,7 @@
 
   const THEMES = ['auto', 'light', 'dark'];
   let theme = L.store.get('theme', 'auto');
+  if (!THEMES.includes(theme)) theme = 'auto';
   const themeBtn = $('#theme-toggle');
   function applyTheme() {
     if (theme === 'auto') document.documentElement.removeAttribute('data-theme');
@@ -350,7 +367,7 @@
     [0, 'Recruit'], [100, 'Shooter'], [300, 'Marksman'], [600, 'Sharpshooter'],
     [1000, 'Expert'], [1600, 'Precision Rifleman'], [2500, 'Distinguished'], [4000, 'Legend'],
   ];
-  let xp = L.store.get('xp', 0);
+  let xp = Number(L.store.get('xp', 0)) || 0;
 
   function rankInfo(v) {
     let i = 0;
@@ -408,32 +425,37 @@
 
   // ------------------------------------------------------------ confetti
 
+  const confetti = { parts: [], running: false };
   L.confetti = (originX, originY) => {
     if (L.reducedMotion()) return;
     const cv = $('#confetti');
     const ctx = cv.getContext('2d');
+    const ox = originX != null ? originX : innerWidth / 2;
+    const oy = originY != null ? originY : innerHeight / 3;
+    const colors = ['#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#facc15', '#ffffff'];
+    const born = performance.now();
+    for (let i = 0; i < 140; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 4 + Math.random() * 9;
+      confetti.parts.push({
+        born, x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 6,
+        w: 5 + Math.random() * 6, h: 3 + Math.random() * 4,
+        r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.4,
+        c: colors[Math.floor(Math.random() * colors.length)],
+      });
+    }
+    if (confetti.running) return;
+    confetti.running = true;
     const dpr = window.devicePixelRatio || 1;
     cv.width = innerWidth * dpr;
     cv.height = innerHeight * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const ox = originX != null ? originX : innerWidth / 2;
-    const oy = originY != null ? originY : innerHeight / 3;
-    const colors = ['#f59e0b', '#34d399', '#60a5fa', '#f472b6', '#facc15', '#ffffff'];
-    const parts = Array.from({ length: 140 }, () => {
-      const a = Math.random() * Math.PI * 2;
-      const s = 4 + Math.random() * 9;
-      return {
-        x: ox, y: oy, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 6,
-        w: 5 + Math.random() * 6, h: 3 + Math.random() * 4,
-        r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.4,
-        c: colors[Math.floor(Math.random() * colors.length)],
-      };
-    });
-    const start = performance.now();
+    // One loop draws every burst, so overlapping bursts share the canvas
     (function frame(now) {
-      const age = now - start;
       ctx.clearRect(0, 0, innerWidth, innerHeight);
-      parts.forEach((p) => {
+      confetti.parts = confetti.parts.filter((p) => now - p.born < 1800);
+      confetti.parts.forEach((p) => {
+        const age = now - p.born;
         p.vy += 0.32; p.vx *= 0.985; p.x += p.vx; p.y += p.vy; p.r += p.vr;
         ctx.save();
         ctx.globalAlpha = Math.max(0, 1 - age / 1800);
@@ -442,9 +464,9 @@
         ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
         ctx.restore();
       });
-      if (age < 1800) requestAnimationFrame(frame);
-      else ctx.clearRect(0, 0, innerWidth, innerHeight);
-    })(start);
+      if (confetti.parts.length) requestAnimationFrame(frame);
+      else { confetti.running = false; ctx.clearRect(0, 0, innerWidth, innerHeight); }
+    })(born);
   };
 
   // ------------------------------------------------------------ tabs
@@ -496,6 +518,7 @@
   const TAB_ORDER = $$('.tab').map((b) => b.dataset.tab);
   L.showTab = (name) => {
     if (name === 'learn') name = 'lab';
+    if (!/^[a-z]+$/.test(name || '')) name = 'academy';
     if (!$('#tab-' + name)) name = 'academy';
     // direction-aware panel transition: forward slides from the right, back from the left
     const from = TAB_ORDER.indexOf(L.currentTab), to = TAB_ORDER.indexOf(name);
@@ -516,7 +539,9 @@
     L.showTab(btn.dataset.tab);
     window.scrollTo({ top: 0 });
   }));
-  window.addEventListener('DOMContentLoaded', () => L.showTab((location.hash || '#academy').slice(1)));
+  const tabFromHash = () => { const h = (location.hash || '#academy').slice(1); return /^[a-z]+$/.test(h) ? h : 'academy'; };
+  window.addEventListener('DOMContentLoaded', () => L.showTab(tabFromHash()));
+  window.addEventListener('hashchange', () => { const t = tabFromHash(); if (t !== L.currentTab) L.showTab(t); });
   // Any element with data-goto="tab" navigates to that tab
   document.addEventListener('click', (e) => {
     const a = e.target.closest('[data-goto]');

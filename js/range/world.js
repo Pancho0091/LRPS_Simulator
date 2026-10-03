@@ -28,7 +28,7 @@
   RANGE.newWorld = function (setup, toggles) {
     const loc = RANGE.location(setup.location) || L.pick(RANGE.LOCATIONS);
     const sky = RANGE.sky(setup.sky);
-    const real = setup.preset === 'realistic';
+    const real = typeof setup.realistic === 'boolean' ? setup.realistic : setup.preset === 'realistic';
     const tempF = real ? Math.round(L.rand(loc.temp[0], loc.temp[1])) : Math.round(clamp(59 + L.gauss() * 6, loc.temp[0], loc.temp[1]));
     const humidityPct = real ? L.randInt(loc.hum[0], loc.hum[1]) : L.randInt(30, 60);
     // Weather systems move station pressure a few tenths either side of standard
@@ -246,7 +246,7 @@
     let bad = false;
     if (toggles.lrfError) {
       const beamMil = 1.3; // effective divergence incl. hand shake
-      const pGood = clamp(plateMil / beamMil, 0.12, 1) ** 0.8;
+      const pGood = 1 - Math.exp(-Math.pow(plateMil / 0.35, 2)); // a 0.5 mil plate returns clean ~87% of the time; coin-flips only below ~0.3 mil
       if (Math.random() > pGood) {
         bad = true;
         reading = Math.random() < 0.75 ? yards + L.rand(12, 90) : yards - L.rand(8, 40);

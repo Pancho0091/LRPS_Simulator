@@ -98,8 +98,6 @@
 #shot-log-card summary .hint { font-weight: 500; }
 .hud .tile .value small { display: block; font-size: 10px; margin: 0; }
 
-/* light theme: the kestrel/chrono devices stay dark; make sure the flags strip has a frame */
-.flags-wrap { margin-top: 12px; }
 
 /* ------------------------------------------------------------ print: blank data book */
 .print-sheet { display: none; }
@@ -109,7 +107,6 @@
   body.print-range #tab-range .no-print { display: none !important; }
   body.print-range .print-sheet { display: block; color: #000; font: 11px/1.4 var(--sans); }
   body.print-range main { padding: 0; max-width: none; }
-  body.print-range body::before { display: none; }
   .ps-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 10px; }
   .ps-head h1 { font-size: 20px; margin: 0; }
   .ps-tag { font: 700 10px var(--mono); letter-spacing: 0.12em; }

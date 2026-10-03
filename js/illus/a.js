@@ -1019,7 +1019,7 @@
 
   ISO.lesson('powder-primers', {
     at: 'after:table',
-    caption: '<b>Warm powder burns faster.</b> The same cartridge shot on a cold morning and a hot afternoon can differ by tens of fps (roughly 0.5–2 fps per °F, depending on the powder). That changes your drop at long range — note the temperature with your dope.',
+    caption: '<b>Warm powder burns faster.</b> The same cartridge shot on a cold morning and a hot afternoon can differ by tens of fps (roughly 0.3–1.5 fps per °F, depending on the powder). That changes your drop at long range — note the temperature with your dope.',
     draw: () => {
       const s = ISO.scene({ w: 720, h: 300, origin: [56, 104], scale: 9 });
       const ax3 = { U: T, W: perp(T) };

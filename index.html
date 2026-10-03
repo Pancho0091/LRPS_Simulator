@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eef1ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0e0c" media="(prefers-color-scheme: dark)">
   <title>LRPS Dope Simulator</title>
   <meta name="description" content="Learn to build and use dope cards for long-range precision shooting: ballistics lab, card builder, graded drills and a range simulator.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%23f59e0b' stroke-width='3'/%3E%3Cpath d='M16 1v10M16 21v10M1 16h10M21 16h10' stroke='%23f59e0b' stroke-width='3'/%3E%3C/svg%3E">
@@ -22,11 +24,11 @@
       <div>LRPS Dope Sim<small>Long-range precision</small></div>
     </div>
     <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="academy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></svg>Academy</button>
-      <button class="tab" data-tab="lab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>Lab</button>
-      <button class="tab" data-tab="build"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Build Card</button>
-      <button class="tab" data-tab="drill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Drills</button>
-      <button class="tab" data-tab="range"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Range</button>
+      <button class="tab active" role="tab" data-tab="academy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></svg>Academy</button>
+      <button class="tab" role="tab" data-tab="lab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>Lab</button>
+      <button class="tab" role="tab" data-tab="build"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Build Card</button>
+      <button class="tab" role="tab" data-tab="drill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Drills</button>
+      <button class="tab" role="tab" data-tab="range"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Range</button>
     </nav>
     <div class="header-right">
       <div class="xp-chip" title="Experience: earn XP in challenges, drills and on the range">
@@ -41,7 +43,7 @@
   <main>
     <!-- ================================================== LEARN -->
     <!-- ================================================== ACADEMY -->
-    <section id="tab-academy" class="panel active">
+    <section id="tab-academy" class="panel active" role="tabpanel">
       <div class="page-head">
         <div>
           <div class="eyebrow">Start here · beginner to advanced</div>
@@ -60,7 +62,7 @@
       </div>
     </section>
 
-    <section id="tab-lab" class="panel">
+    <section id="tab-lab" class="panel" role="tabpanel">
       <div class="page-head">
         <div>
           <div class="eyebrow">Experiment</div>
@@ -94,7 +96,7 @@
     </section>
 
     <!-- ================================================== BUILD -->
-    <section id="tab-build" class="panel">
+    <section id="tab-build" class="panel" role="tabpanel">
       <div class="page-head no-print">
         <div>
           <div class="eyebrow">Step 2 · Make your data</div>
@@ -108,37 +110,37 @@
       </div>
 
       <div class="grid-2">
-        <form id="profile-form" class="no-print stack" autocomplete="off" onsubmit="return false">
+        <form id="profile-form" class="no-print stack" autocomplete="off">
           <div class="card">
             <div class="card-title"><h3>Rifle &amp; load</h3></div>
             <div class="field"><label for="preset">Rifle system</label><select id="preset"></select></div>
-            <div class="field"><label>Profile name</label><input name="name" type="text"></div>
+            <div class="field"><label for="pf-name">Profile name</label><input id="pf-name" name="name" type="text"></div>
             <div class="field-row">
-              <div class="field"><label>Muzzle vel. (fps)</label><input name="muzzleVelocityFps" type="number" step="5"></div>
-              <div class="field"><label>Bullet (gr)</label><input name="bulletWeightGr" type="number" step="1"></div>
+              <div class="field"><label for="pf-muzzleVelocityFps">Muzzle vel. (fps)</label><input id="pf-muzzleVelocityFps" name="muzzleVelocityFps" type="number" step="5"></div>
+              <div class="field"><label for="pf-bulletWeightGr">Bullet (gr)</label><input id="pf-bulletWeightGr" name="bulletWeightGr" type="number" step="1"></div>
             </div>
             <div class="field-row">
-              <div class="field"><label>BC</label><input name="bc" type="number" step="0.001"></div>
-              <div class="field"><label>Drag model</label><select name="dragModel"><option>G7</option><option>G1</option></select></div>
+              <div class="field"><label for="pf-bc">BC</label><input id="pf-bc" name="bc" type="number" step="0.001"></div>
+              <div class="field"><label for="pf-dragModel">Drag model</label><select id="pf-dragModel" name="dragModel"><option>G7</option><option>G1</option></select></div>
             </div>
             <div class="field-row">
-              <div class="field"><label>Sight height (in)</label><input name="sightHeightIn" type="number" step="0.05"></div>
-              <div class="field"><label>Zero (yd)</label><input name="zeroYards" type="number" step="25"></div>
+              <div class="field"><label for="pf-sightHeightIn">Sight height (in)</label><input id="pf-sightHeightIn" name="sightHeightIn" type="number" step="0.05"></div>
+              <div class="field"><label for="pf-zeroYards">Zero (yd)</label><input id="pf-zeroYards" name="zeroYards" type="number" step="25"></div>
             </div>
           </div>
           <div class="card">
             <div class="card-title"><h3>Bullet, barrel &amp; ammo</h3></div>
             <div class="field-row">
-              <div class="field"><label>Diameter (in)</label><input name="bulletDiameterIn" type="number" step="0.001"></div>
-              <div class="field"><label>Length (in)</label><input name="bulletLengthIn" type="number" step="0.01"></div>
+              <div class="field"><label for="pf-bulletDiameterIn">Diameter (in)</label><input id="pf-bulletDiameterIn" name="bulletDiameterIn" type="number" step="0.001"></div>
+              <div class="field"><label for="pf-bulletLengthIn">Length (in)</label><input id="pf-bulletLengthIn" name="bulletLengthIn" type="number" step="0.01"></div>
             </div>
             <div class="field-row">
-              <div class="field"><label>Twist (1:x in)</label><input name="twistIn" type="number" step="0.5"></div>
-              <div class="field"><label>Ammo SD (fps)</label><input name="sdFps" type="number" step="1"></div>
+              <div class="field"><label for="pf-twistIn">Twist (1:x in)</label><input id="pf-twistIn" name="twistIn" type="number" step="0.5"></div>
+              <div class="field"><label for="pf-sdFps">Ammo SD (fps)</label><input id="pf-sdFps" name="sdFps" type="number" step="1"></div>
             </div>
             <div class="field-row">
-              <div class="field"><label>Chrono temp (°F)</label><input name="mvTempF" type="number" step="1"></div>
-              <div class="field"><label>Temp sens. (fps/°F)</label><input name="tempSensitivity" type="number" step="0.1"></div>
+              <div class="field"><label for="pf-mvTempF">Chrono temp (°F)</label><input id="pf-mvTempF" name="mvTempF" type="number" step="1"></div>
+              <div class="field"><label for="pf-tempSensitivity">Temp sens. (fps/°F)</label><input id="pf-tempSensitivity" name="tempSensitivity" type="number" step="0.1"></div>
             </div>
             <p class="hint" style="margin:0">MV is adjusted by temp sensitivity × (card temp − chrono temp). Twist and bullet size give the stability factor (Sg), which drives spin drift.</p>
           </div>
@@ -149,24 +151,24 @@
           <div class="card">
             <div class="card-title"><h3>Conditions</h3></div>
             <div class="field-row">
-              <div class="field"><label>Altitude (ft)</label><input name="altitudeFt" type="number" step="100"></div>
-              <div class="field"><label>Temp (°F)</label><input name="tempF" type="number" step="1"></div>
+              <div class="field"><label for="pf-altitudeFt">Altitude (ft)</label><input id="pf-altitudeFt" name="altitudeFt" type="number" step="100"></div>
+              <div class="field"><label for="pf-tempF">Temp (°F)</label><input id="pf-tempF" name="tempF" type="number" step="1"></div>
             </div>
             <div class="field-row">
-              <div class="field"><label>Humidity (%)</label><input name="humidityPct" type="number" step="5"></div>
-              <div class="field"><label>Shot angle (°)</label><input name="shotAngleDeg" type="number" step="1"></div>
+              <div class="field"><label for="pf-humidityPct">Humidity (%)</label><input id="pf-humidityPct" name="humidityPct" type="number" step="5"></div>
+              <div class="field"><label for="pf-shotAngleDeg">Shot angle (°)</label><input id="pf-shotAngleDeg" name="shotAngleDeg" type="number" step="1"></div>
             </div>
             <label class="check"><input name="spinDrift" type="checkbox"> Spin drift column (right twist, from Sg)</label>
           </div>
           <div class="card">
             <div class="card-title"><h3>Card layout</h3></div>
             <div class="field-row">
-              <div class="field"><label>From (yd)</label><input name="rangeStart" type="number" step="25"></div>
-              <div class="field"><label>To (yd)</label><input name="rangeEnd" type="number" step="25"></div>
+              <div class="field"><label for="pf-rangeStart">From (yd)</label><input id="pf-rangeStart" name="rangeStart" type="number" step="25"></div>
+              <div class="field"><label for="pf-rangeEnd">To (yd)</label><input id="pf-rangeEnd" name="rangeEnd" type="number" step="25"></div>
             </div>
             <div class="field-row">
-              <div class="field"><label>Step (yd)</label><input name="rangeStep" type="number" step="25"></div>
-              <div class="field"><label>Wind (mph)</label><input name="windBrackets" type="text"></div>
+              <div class="field"><label for="pf-rangeStep">Step (yd)</label><input id="pf-rangeStep" name="rangeStep" type="number" step="25"></div>
+              <div class="field"><label for="pf-windBrackets">Wind (mph)</label><input id="pf-windBrackets" name="windBrackets" type="text"></div>
             </div>
           </div>
         </form>
@@ -180,7 +182,7 @@
     </section>
 
     <!-- ================================================== DRILLS -->
-    <section id="tab-drill" class="panel">
+    <section id="tab-drill" class="panel" role="tabpanel">
       <div class="page-head">
         <div>
           <div class="eyebrow">Step 3 · Do it yourself</div>
@@ -207,7 +209,7 @@
     </section>
 
     <!-- ================================================== RANGE -->
-    <section id="tab-range" class="panel">
+    <section id="tab-range" class="panel" role="tabpanel">
       <div class="page-head no-print">
         <div>
           <div class="eyebrow">Step 4 · Put it to work</div>
@@ -232,7 +234,7 @@
       <!-- ---------------------------------------------- 1. SETUP -->
       <div class="r-step no-print" id="r-setup">
         <div class="grid-2 r-setup-grid">
-          <form id="rig-form" class="stack" autocomplete="off" onsubmit="return false">
+          <form id="rig-form" class="stack" autocomplete="off">
             <div class="card">
               <div class="card-title"><h3>Rifle &amp; ammunition</h3><span class="hint">approx. published data</span></div>
               <div class="field"><label for="rig-cart">Cartridge</label><select id="rig-cart"></select></div>

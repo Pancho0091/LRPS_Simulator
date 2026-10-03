@@ -432,7 +432,7 @@
       const s = ISO.scene({ w: 720, h: 360, origin: [14, 200], scale: 1 });
       const lanes = [
         { w: -64, bc: 0.326, type: 'vld', name: 'High BC', sub: 'long boat-tail · G7 0.326', col: C.blue },
-        { w: 98, bc: 0.2, type: 'flat', name: 'Low BC', sub: 'flat base · G7 ≈ 0.20', col: C.coral },
+        { w: 98, bc: 0.2, type: 'flat', name: 'Low BC', sub: 'low-drag design, poor BC · G7 ≈ 0.20', col: C.coral },
       ];
       lanes.forEach((ln) => {
         strip(s, 0, 700, ln.w - 30, ln.w + 30, { edge: 6 });
@@ -617,7 +617,7 @@
   });
 
   ISO.lesson('stability', {
-    caption: '<b>Spin keeps the nose forward.</b> The rifling twist spins the bullet like a gyroscope. A fast enough twist for its length (A, 1:8 → Sg ≈ 1.6) flies point-first; the same long bullet from a slow 1:12 twist (B, Sg ≈ 0.7) is overpowered by the air and tumbles.',
+    caption: '<b>Spin keeps the nose forward.</b> The rifling twist spins the bullet like a gyroscope. A fast enough twist for its length (A, 1:8 → Sg ≈ 1.7) flies point-first; the same long bullet from a slow 1:12 twist (B, Sg ≈ 0.75) is overpowered by the air and tumbles.',
     draw: () => {
       const s = ISO.scene({ w: 720, h: 400, origin: [236, 84], scale: 6.6 });
       s.floor(-3, -5, 63, 37, { grid: 4 });
@@ -660,7 +660,7 @@
       const gy = 26, k = 20, x0 = 4;
       [[0, 1.0, C.coral], [1.0, 1.4, C.amber], [1.4, 2.4, C.green]].forEach(([a, b, col]) => s.box(x0 + a * k, gy, 0, (b - a) * k, 3, 0.8, { color: col }));
       [[1.0, '1.0'], [1.4, '1.4'], [2.4, 'Sg 2.4']].forEach(([v, t]) => s.text3([x0 + v * k, gy + 3, 0], t, { anchor: 'middle', dy: 16, size: 11, weight: 700 }));
-      [[1.59, 'A', C.green], [0.71, 'B', C.coral]].forEach(([v, t, col]) => {
+      [[1.70, 'A', C.green], [0.75, 'B', C.coral]].forEach(([v, t, col]) => {
         const x = x0 + v * k;
         s.lathe(x, gy + 1.5, 0.8, [[0, 1], [2.6, 0.05]], { axis: 'z', color: col, segments: 14 });
         s.text3([x, gy + 1.5, 3.6], t, { anchor: 'middle', dy: -2, size: 13, weight: 800, color: col });
@@ -675,7 +675,7 @@
   });
 
   ISO.lesson('small-effects', {
-    caption: '<b>Three small pushes.</b> Right-twist spin drift curves the bullet right, more with time of flight. In the northern hemisphere Coriolis deflects every shot right. A crosswind at the muzzle tips a right-twist bullet: wind from the left throws it high (from the right, low).',
+    caption: '<b>Three small pushes.</b> Right-twist spin drift curves the bullet right, more with time of flight. In the northern hemisphere Coriolis deflects every shot right. A crosswind at the muzzle tips a right-twist bullet: wind from the right throws it high (from the left, low).',
     draw: () => {
       const s = ISO.scene({ w: 720, h: 330, origin: [128, 170], scale: 6 });
       const off = (k) => [k * 22, -k * 22];
@@ -707,7 +707,7 @@
         pin(s, sp(58, 75), 'North: always right', 300, 62, { n: 2, color: C.coral, size: 11 });
         pin(s, sp(-30, 45), 'South: left', 300, 300, { n: 'S', color: C.slate, size: 11 });
       }
-      // C · aerodynamic jump (wind from the shooter's left = +y)
+      // C · aerodynamic jump (wind from the shooter's right = -y; right twist jumps high)
       {
         const [ox, oy] = off(2);
         s.floor(ox - 12, oy - 8, 24, 16, { grid: 4 });
@@ -716,10 +716,10 @@
         s.lathe(ox - 5, oy, z, [[0, 0.8], [2, 0.8]], { axis: 'x', color: C.black });
         s.line([[ox - 3, oy, z], [ox + 13, oy, z]], { color: C.slate, width: 2, dash: '5 5' });
         s.curve((t) => [ox - 3 + 16 * t, oy, z + 3.4 * t], 0, 1, { color: C.coral, width: 3, arrow: true });
-        [-6, 0, 6].forEach((x) => s.line([[ox + x, oy + 8, z + 1], [ox + x, oy + 3, z + 1]], { color: C.teal, width: 2.5, arrow: true }));
+        [-6, 0, 6].forEach((x) => s.line([[ox + x, oy - 8, z + 1], [ox + x, oy - 3, z + 1]], { color: C.teal, width: 2.5, arrow: true }));
         s.text(584, 34, 'AERO JUMP', { anchor: 'middle', size: 14, weight: 800 });
-        pin(s, [ox + 13, oy, z + 3.4], 'Wind from left → high', 700, 62, { n: 3, color: C.coral, size: 11 });
-        pin(s, [ox - 6, oy + 6, z + 1], 'Crosswind at the muzzle', 700, 300, { n: '~', color: C.teal, size: 11 });
+        pin(s, [ox + 13, oy, z + 3.4], 'Wind from right → high', 700, 62, { n: 3, color: C.coral, size: 11 });
+        pin(s, [ox - 6, oy - 6, z + 1], 'Crosswind at the muzzle', 700, 300, { n: '~', color: C.teal, size: 11 });
       }
       return s.svg();
     },

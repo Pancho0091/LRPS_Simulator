@@ -355,7 +355,7 @@ test('aerodynamic jump magnitude: 0.01·Sg − 0.0024·L + 0.032 MOA per mph, ap
   near(B.solve(Object.assign({}, CM65, w), [600]).aeroJumpMoa, 0, 1e-12, 'no jump without bullet dimensions (Sg fallback has no L)');
 });
 
-test.todo('[KNOWN BUG] aerodynamic jump sign: right twist, wind from the RIGHT (3 o\'clock) throws the shot HIGH, from the left LOW', () => {
+test('[FIXED] aerodynamic jump sign: right twist, wind from the RIGHT (3 o\'clock) throws the shot HIGH, from the left LOW', () => {
   // Physics: wind from the left puts the bullet's nose to the right of the relative wind; the overturning
   // moment at the CP then torques the nose about -y, and a right-hand spin (L along +x) precesses that
   // nose-right offset DOWN. Hornady 4DOF tech paper: "if the wind is blowing from right to left, the
@@ -383,8 +383,10 @@ test('powder temperature sensitivity: MV shifts by sens × (powder − chrono te
   assert.ok(row({ tempSensitivity: 0.8, mvTempF: 59, tempF: 99 }, 800).elevMil < row({ tempF: 99 }, 800).elevMil);
 });
 
-test('zero is re-solved with the temperature-adjusted MV (documented behaviour: hot ammo still crosses the LOS at the zero range)', () => {
-  near(row({ tempSensitivity: 1, mvTempF: 59, tempF: 100 }, 100).dropIn, 0, 1e-6);
+test('zero is solved at the chronograph temperature; hot ammo through that zero prints slightly high at the zero range', () => {
+  const hot = row({ tempSensitivity: 1, mvTempF: 59, tempF: 100 }, 100);
+  assert.ok(hot.dropIn > 0 && hot.dropIn < 0.3, `expected a small high print at 100 yd, got ${hot.dropIn} in`);
+  near(row({ tempSensitivity: 1, mvTempF: 59, tempF: 59 }, 100).dropIn, 0, 1e-6);
 });
 
 test('fixed zeroAngleRad reproduces the solved zero and models a stale zero', () => {
@@ -413,29 +415,32 @@ test('toClicks / roundToClick', () => {
   assert.equal(B.toClicks(0, 0.1), 0);
 });
 
-test.todo('[KNOWN BUG][nit] toClicks rounds exact half-clicks asymmetrically (Math.round is round-half-up, not symmetric)', () => {
+test('[FIXED][nit] toClicks rounds exact half-clicks asymmetrically (Math.round is round-half-up, not symmetric)', () => {
   assert.equal(B.toClicks(0.25, 0.1), 3);
   assert.equal(B.toClicks(-0.25, 0.1), -3, '−0.25 should round to −3 clicks like +0.25 rounds to +3');
 });
 
 // ------------------------------------------------------------ edge cases
 
-test('ranges beyond reach: rows are a prefix of the requested ranges (never a mismatched index), no throw', () => {
+test('ranges beyond reach: rows stay index-aligned with ranges, unreached entries are null, no throw', () => {
   const res = B.solve(CM65, [100, 3000, 6000]);
-  assert.ok(res.rows.length < 3);
-  res.rows.forEach((r, i) => assert.equal(r.yards, [100, 3000, 6000][i]));
-  assert.ok(res.rows[res.rows.length - 1].tofSec < 20);
+  assert.equal(res.rows.length, 3);
+  assert.equal(res.rows[0].yards, 100);
+  assert.equal(res.rows[2], null);
+  res.rows.filter(Boolean).forEach((r) => assert.ok(r.tofSec < 20));
 });
 
-test('empty ranges, NaN / zero BC, zero or negative MV return empty rows without throwing', () => {
+test('empty ranges, NaN / zero BC, zero or negative MV return null rows (index-aligned) without throwing or stalling', () => {
   assert.deepEqual(B.solve(CM65, []).rows, []);
-  assert.deepEqual(B.solve(Object.assign({}, CM65, { bc: NaN }), [100]).rows, []);
-  assert.deepEqual(B.solve(Object.assign({}, CM65, { bc: 0 }), [100]).rows, []);
-  assert.deepEqual(B.solve(Object.assign({}, CM65, { muzzleVelocityFps: 0 }), [100]).rows, []);
-  assert.deepEqual(B.solve(Object.assign({}, CM65, { muzzleVelocityFps: -100 }), [100]).rows, []);
+  const t0 = Date.now();
+  assert.deepEqual(B.solve(Object.assign({}, CM65, { bc: NaN }), [100]).rows, [null]);
+  assert.deepEqual(B.solve(Object.assign({}, CM65, { bc: 0 }), [100]).rows, [null]);
+  assert.deepEqual(B.solve(Object.assign({}, CM65, { muzzleVelocityFps: 0 }), [100]).rows, [null]);
+  assert.deepEqual(B.solve(Object.assign({}, CM65, { muzzleVelocityFps: -100 }), [100]).rows, [null]);
+  assert.ok(Date.now() - t0 < 200, 'degenerate inputs must return immediately, not run the full integration');
 });
 
-test.todo('[KNOWN BUG] unsorted ranges give wrong samples (solve assumes ascending input)', () => {
+test('[FIXED] unsorted ranges give wrong samples (solve assumes ascending input)', () => {
   const sorted = solve({}, [100, 300, 500]).rows, unsorted = solve({}, [500, 100, 300]).rows;
   const by = (rows) => Object.fromEntries(rows.map((r) => [r.yards, r]));
   const s = by(sorted), u = by(unsorted);

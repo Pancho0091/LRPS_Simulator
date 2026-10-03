@@ -79,7 +79,7 @@ so the biggest single error dominates — fix that one first.</div>
 <pre class="code">safety ─▶ words & units ─▶ history ─▶ rifles ─▶ ammo ─▶ bullet types ─▶ calibers
        ─▶ ballistics ─▶ optics ─▶ equipment ─▶ positions ─▶ dope cards ─▶ field craft</pre>
 <p>Each module uses words and ideas from the ones before it. That's why lessons unlock in order.</p>
-<div class="callout try"><b>Verify:</b> open the <a data-goto="range">Range</a> in Training mode and fire without dialing. The miss you see is the "data" error — the one this course teaches you to remove.</div>`,
+<div class="callout try"><b>Verify:</b> on the <a data-goto="range">Range</a> (Training), run Setup → Chronograph → Zero, then fire at steel without dialing. The miss you see is the "data" error — the one this course teaches you to remove.</div>`,
         recap: ['Goal: first-round hits on small, distant targets.', 'Misses = rifle/ammo + data + wind + optics + shooter errors.', 'Precision = tight groups; accuracy = groups in the right place.'],
         quiz: [
           { q: 'Your rifle shoots tiny groups but they land 2 ft low at 800 yd. That is a problem of…', options: ['Precision', 'Accuracy (wrong data)', 'Safety'], answer: 1, why: 'The group is tight (precise) but not where you aimed (inaccurate).' },
@@ -160,7 +160,7 @@ unit <b>and its typical range</b>, so a wrong number looks wrong instantly.</div
 <tr><td>Velocity</td><td>feet per second (fps)</td><td>2,500 – 3,100 fps at the muzzle</td><td>Sound ≈ 1,120 fps</td></tr>
 <tr><td>Distance</td><td>yards (yd) or meters (m)</td><td>100 – 1,500</td><td>1 yd = 0.9144 m — never mix them on one card</td></tr>
 <tr><td>Size, drop</td><td>inches (in)</td><td>0 – 400 in of drop</td><td>Converted to angles (MIL) in module 08</td></tr>
-<tr><td>Energy</td><td>foot-pounds (ft·lb)</td><td>500 – 3,000 at the muzzle</td><td>Matters for hunting and steel</td></tr>
+<tr><td>Energy</td><td>foot-pounds (ft·lb)</td><td>1,000 – 5,000 at the muzzle (magnums at the top)</td><td>Matters for hunting and steel</td></tr>
 <tr><td>Temperature</td><td>°F</td><td>0 – 110 °F</td><td>Affects air and powder</td></tr>
 <tr><td>Air pressure</td><td>inches of mercury (inHg)</td><td>23 – 30 inHg</td><td>Lower at altitude</td></tr>
 <tr><td>Twist rate</td><td>1:x inches</td><td>1:7 – 1:12</td><td>1:8 = one full turn of rifling every 8 inches</td></tr>
@@ -254,8 +254,8 @@ Learn the bucket first, then the word; the bucket tells you which module explain
 <div class="callout rule"><b>Rule:</b> The history of accuracy is a chain of bottlenecks. Each invention removed the biggest error of its time —
 the same "fix the biggest error first" rule you learned in module 00.</div>
 <div class="timeline">
-  <div class="tl-item"><div class="tl-date">1500s–1800s</div><div><b>Smoothbore muskets.</b> A round ball in a smooth barrel tumbles unpredictably. Useful accuracy: roughly 50–100 yards. <i>Bottleneck: no spin.</i></div></div>
-  <div class="tl-item"><div class="tl-date">1500s–1700s</div><div><b>Rifled barrels.</b> Spiral grooves spin the ball, stabilising it like a thrown football. Much more accurate — but a tight-fitting ball is slow to ram down the barrel, so rifles stayed a specialist tool. <i>Bottleneck: loading speed.</i></div></div>
+  <div class="tl-item"><div class="tl-date">1500s–1850s</div><div><b>Smoothbore muskets.</b> A round ball in a smooth barrel tumbles unpredictably. Useful accuracy: roughly 50–100 yards. <i>Bottleneck: no spin.</i></div></div>
+  <div class="tl-item"><div class="tl-date">1500s–1840s · specialist</div><div><b>Rifled barrels.</b> Spiral grooves spin the ball, stabilising it like a thrown football. Much more accurate — but a tight-fitting ball is slow to ram down the barrel, so rifles stayed a specialist tool. <i>Bottleneck: loading speed.</i></div></div>
   <div class="tl-item"><div class="tl-date">1849</div><div><b>The Minié ball.</b> A conical bullet small enough to drop down the barrel, with a hollow base that expands on firing to grip the rifling. Fast to load <i>and</i> spun. It made rifles standard issue by the 1850s–60s.</div></div>
 </div>
 <div class="callout analog"><b>Technical analog:</b> spin is a <b>gyroscope</b>. A spinning object resists being tipped over — that is why a rifled bullet flies point-first.
@@ -270,7 +270,7 @@ Module 07 turns this into a number (the stability factor, Sg).</div>`,
         id: 'history-smokeless',
         title: 'Smokeless powder, pointed bullets and bolt actions',
         mins: 5,
-        terms: ['Smokeless powder', 'Spitzer', 'Boat tail', 'Bolt action', 'Drag function'],
+        terms: ['Smokeless powder', 'Spitzer', 'Boat tail', 'Bolt action', 'Drag tables'],
         html: `
 <div class="callout rule"><b>Rule:</b> Between about 1880 and 1910 the modern rifle cartridge was born. Its shape — a brass case, smokeless powder,
 a pointed jacketed bullet, a bolt action — is still what you shoot today.</div>
@@ -324,7 +324,7 @@ measuring range, weather and velocity precisely and computing the solution. The 
         id: 'actions',
         title: 'Action types',
         mins: 5,
-        terms: ['Bolt action', 'Semi-automatic', 'Gas system', 'Rimfire trainer'],
+        terms: ['Bolt action', 'Semi-automatic', 'Single shot', 'Rimfire trainer'],
         html: `
 <div class="callout rule"><b>Rule:</b> The action decides how a new cartridge gets into the chamber. For precision, <b>fewer moving parts during
 the shot and a rigid lock</b> mean more consistency — which is why most precision rifles are bolt actions.</div>
@@ -414,7 +414,7 @@ Pick the discipline first; it tells you the platform.</div>
 <tr><td>Benchrest</td><td>Smallest groups from a bench</td><td>Single-shot specialist rifles</td></tr>
 <tr><td>ELR (extreme long range)</td><td>1,500 – 3,500+ yd</td><td>.375/.416-class magnums, 25+ lb</td></tr>
 </tbody></table>
-<div class="callout try"><b>Verify:</b> the <a data-goto="range">Range</a> "PRS stage" mode simulates a timed, multi-distance stage.</div>`,
+<div class="callout try"><b>Verify:</b> the <a data-goto="range">Range</a> "Stage" mode simulates a timed, multi-distance stage.</div>`,
         recap: ['Discipline → constraints → platform.', 'PRS/NRL: heavy chassis rifles, mild cartridges, brakes.', 'Rimfire versions train the same skills cheaply.'],
         quiz: [
           { q: 'Why are PRS rifles heavy (14–18 lb)?', options: ['Rules require it', 'Weight = stability and low recoil so you can spot hits', 'For carrying'], answer: 1, why: 'Heavy rifles move less and recoil less.' },
@@ -638,7 +638,7 @@ then decide behaviour: <b>case capacity</b> (powder), <b>bore diameter</b>, and 
         id: 'first-cartridge',
         title: 'Choosing your first precision cartridge',
         mins: 4,
-        terms: ['Trainer', 'Component availability'],
+        terms: ['Trainer', 'Match ammo availability'],
         html: `
 <div class="callout rule"><b>Rule:</b> For learning, choose the cartridge that lets you <b>shoot the most, see your hits, and buy consistent ammo</b> —
 not the one with the most energy. Skill grows with rounds fired.</div>
@@ -710,7 +710,7 @@ not the one with the most energy. Skill grows with rounds fired.</div>
         id: 'kit-priorities',
         title: 'Building a kit: what to get first',
         mins: 5,
-        terms: ['Must-have', 'Force multiplier', 'Data book'],
+        terms: ['Tier', 'Torque wrench', 'Data book'],
         html: `
 <div class="callout rule"><b>Rule:</b> Buy in the order that removes the <b>largest error</b> first — the same error-budget rule from module 00.
 Safety gear, then a reliable rifle + scope, then measurement, then comfort.</div>
@@ -761,7 +761,7 @@ your wobble — and the smaller the target you can hit reliably.</div>
 </tbody></table>
 <p class="hint">*Wobble values used by this app's Range simulator. A 12" plate at 800 yd is only 0.42 mil wide.</p>
 <div class="callout analog"><b>Technical analog:</b> wobble is <b>noise</b> on your aim signal. A lower position is a better low-pass filter.</div>
-<div class="callout try"><b>Verify:</b> change "Position" in <a data-goto="range">Range → settings</a> and watch the reticle sway change.</div>`,
+<div class="callout try"><b>Verify:</b> change "Position" in the <a data-goto="range">Range</a> Setup and watch the reticle sway change.</div>`,
         recap: ['Bone + ground contact = stability.', 'Prone with bipod and rear bag is the default long-range position.', 'Your wobble must be smaller than the target.'],
         quiz: [
           { q: 'A 12" plate at 800 yd is about 0.42 mil. Which positions can hit it reliably?', options: ['Standing only', 'Prone (and bench) — wobble well under the plate size', 'Kneeling'], answer: 1, why: 'Prone wobble (~0.1–0.2 mil) fits inside 0.42 mil; kneeling (~0.75) does not.' },

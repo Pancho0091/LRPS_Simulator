@@ -103,13 +103,13 @@ test('Coriolis: northern hemisphere deflects right; shooting east hits high', ()
   assert.ok(south.windIn < 0, 'southern hemisphere deflects left');
 });
 
-test('aerodynamic jump: right twist, wind from the left throws the shot up', () => {
-  const w = { windMph: 10, windClock: 9 };
+test('aerodynamic jump: right twist, wind from the right throws the shot up, from the left down', () => {
+  const w = { windMph: 10, windClock: 3 };
   const [noAj] = B.solve(Object.assign({}, SYS, w), [600]).rows;
   const [aj] = B.solve(Object.assign({}, SYS, w, { aeroJump: true }), [600]).rows;
   assert.ok(aj.dropIn > noAj.dropIn);
-  const [ajRight] = B.solve(Object.assign({}, SYS, w, { aeroJump: true, windClock: 3 }), [600]).rows;
-  assert.ok(ajRight.dropIn < noAj.dropIn);
+  const [ajLeft] = B.solve(Object.assign({}, SYS, w, { aeroJump: true, windClock: 9 }), [600]).rows;
+  assert.ok(ajLeft.dropIn < noAj.dropIn);
 });
 
 test('powder temperature sensitivity: hot ammo leaves the muzzle faster', () => {

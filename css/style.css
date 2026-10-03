@@ -366,17 +366,6 @@ main[data-dir="back"] .panel { animation-name: panel-in-back; }
   .grid-2, .grid-range { grid-template-columns: minmax(0, 1fr); }
 }
 
-.rule {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  padding: 14px 16px;
-  border-radius: var(--radius);
-  background: linear-gradient(135deg, var(--accent-soft), var(--accent-2-soft));
-  border: 1px solid var(--border);
-  margin-bottom: 16px;
-}
-.rule svg { flex: none; width: 22px; height: 22px; color: var(--accent); margin-top: 2px; }
 
 /* =========================================================== stat tiles */
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
@@ -724,7 +713,6 @@ pre.code {
 .path::before { content: ""; position: absolute; left: 25px; top: 20px; bottom: 20px; width: 2px; background: var(--border); }
 .path-mod { position: relative; display: flex; gap: 14px; align-items: flex-start; text-align: left; width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font: inherit; box-shadow: var(--shadow-sm); transition: border-color var(--dur-2), transform var(--dur-2) var(--ease-out), box-shadow var(--dur-3) var(--ease-out); }
 .path-mod:hover:not(:disabled):not(.locked) { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); box-shadow: var(--shadow); transform: translateY(-1px); }
-.path-mod:disabled { cursor: not-allowed; opacity: 0.6; }
 .path-num { flex: none; width: 24px; height: 24px; margin-top: 2px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); border: 2px solid var(--border); font: 700 10px var(--mono); color: var(--muted); z-index: 1; box-shadow: 0 0 0 4px var(--surface); transition: background var(--dur-3), border-color var(--dur-3), transform var(--dur-3) var(--ease-spring); }
 .path-mod.ready .path-num, .path-mod.in-progress .path-num { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .path-mod.completed .path-num { background: var(--good); border-color: var(--good); color: #fff; }
@@ -898,7 +886,6 @@ td.cell .exp { display: block; font: 600 11px var(--mono); color: var(--bad); ma
 .feedback .verdict { font: 800 22px var(--sans); letter-spacing: 0.02em; }
 .feedback .verdict.hit { color: var(--good); }
 .feedback .verdict.miss { color: var(--bad); }
-.feedback pre { white-space: pre-wrap; margin-top: 10px; }
 
 details.plain summary { cursor: pointer; font-weight: 700; padding: 4px 0; }
 details.plain[open] summary { margin-bottom: 10px; }
@@ -913,7 +900,6 @@ details.plain[open] summary { margin-bottom: 10px; }
 .k-grid div { display: flex; flex-direction: column; }
 .k-grid small { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #7e9886; }
 .k-grid b { font-size: 13px; color: #eafff0; }
-.k-btn { width: 100%; margin-top: 10px; font-size: 12px; padding: 6px 10px; background: #1b2a20; color: #cfe8d5; border-color: #2c4234; }
 @media (max-width: 420px) { .k-grid { grid-template-columns: repeat(2, 1fr); } }
 .stage-list { margin-top: 12px; border-radius: 12px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--border); }
 .stage-list .k-head { color: var(--accent); }
@@ -955,7 +941,7 @@ details.plain[open] summary { margin-bottom: 10px; }
 
 /* =========================================================== print */
 @media print {
-  .app-header, .no-print, #toasts { display: none !important; }
+  .app-header, .no-print, #toasts, body::before { display: none !important; }
   body { background: #fff; color: #000; }
   .panel { display: none !important; }
   #tab-build { display: block !important; }

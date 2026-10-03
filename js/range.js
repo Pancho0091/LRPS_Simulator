@@ -125,6 +125,7 @@
   }
 
   function setPreset(name, silent) {
+    S.setup.realistic = name === 'realistic';
     S.setup.preset = name;
     S.toggles = Object.assign({}, RANGE.PRESETS[name]);
     L.store.set('range.toggles', S.toggles);
@@ -141,7 +142,7 @@
     const sg = B.millerStability({ bulletWeightGr: load.bulletGr, bulletDiameterIn: load.diaIn, bulletLengthIn: load.lenIn, twistIn: st.twistIn, muzzleVelocityFps: boxMv, tempF: 59, pressureInHg: 29.92 });
     const sgCls = sg < 1 ? 'bad' : sg < 1.4 ? 'warn' : 'good';
     const sgWord = sg < 1 ? 'unstable' : sg < 1.4 ? 'marginal' : 'stable';
-    const std = B.solve({ muzzleVelocityFps: boxMv, bc: load.bc, dragModel: load.dragModel, bulletWeightGr: load.bulletGr, sightHeightIn: st.sightHeightIn, zeroYards: st.zeroYd, windMph: 0 }, [cart.maxYd]).rows[0];
+    const std = B.solve({ muzzleVelocityFps: boxMv, bc: load.bc, dragModel: load.dragModel, bulletWeightGr: load.bulletGr, sightHeightIn: st.sightHeightIn, zeroYards: st.zeroYd, windMph: 0 }, [cart.maxYd]).rows[0] || { velocityFps: 0, mach: 0, tofSec: 0, energyFtLb: 0, dropIn: 0 };
     const tile = (l, v, u, cls) => `<div class="tile${cls ? ' ' + cls : ''}"><div class="label">${l}</div><div class="value">${v}<small>${u || ''}</small></div></div>`;
     $('#rig-summary').innerHTML = `
       <div class="card-title"><h3>${esc(cart.name)}</h3><span class="chip">box data · approx.</span></div>
@@ -154,7 +155,7 @@
         ${tile('Typical SD', load.sdFps, ' fps')}
         ${tile('Temp sens.', load.tempSens.toFixed(1), ' fps/°F')}
         ${tile(`Mach @${cart.maxYd}`, std.mach.toFixed(2), std.mach < 1 ? ' subsonic' : std.mach < 1.2 ? ' transonic' : '')}
-        ${tile('Recoil', rifle.weightLb, ` lb rifle`)}
+        ${tile('Rifle weight', rifle.weightLb, ` lb rifle`)}
       </div>
       <p class="hint" style="margin:10px 0 0">${esc(load.src)}. ${esc(cart.note)}<br>
         Box velocity is scaled ${cart.fpsPerIn ? `${cart.fpsPerIn} fps per inch from the ${load.refBarrelIn}" test barrel` : 'flat for rimfire past 16"'}.
@@ -165,8 +166,12 @@
     $('#rig-loc-desc').textContent = loc ? `${loc.terrain} Elevation ${loc.alt} ft, berms to ${loc.maxYd} yd, ${loc.lat}°N.` : '';
   }
 
+  // Zero distance of the rifle in use (setup changes only apply to a new session)
+  const zeroYd = () => +((S.rifle && S.rifle.setup) || S.setup).zeroYd || 100;
+
   function previewWorld() {
     readSetupForm(); readToggles();
+    windHist.length = 0;
     S.world = RANGE.newWorld(S.setup, S.toggles);
     renderKestrel(performance.now());
   }
@@ -175,7 +180,8 @@
 
   const STEPS = ['setup', 'chrono', 'zero', 'shoot', 'debrief'];
 
-  function setStep(step) {
+  function setStep(step, enter = true) {
+    if (enter && S.flight) { L.toast('Wait for the round to land'); return; }
     S.step = step;
     $('#r-setup').hidden = step !== 'setup';
     $('#r-line').hidden = !(step === 'chrono' || step === 'zero' || step === 'shoot');
@@ -191,21 +197,26 @@
     const slot = step === 'setup' ? $('#setup-instruments-card') : $('#instruments-slot');
     if (inst.parentElement !== slot) slot.appendChild(inst);
     releaseBreath();
-    if (step === 'chrono') enterChrono();
-    else if (step === 'zero') enterZero();
-    else if (step === 'shoot') enterShoot();
-    else if (step === 'debrief') renderDebrief();
+    if (enter) {
+      if (step === 'chrono') enterChrono();
+      else if (step === 'zero') enterZero();
+      else if (step === 'shoot') enterShoot();
+      else if (step === 'debrief') renderDebrief();
+    } else if (step === 'debrief') renderDebrief();
+    else if (S.target) renderStation();
     $('#station-next').hidden = step === 'shoot' && S.mode === 'stage' && S.stage && !S.stage.over;
     $('#station-next').textContent = step === 'chrono' ? 'Done → Zero' : step === 'zero' ? 'Zero confirmed → Shoot' : 'End session → Debrief';
     $('#range-new').hidden = step !== 'shoot';
-    window.scrollTo({ top: 0, behavior: reduced() ? 'auto' : 'smooth' });
+    if (enter) window.scrollTo({ top: 0, behavior: reduced() ? 'auto' : 'smooth' });
   }
 
   function startSession() {
     readSetupForm(); readToggles();
+    windHist.length = 0;
     if (!S.world) S.world = RANGE.newWorld(S.setup, S.toggles);
     S.world.start = performance.now();
     S.rifle = RANGE.newRifle(S.setup, S.toggles);
+    S.rifle.setup = Object.assign({}, S.setup); // the rifle keeps the zero distance it was zeroed at
     S.log = []; S.shotNo = 0; S.lrfBad = 0;
     S.chrono = { shots: [] };
     S.session = { shots: 0, hits: 0, targets: 0, firstHits: 0, streak: 0, byRange: {} };
@@ -224,7 +235,7 @@
   // ------------------------------------------------------------ targets
 
   function paperTarget() {
-    const y = +S.setup.zeroYd;
+    const y = zeroYd();
     return { yards: y, plateIn: 24, kind: 'paper', shape: 'square', angleDeg: 0, calIn: S.rifle.load.diaIn, marks: [], shotsHere: 0, lrf: null, known: true };
   }
 
@@ -233,7 +244,6 @@
     S.puffs = [];
     S.swing = { t0: 0, amp: 0 };
     if (S.toggles.cant && S.step === 'shoot') { S.cant = L.gauss() * 2.2; S.cantTarget = S.cant; } else { S.cant = 0; S.cantTarget = 0; }
-    if (S.step === 'shoot') { S.session.targets++; }
     renderStation();
     renderHud();
   }
@@ -277,7 +287,7 @@
   }
 
   function nextTarget() {
-    if (S.step !== 'shoot') return;
+    if (S.step !== 'shoot' || S.flight) return;
     if (S.mode === 'stage') startStage();
     else if (S.mode === 'ukd') newUkdTarget();
     else {
@@ -290,7 +300,7 @@
 
   function lase() {
     const t = S.target;
-    if (!t || S.step !== 'shoot' || !S.toggles.lrf || t.known) return;
+    if (!t || S.step !== 'shoot' || S.flight || !S.toggles.lrf || t.known || t.stage) return;
     const r = RANGE.lase(t, S.toggles);
     if (r.bad) S.lrfBad++;
     t.lrf = r;
@@ -378,7 +388,7 @@
     let rf;
     if (t.known) rf = `<div class="range-num">${t.yards}<small> yd</small></div><div class="hint">Known distance · berm sign</div>`;
     else if (t.stage) rf = `<div class="range-num">${t.lrf.yards}<small> yd</small></div><div class="hint">Lased in prep${t.angleDeg ? ` · ${t.angleDeg > 0 ? '▲' : '▼'} ${Math.abs(t.angleDeg)}°` : ' · flat'}</div>`;
-    else if (!lrfOn) rf = `<div class="range-num">?<small> mil it</small></div><div class="hint">No rangefinder · plate is <b>${t.plateIn}"</b> ${t.shape}</div>`;
+    else if (!lrfOn) rf = `<div class="range-num">?<small> mil it</small></div><div class="hint">No rangefinder · plate is <b>${t.plateIn}"</b> ${t.shape}${t.angleDeg ? ` · ${t.angleDeg > 0 ? '▲' : '▼'}${Math.abs(t.angleDeg)}° incline` : ''}</div>`;
     else if (!t.lrf) rf = `<div class="range-num" id="lrf-num">— — —<small> yd</small></div><div class="hint">Press <b>Lase</b> (R)</div>`;
     else rf = `<div class="range-num${t.lrf.bad ? ' bad' : ''}" id="lrf-num">${t.lrf.yards}<small> yd</small></div><div class="hint">${t.lrf.angleDeg ? `${t.lrf.angleDeg > 0 ? '▲' : '▼'} ${Math.abs(t.lrf.angleDeg)}° · cos ${Math.cos(t.lrf.angleDeg * Math.PI / 180).toFixed(3)}` : 'Flat · 0°'} · reading ${t.lases || 1}</div>`;
     const windCall = S.toggles.windCall ? RANGE.windCallText(S.world) : 'None — read the flags, mirage and meter';
@@ -400,8 +410,8 @@
     const zp = $('#zero-paper'); if (zp) zp.addEventListener('click', () => { S.target.marks = []; S.target.shotsHere = 0; renderStation(); L.sfx.click(); });
     const lb = $('#lase-btn'); if (lb) lb.addEventListener('click', lase);
     const seg = $('#range-mode');
-    if (seg) L.seg(seg, (v) => { S.mode = v; S.stage = null; enterShoot(); $('#station-next').hidden = v === 'stage'; });
-    $$('.lane').forEach((b) => b.addEventListener('click', () => { newKdTarget(+b.dataset.yd); L.sfx.click(); }));
+    if (seg) L.seg(seg, (v) => { if (S.flight) { L.toast('Wait for the round to land'); return; } S.mode = v; S.stage = null; enterShoot(); $('#station-next').hidden = v === 'stage'; });
+    $$('.lane').forEach((b) => b.addEventListener('click', () => { if (S.flight) return; newKdTarget(+b.dataset.yd); L.sfx.click(); }));
   }
 
   function setZero() {
@@ -645,11 +655,14 @@
   function fire() {
     const t = S.target;
     if (!t || S.flight || !S.rifle || (S.stage && S.mode === 'stage' && S.step === 'shoot' && S.stage.over)) return;
+    // One round per stage target: a second press during the advance delay is ignored
+    if (S.step === 'shoot' && S.mode === 'stage' && S.stage && S.stage.targets[S.stage.i] && S.stage.targets[S.stage.i].result != null) return;
     if (S.step === 'shoot' && S.mode === 'stage' && S.stage && !S.stage.start) S.stage.start = performance.now();
     const now = performance.now();
     const w = RANGE.pathWind(S.world, now, t.yards);
     const sb = RANGE.shotBallistics(S.rifle, S.world, S.toggles, now);
     const row = solveShot({ muzzleVelocityFps: sb.mv, windMph: w.speed, windClock: w.clock });
+    if (!row) { L.toast('That load cannot reach this target'); return; }
     const pos = RANGE.position(S.setup.position);
     const to = turretOffsets(S.dial.elev, S.dial.wind);
     const sw = sway(now);
@@ -662,7 +675,7 @@
     else hit = t.shape === 'square' ? Math.max(Math.abs(upIn), Math.abs(rightIn)) <= t.plateIn / 2 : Math.hypot(upIn, rightIn) <= t.plateIn / 2;
 
     RANGE.recordShot(S.rifle, now);
-    S.flight = { start: now, tof: row.tofSec * 1000, up, right, upIn, rightIn, hit, dialE: S.dial.elev, dialW: S.dial.wind, mv: sb.mv, wind: w, cold: sb.coldBore, heat: sb.heat, powderT: sb.powderT };
+    S.flight = { start: now, tof: row.tofSec * 1000, up, right, upIn, rightIn, hit, dialE: S.dial.elev, dialW: S.dial.wind, mv: sb.mv, wind: w, cold: sb.coldBore, heat: sb.heat, powderT: sb.powderT, target: t, step: S.step };
     $('#fire-btn').disabled = true;
     L.sfx.shot();
     S.recoilAt = now;
@@ -670,11 +683,12 @@
   }
 
   function land() {
-    const f = S.flight, t = S.target;
+    const f = S.flight, t = f.target || S.target;
     S.flight = null;
     $('#fire-btn').disabled = false;
     $('#flight-bar').style.width = '0';
     const first = t.shotsHere === 0;
+    if (first && f.step === 'shoot' && t.kind === 'steel') S.session.targets++;
     t.shotsHere++;
     S.shotNo++;
     const mark = { up: f.up, right: f.right, upIn: f.upIn, rightIn: f.rightIn, hit: f.hit, n: S.shotNo, paper: t.kind === 'paper' };
@@ -682,8 +696,8 @@
     const entry = { n: S.shotNo, station: S.step, yards: t.yards, angleDeg: t.angleDeg, dialE: f.dialE, dialW: f.dialW, up: f.up, right: f.right, hit: f.hit, mv: f.mv, wind: f.wind, cold: f.cold, heat: f.heat, powderT: f.powderT, lrf: t.lrf ? t.lrf.yards : null, plateIn: t.plateIn, kind: t.kind, known: !!t.known, stage: !!t.stage };
     S.log.push(entry);
 
-    if (S.step === 'chrono') landChrono(entry);
-    else if (S.step === 'zero') landZero(entry);
+    if (f.step === 'chrono') landChrono(entry);
+    else if (f.step === 'zero') landZero(entry);
     else landSteel(entry, first);
     logRow(entry);
     renderHud();
@@ -807,7 +821,7 @@
     if (!S.debriefed) { S.debriefed = true; if (xp) L.addXp(xp, 'session debrief'); }
 
     $('#debrief').innerHTML = `
-      <div class="card-title"><h3>Debrief · ${esc(r.cart.name)} · ${esc(w.loc.name)}</h3><span class="chip">${S.setup.preset}</span></div>
+      <div class="card-title"><h3>Debrief · ${esc(r.cart.name)} · ${esc(w.loc.name)}</h3><span class="chip">${esc(S.setup.preset)}</span></div>
       <div class="tiles">
         ${tile('Rounds', r.rounds)}${tile('Steel hits', `${ss.hits}/${ss.shots}`, ` ${pct}%`)}${tile('First-round', `${ss.firstHits}/${ss.targets}`)}${tile('Best streak', S.best)}
       </div>
@@ -820,7 +834,7 @@
           <tr><td>Zero</td><td class="mono">slipped ${fmt1(r.slip.elev)} / ${fmt1(r.slip.wind)}</td><td class="mono">residual ${fmt2(zeroResid.e)} / ${fmt2(zeroResid.w)} mil</td><td>${Math.abs(zeroResid.e) < 0.1 && Math.abs(zeroResid.w) < 0.1 ? 'Tight zero.' : 'A zero error rides along to every distance.'}</td></tr>
           <tr><td>Scope tracking</td><td class="mono">assumed 0.1 mil/click</td><td class="mono">${r.trackErr ? `${(r.trackErr * 100).toFixed(1)}% ${r.trackErr > 0 ? 'over' : 'under'}` : 'true'}</td><td>${r.trackErr ? `10 mil dialed moves ${(10 * (1 + r.trackErr)).toFixed(2)} mil. Tall-target test it.` : 'Clicks are honest.'}</td></tr>
           <tr><td>Cold bore</td><td>–</td><td class="mono">${S.toggles.coldBore ? `${fmt2(r.coldBore.e)} / ${fmt2(r.coldBore.w)} mil, ${Math.round(r.coldBore.mv)} fps` : 'off'}</td><td>First shot of the day (and after a long pause).</td></tr>
-          <tr><td>Barrel heat</td><td>–</td><td class="mono">${S.toggles.heat ? `walks ${(0.035 * r.contour * 10).toFixed(2)} mil per 10 rapid rounds` : 'off'}</td><td>Peak heat ${Math.max(0, ...S.log.map((e) => e.heat || 0)).toFixed(1)} rounds-worth this session.</td></tr>
+          <tr><td>Barrel heat</td><td>–</td><td class="mono">${S.toggles.heat ? `walks ${(0.035 * r.contour * 10).toFixed(2)} mil per 10 rapid rounds` : 'off'}</td><td>${S.toggles.heat ? `Peak heat ${Math.max(0, ...S.log.map((e) => e.heat || 0)).toFixed(1)} rounds-worth this session.` : 'Toggle was off this session.'}</td></tr>
           <tr><td>Rangefinder</td><td class="mono">${S.lrfBad} bad return${S.lrfBad === 1 ? '' : 's'}</td><td>–</td><td>Re-lase small far plates; a jump of 20+ yd is the berm.</td></tr>
           <tr><td>Air</td><td class="mono">${w.tempF}°F · ${w.stationPressureInHg.toFixed(2)}" · ${w.humidityPct}%</td><td class="mono">DA ${Math.round(w.atm.densityAltitudeFt)} ft</td><td>${esc(w.loc.terrain)}</td></tr>
         </tbody></table></div>
@@ -856,6 +870,7 @@
       windMph: mw.speed, windClock: mw.clock,
       spinDrift: adv, aeroJump: adv, coriolis: adv, latitudeDeg: w.latitudeDeg, azimuthDeg: w.azimuthDeg,
     }), [yards]).rows[0];
+    if (!row) return { elev: NaN, wind: NaN, windMph: mw.speed, windClock: mw.clock };
     const k = 1 + r.trackErr;
     return {
       elev: B.roundToClick(-(toMil(row.dropIn, yards) + r.boreE) / k - r.slip.elev, CLICK),
@@ -873,8 +888,9 @@
       tempSensitivity: 0, mvTempF: null, windMph: 0,
       altitudeFt: w.altitudeFt, tempF: w.tempF, humidityPct: w.humidityPct, stationPressureInHg: w.stationPressureInHg,
       zeroAngleRad: r.zeroAngleRad,
-    }), [+S.setup.zeroYd]).rows[0];
-    return { e: toMil(row.dropIn, +S.setup.zeroYd) + r.boreE + r.slip.elev * k, w: toMil(row.windIn, +S.setup.zeroYd) + r.boreW + r.slip.wind * k };
+    }), [zeroYd()]).rows[0];
+    if (!row) return { e: 0, w: 0 };
+    return { e: toMil(row.dropIn, zeroYd()) + r.boreE + r.slip.elev * k, w: toMil(row.windIn, zeroYd()) + r.boreW + r.slip.wind * k };
   }
 
   function layerTable(yards, angleDeg) {
@@ -893,7 +909,7 @@
     let prev = null;
     const trs = steps.map(([name, extra]) => {
       acc = Object.assign({}, acc, extra);
-      const row = B.solve(acc, [yards]).rows[0];
+      const row = B.solve(acc, [yards]).rows[0] || { dropIn: NaN, windIn: NaN };
       const e = -toMil(row.dropIn, yards), wd = -toMil(row.windIn, yards);
       const de = prev ? e - prev.e : null, dw = prev ? wd - prev.w : null;
       prev = { e, w: wd };
@@ -974,6 +990,11 @@
   // ------------------------------------------------------------ frame loop
 
   function frame(now) {
+    try { frameBody(now); } catch (e) { console.error('range frame', e); }
+    requestAnimationFrame(frame);
+  }
+
+  function frameBody(now) {
     if (L.currentTab === 'range') {
       if (S.step === 'setup') {
         if (now - kestrelAt > 1000) renderKestrel(now);
@@ -996,6 +1017,7 @@
         if (S.breath.holding) setHud(`Holding breath · ${((now - S.breath.start) / 1000).toFixed(1)} s`);
         if (now - kestrelAt > 1000) renderKestrel(now);
         S.cant += (S.cantTarget - S.cant) * 0.08;
+        S.puffs = S.puffs.filter((p) => now - p.t0 < 5200);
         RANGE.drawScope($('#scope'), {
           target: S.target, halfFov: halfFov(), zoomX: zoomX(), sway: sway(now), cant: S.cant, recoilAt: S.recoilAt,
           recoil: S.rifle ? Math.min(1.6, S.rifle.cart.recoil * 12 / S.rifle.cls.weightLb) : 0.6,
@@ -1005,7 +1027,6 @@
         RANGE.drawFlags($('#flags'), S.world, now, reduced());
       }
     }
-    requestAnimationFrame(frame);
   }
 
   // ------------------------------------------------------------ init
@@ -1016,7 +1037,12 @@
     if (!RANGE || !RANGE.newWorld || !RANGE.drawScope) return; // module scripts not loaded yet
     S.inited = true;
     S.setup = Object.assign({}, RANGE.DEFAULT_SETUP, L.store.get('range.setup', {}));
-    S.toggles = Object.assign({}, RANGE.PRESETS[S.setup.preset] || RANGE.PRESETS.training, L.store.get('range.toggles', {}));
+    ['zeroYd', 'barrelIn', 'twistIn', 'sightHeightIn'].forEach((k) => {
+      S.setup[k] = Number.isFinite(+S.setup[k]) && +S.setup[k] > 0 ? +S.setup[k] : RANGE.DEFAULT_SETUP[k];
+    });
+    if (!['training', 'realistic', 'custom'].includes(S.setup.preset)) S.setup.preset = 'training';
+    if (typeof S.setup.realistic !== 'boolean') S.setup.realistic = S.setup.preset === 'realistic';
+    S.toggles = Object.assign({}, RANGE.PRESETS[S.setup.preset] || RANGE.PRESETS[S.setup.realistic ? 'realistic' : 'training'], L.store.get('range.toggles', {}));
     buildSetupForm();
     $$('#range-preset button').forEach((b) => b.classList.toggle('on', b.dataset.v === S.setup.preset));
     renderSetupSummary();
@@ -1029,10 +1055,18 @@
       if (e.target.dataset.toggle) { readToggles(); $$('#range-preset button').forEach((b) => b.classList.remove('on')); S.setup.preset = 'custom'; }
       readSetupForm();
       renderSetupSummary();
-      if (['rig-loc', 'rig-sky'].includes(id) || e.target.dataset.toggle) previewWorld();
-      if (S.rifle && e.target.dataset.toggle) L.toast('Applies to the next shot');
+      if (S.rifle) {
+        // A session is running: the day stays the same; toggles apply to the next shot
+        if (e.target.dataset.toggle) {
+          if (S.world && S.world.wind && e.target.dataset.toggle === 'gusts') S.world.wind.vary = !!S.toggles.gusts;
+          L.toast('Applies to the next shot');
+        } else if (!/pos/.test(id)) {
+          L.toast('Rifle and range changes take effect when you start a new session');
+        }
+      } else if (['rig-loc', 'rig-sky'].includes(id) || e.target.dataset.toggle) previewWorld();
     });
-    L.seg($('#range-preset'), (v) => { setPreset(v); previewWorld(); });
+    $('#rig-form').addEventListener('submit', (e) => e.preventDefault());
+    L.seg($('#range-preset'), (v) => { setPreset(v); if (S.rifle) L.toast('Applies to the next shot'); else previewWorld(); });
     $('#setup-go').addEventListener('click', startSession);
     $('#range-print').addEventListener('click', printSheet);
     $$('#r-steps button').forEach((b) => b.addEventListener('click', () => {
@@ -1072,7 +1106,8 @@
       }
       if (S.step === 'setup' || S.step === 'debrief') return;
       const k = e.key;
-      if ((tag === 'BUTTON' || tag === 'SUMMARY') && k === 'Enter') return;
+      if (tag === 'SUMMARY') return; // disclosure widgets keep Space/Enter
+      if (tag === 'BUTTON' && k === 'Enter') return;
       const mult = e.shiftKey ? 5 : 1;
       if (k === 'ArrowUp') nudge('elev', mult);
       else if (k === 'ArrowDown') nudge('elev', -mult);
@@ -1097,7 +1132,7 @@
     ensureInit();
     if (!S.inited) return;
     if (!S.world) previewWorld();
-    setStep(S.step);
+    setStep(S.step, false);
     if (S.rifle) { setDial('elev', S.dial.elev, true); setDial('wind', S.dial.wind, true); }
     renderHud();
     if (!S.running) { S.running = true; requestAnimationFrame(frame); }

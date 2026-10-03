@@ -91,6 +91,7 @@
 
   function showMap(noScroll) {
     view = 'map';
+    if (figObserver) figObserver.disconnect();
     L.store.set('academy.last', 'map');
     const nx = nextLesson();
     const started = ORDER.some((l) => done[l.id]);
@@ -101,7 +102,7 @@
           so lessons unlock in order: pass a lesson's quiz to open the next.</p></div>
         <button class="btn primary big" id="ac-continue">${started ? 'Continue' : 'Start'}: ${nx.title} →</button>
       </div>
-      ${window.ISO && ISO.registry.module.course ? `<div class="map-hero-art">${figureHtml(ISO.registry.module.course(), '')}</div>` : ''}
+      ${window.ISO && ISO.registry.module.course ? `<div class="map-hero-art">${figureHtml(cachedSvg('module:course', ISO.registry.module.course), '')}</div>` : ''}
       <div class="toc-tools"><h3>Table of contents</h3>
         <span><button class="btn" id="toc-expand">Expand all</button> <button class="btn" id="toc-collapse">Collapse all</button></span></div>
       <div class="path">${MODULES.map((m, k) => {
@@ -147,6 +148,7 @@
     const l = byId[id];
     if (!l || !isUnlocked(l)) { showMap(noScroll); return; }
     view = id;
+    if (figObserver) figObserver.disconnect();
     L.store.set('academy.last', id);
     const m = l.m;
     const prev = l.m.reference ? null : ORDER[l.idx - 1];
@@ -173,6 +175,7 @@
       t.replaceWith(w);
       w.appendChild(t);
     });
+    $$('.ac-body a[data-goto]', $('#ac-main')).forEach((a) => { if (!a.getAttribute('href')) a.href = '#' + a.dataset.goto; });
     $$('[data-widget]', $('#ac-main')).forEach((el) => {
       const w = WIDGETS[el.dataset.widget];
       if (w) w(el);
@@ -213,15 +216,17 @@
     const body = $('#ac-main .ac-body');
     let figs = ISO.registry.lesson[l.id] || [];
     if (!figs.length && ISO.registry.module[l.m.id]) figs = [{ draw: ISO.registry.module[l.m.id], caption: '' }];
-    figs.forEach((f) => {
-      let svg;
-      try { svg = f.draw(); } catch (e) { console.error('illustration failed', l.id, e); return; }
+    figs.forEach((f, idx) => {
+      const svg = cachedSvg(`lesson:${l.id}:${idx}`, f.draw);
+      if (!svg) return;
       const html = figureHtml(svg, f.caption);
       const rule = $('.callout.rule', body);
+      // An anchor inside a scrolling table wrapper places the figure outside the wrapper
+      const anchor = (sel) => { const el = $(sel, body); return el ? (el.closest('.table-wrap') || el) : null; };
       if (f.at === 'top' || (!rule && f.at !== 'end')) body.insertAdjacentHTML('afterbegin', html);
       else if (f.at === 'end') body.insertAdjacentHTML('beforeend', html);
-      else if (f.at && f.at.startsWith('before:') && $(f.at.slice(7), body)) $(f.at.slice(7), body).insertAdjacentHTML('beforebegin', html);
-      else if (f.at && f.at.startsWith('after:') && $(f.at.slice(6), body)) $(f.at.slice(6), body).insertAdjacentHTML('afterend', html);
+      else if (f.at && f.at.startsWith('before:') && anchor(f.at.slice(7))) anchor(f.at.slice(7)).insertAdjacentHTML('beforebegin', html);
+      else if (f.at && f.at.startsWith('after:') && anchor(f.at.slice(6))) anchor(f.at.slice(6)).insertAdjacentHTML('afterend', html);
       else {
         // after the rule, keeping figures in registration order
         const prevFigs = [];
@@ -232,11 +237,20 @@
     });
   }
 
+  // Illustrations are deterministic, so each one is drawn once per page load
+  const svgCache = new Map();
+  function cachedSvg(key, draw) {
+    if (!svgCache.has(key)) {
+      try { svgCache.set(key, draw()); } catch (e) { console.error('illustration failed', key, e); svgCache.set(key, ''); }
+    }
+    return svgCache.get(key);
+  }
   function moduleThumb(m) {
     const ISO = window.ISO;
     const draw = ISO && ISO.registry.module[m.id];
     if (!draw) return '';
-    try { return `<span class="path-thumb">${draw()}</span>`; } catch (e) { return ''; }
+    const svg = cachedSvg('module:' + m.id, draw);
+    return svg ? `<span class="path-thumb">${svg}</span>` : '';
   }
 
   // "In this lesson": the rule, each section heading, widgets, recap, quiz
@@ -355,6 +369,8 @@
     return el.firstChild;
   }
 
+  const deckXp = new Set();
+  const NO_REACH = '<p class="hint">Your Build Card load does not reach this distance — pick a faster load to use this calculator.</p>';
   const WIDGETS = {
     'drag-curves'(el) {
       const box = widgetShell(el, 'Drag coefficient vs Mach', '<div class="w-chart"></div>');
@@ -376,6 +392,7 @@
         const p = L.profile;
         const here = B.solve(L.solverInput(p, { altitudeFt: a, tempF: t, humidityPct: h, windMph: 0 }), [1000]).rows[0];
         const std = B.solve(L.solverInput(p, { altitudeFt: 0, tempF: 59, humidityPct: 0, windMph: 0 }), [1000]).rows[0];
+        if (!here || !std) { $('.w-out', box).innerHTML = NO_REACH; return; }
         const u = unit();
         const e = L.toUnit(-here.dropIn, 1000, u), e0 = L.toUnit(-std.dropIn, 1000, u);
         $('.w-out', box).innerHTML = tile('Density altitude', Math.round(atm.densityAltitudeFt), 'ft') +
@@ -392,7 +409,7 @@
         const p = L.profile;
         const u = unit();
         const r = B.solve(L.solverInput(p, { windMph: 10, windClock: clock }), [800]).rows[0];
-        return { v: Math.abs(Math.sin(clock * Math.PI / 6)), hold: L.toUnit(-r.windIn, 800, u), u };
+        return { v: Math.abs(Math.sin(clock * Math.PI / 6)), hold: r ? L.toUnit(-r.windIn, 800, u) : NaN, u };
       };
       let sel = 3;
       const draw = () => {
@@ -429,6 +446,7 @@
         const p = L.profile;
         const a = B.solve(L.solverInput(p, { windMph: 0 }), [1000]).rows[0];
         const c = B.solve(L.solverInput(p, { windMph: 0, coriolis: true, latitudeDeg: lat, azimuthDeg: az }), [1000]).rows[0];
+        if (!a || !c) { $('.w-out', box).innerHTML = NO_REACH; return; }
         const u = unit();
         const v = L.toUnit(c.dropIn - a.dropIn, 1000, u), h = L.toUnit(c.windIn - a.windIn, 1000, u);
         $('.w-out', box).innerHTML = tile('Vertical', `${v >= 0 ? '▲' : '▼'} ${fmt(Math.abs(v), 3)}`, u) +
@@ -526,7 +544,7 @@
       const u = unit();
       const notes = {
         '.223 Rem 77 TMK': ['Very low', '5,000+'], '6mm Creedmoor 108 ELD-M': ['Low', '2,000–3,000'],
-        '6.5 Creedmoor 140 ELD-M': ['Low–moderate', '2,500–3,500'], '6.5 PRC 147 ELD-M': ['Moderate', '1,500–2,000'],
+        '6.5 Creedmoor 140 ELD-M': ['Low–moderate', '2,500–3,500'], '6.5 PRC 147 ELD-M': ['Moderate', '1,500–2,500'],
         '.308 Win 175 SMK': ['Moderate', '5,000+'], '.300 Win Mag 215 Hybrid': ['High', '1,500–2,500'],
         '.300 PRC 225 ELD-M': ['High', '1,500–2,500'], '.338 Lapua 300 Hybrid': ['Very high', '2,000–3,000'],
       };
@@ -534,8 +552,9 @@
       for (let r = 25; r <= 1600; r += 25) ranges.push(r);
       const rows = L.PRESETS.map((p) => {
         const res = B.solve(L.solverInput(Object.assign({}, L.DEFAULT_PROFILE, p), { windMph: 10, windClock: 3 }), ranges);
-        const r1k = res.rows.find((r) => r.yards === 1000);
-        const trans = res.rows.find((r) => r.mach < 1.2);
+        const okRows = res.rows.filter(Boolean);
+        const r1k = okRows.find((r) => r.yards === 1000) || okRows[okRows.length - 1];
+        const trans = okRows.find((r) => r.mach < 1.2);
         return { p, r1k, trans: trans ? trans.yards : '>1600', sg: res.sg, n: notes[p.name] || ['', ''] };
       });
       const minWind = Math.min(...rows.map((r) => r.r1k.windMil));
@@ -564,7 +583,7 @@
         $('#w-sdr-o').textContent = r + ' yd';
         const p = L.profile;
         const zero = B.solve(L.solverInput(p, { windMph: 0 }), [+p.zeroYards]).zeroAngleRad;
-        const at = (mv) => B.solve(L.solverInput(p, { windMph: 0, muzzleVelocityFps: mv, zeroAngleRad: zero, tempSensitivity: 0 }), [r]).rows[0].dropIn;
+        const at = (mv) => (B.solve(L.solverInput(p, { windMph: 0, muzzleVelocityFps: mv, zeroAngleRad: zero, tempSensitivity: 0 }), [r]).rows[0] || { dropIn: NaN }).dropIn;
         const spread = Math.abs(at(+p.muzzleVelocityFps + 2 * sd) - at(+p.muzzleVelocityFps - 2 * sd));
         const u = unit();
         $('.w-out', box).innerHTML = tile('95% vertical spread', fmt(spread, 1), 'in') + tile('In angle', fmt(L.toUnit(spread, r, u), 2), u) +
@@ -718,7 +737,7 @@
         if (!flipped) { flipped = true; card.classList.add('flip'); return; }
         const c = queue.shift();
         if (a === 'got') { known++; L.sfx.click(); } else queue.push(c);
-        if (!queue.length) { L.sfx.good(); L.addXp(5, 'flashcards complete'); }
+        if (!queue.length) { L.sfx.good(); if (!deckXp.has(el.dataset.deck)) { deckXp.add(el.dataset.deck); L.addXp(5, 'flashcards complete'); } }
         draw();
       };
       function restoreButtons() {
@@ -726,6 +745,7 @@
         $$('.fc-actions [data-a]', box).forEach((b) => b.addEventListener('click', () => act(b.dataset.a)));
       }
       card.addEventListener('click', () => { flipped = !flipped; card.classList.toggle('flip', flipped); });
+      card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); } });
       restoreButtons();
       draw();
     },
@@ -750,6 +770,8 @@
 
   const last = L.store.get('academy.last', 'map');
   if (last !== 'map' && byId[last] && isUnlocked(byId[last])) open(last, true); else showMap(true);
-  L.onTab('academy', () => renderSide());
-  L.onProfile(() => { if (L.currentTab === 'academy' && view !== 'map') open(view, true); });
+  // Widgets read the Build Card profile; re-render the open lesson when it changed while we were away
+  let profileDirty = false;
+  L.onTab('academy', () => { renderSide(); if (profileDirty && view !== 'map') { profileDirty = false; open(view, true); } });
+  L.onProfile(() => { if (L.currentTab === 'academy' && view !== 'map') open(view, true); else profileDirty = true; });
 })();

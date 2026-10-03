@@ -128,7 +128,7 @@ Your solver handles both — just give it the real temperature.</p>
 <tr><td>Higher elevation / lower pressure</td><td>Lower</td><td>Less</td></tr>
 <tr><td>More humid</td><td>Slightly lower (water vapour is lighter than air)</td><td>Tiny — usually negligible</td></tr>
 </tbody></table>
-<p>Rough sensitivity: ~0.15 mil per 1,000 ft of DA at 1000 yd for a 6.5 Creedmoor. Every 1,000 ft of DA is roughly 3% less air.</p>
+<p>Rough sensitivity: ~0.1–0.15 mil per 1,000 ft of DA at 1000 yd for a 6.5 Creedmoor. Every 1,000 ft of DA is roughly 3% less air.</p>
 <div data-widget="density-altitude"></div>
 <div class="callout warn"><b>Exception:</b> use <b>station pressure</b> (what a barometer reads where you are), not the "sea-level corrected"
 pressure from a weather report. Using corrected pressure at a mountain range makes the solver think you are at sea level.</div>`,
@@ -179,14 +179,14 @@ they can turn an edge hit into a miss on a small plate.</div>
 <tr><td>Spin drift</td><td>The spinning bullet's nose points slightly right of its path (right twist) — "yaw of repose"</td><td>Right for right twist, grows with TOF</td><td>0.1–0.3 mil</td></tr>
 <tr><td>Coriolis (horizontal)</td><td>Earth rotates under the bullet</td><td>Right in northern hemisphere, left in southern</td><td>~0.05–0.1 mil</td></tr>
 <tr><td>Coriolis (vertical, Eötvös)</td><td>Firing east adds to Earth's rotation, west subtracts</td><td>East = high, West = low</td><td>~0.05 mil</td></tr>
-<tr><td>Aerodynamic jump</td><td>A crosswind tips the spinning bullet as it leaves the muzzle</td><td>Right twist: wind from left = high, from right = low</td><td>~0.1 mil per 10 mph</td></tr>
+<tr><td>Aerodynamic jump</td><td>A crosswind tips the spinning bullet as it leaves the muzzle</td><td>Right twist: wind from the right = high, from the left = low (the classic 10–4 o'clock group slant)</td><td>~0.1 mil per 10 mph</td></tr>
 </tbody></table>
 <div data-widget="coriolis"></div>
 <div class="callout tip"><b>Practical:</b> many shooters fold spin drift into their wind zero (e.g. "hold 0.1 L at 800, 0.2 L at 1000 in no wind").
 Coriolis matters at extreme range or for small targets; your solver handles it if you give it latitude and azimuth (compass direction of fire).</div>`,
         quiz: [
           { q: 'In the northern hemisphere, Coriolis pushes the bullet…', options: ['Left', 'Right', 'Only up'], answer: 1, why: 'Northern hemisphere deflection is to the right regardless of direction.' },
-          { q: 'Right-twist barrel, wind from the right (3 o\'clock). Aerodynamic jump sends the shot…', options: ['High', 'Low', 'Nowhere'], answer: 1, why: 'For right twist: wind from left = high, wind from right = low.' },
+          { q: 'Right-twist barrel, wind from the right (3 o\'clock). Aerodynamic jump sends the shot…', options: ['High', 'Low', 'Nowhere'], answer: 0, why: 'The crosswind yaws the nose into the wind and the spin precesses that yaw vertically: for right twist, wind from the right = high, from the left = low.' },
         ],
       },
       {
@@ -226,7 +226,7 @@ m = weight (gr)   d = diameter (in)   l = length (calibers)   t = twist (caliber
 number works at every range. This app — like most precision shooters, PRS competitors and military snipers — uses the
 <b>milliradian (MIL)</b> for reticle, turrets, card and spotter calls.</div>
 <table class="tbl text">
-<thead><tr><th>Distance</th><th>1 MIL covers</th><th>0.1 MIL (one click) covers</th></tr></thead>
+<thead><tr><th>Distance</th><th>1 MIL covers (its subtension)</th><th>0.1 MIL (one click) covers</th></tr></thead>
 <tbody>
 <tr><td>100 yd</td><td>3.6 in</td><td>0.36 in</td></tr>
 <tr><td>500 yd</td><td>18 in</td><td>1.8 in</td></tr>
@@ -316,7 +316,7 @@ Metric: <code>range (m) = size (mm) / mils</code>.</div>
 <tr><td>SFP scope not at calibrated power</td><td>Wrong by the magnification ratio</td></tr>
 </tbody></table>
 <div class="callout tip">Measure the <b>largest</b> dimension you can, at max magnification, braced. Use a laser rangefinder whenever allowed — reticle ranging is the backup.</div>
-<div class="callout try"><b>Verify:</b> turn off the rangefinder in <a data-goto="range">Range → settings</a> and mil the plates yourself.</div>`,
+<div class="callout try"><b>Verify:</b> on the <a data-goto="range">Range</a>, open Setup → Realism options, turn the laser rangefinder off, and mil the plates yourself.</div>`,
         quiz: [
           { q: 'An 18" target measures 0.8 mil. Range?', options: ['400 yd', '625 yd', '900 yd'], answer: 1, why: '18 × 27.78 / 0.8 = 625 yd.' },
         ],
@@ -338,7 +338,7 @@ Metric: <code>range (m) = size (mm) / mils</code>.</div>
 </tbody></table>
 <pre class="code">horizontal error ≈ dialed_elevation × sin(cant)
 10 mil dialed, 2° cant → 10 × 0.035 = 0.35 mil  (≈ 12" at 1000 yd)</pre>
-<div class="callout try"><b>Verify:</b> enable "Cant & bubble level" on the <a data-goto="range">Range</a> and shoot a far target without leveling first.</div>`,
+<div class="callout try"><b>Verify:</b> enable "Cant (use the bubble level)" in the <a data-goto="range">Range</a> Setup → Realism options and shoot a far target without leveling first.</div>`,
         quiz: [
           { q: 'You have 8 mil dialed and the rifle is canted 3° right. The shot lands roughly…', options: ['0.4 mil right', '0.4 mil left', 'On target'], answer: 0, why: '8 × sin(3°) ≈ 0.42 mil, towards the cant direction.' },
         ],
@@ -366,7 +366,7 @@ Metric: <code>range (m) = size (mm) / mils</code>.</div>
 <li><b>Format the card.</b> Ranges in steps that fit your targets, elevation rounded to clicks, wind brackets, transonic marked, header with conditions.</li>
 <li><b>Maintain.</b> Log every string in a data book; re-chrono when you change lots, and as the barrel wears.</li>
 </ol>
-<div class="callout try"><b>Do it:</b> step 4 and 6 happen on <a data-goto="build">Build Card</a>; step 5 is "truing mode" on the <a data-goto="range">Range</a>.</div>`,
+<div class="callout try"><b>Do it:</b> step 4 and 6 happen on <a data-goto="build">Build Card</a>; step 5 is what the <a data-goto="range">Range</a> teaches — chronograph, zero, shoot steel, then compare your paper dope with the truth in the Debrief.</div>`,
         quiz: [
           { q: 'Which input most often makes a fresh card wrong?', options: ['Muzzle velocity from the ammo box', 'Gravity', 'Scope color'], answer: 0, why: 'Box MV comes from a different barrel length and conditions. Chronograph your own.' },
           { q: 'When is a card "trustworthy"?', options: ['After printing', 'After it has been verified/trued at distance', 'When it uses G7'], answer: 1, why: 'Only live fire at distance closes the loop between model and reality.' },
@@ -430,7 +430,7 @@ using impacts near the transonic region. Change one input at a time.</div>
 <li>Re-print the card and note what you changed and when.</li>
 </ol>
 <div class="callout warn"><b>Exception:</b> don't true in gusty conditions or from single shots. Use group centers, measured ranges, and record DA.</div>
-<div class="callout try"><b>Verify:</b> turn on "Hidden MV error" on the <a data-goto="range">Range</a>. Find the error with impacts, then fix MV on Build Card until the card matches.</div>`,
+<div class="callout try"><b>Verify:</b> on the <a data-goto="range">Range</a> your rifle's real velocity always differs from the box. Chronograph it, shoot steel at distance, and in the Debrief compare the box velocity, your measured average and the truth — then put the measured MV into Build Card.</div>`,
         quiz: [
           { q: 'Your 800 yd impacts are consistently 0.3 mil low vs the card. Most likely fix first?', options: ['Lower the MV in the solver', 'Raise BC', 'Change the zero'], answer: 0, why: 'Low impacts at supersonic ranges usually mean the real MV is lower than entered.' },
         ],
@@ -447,7 +447,7 @@ using impacts near the transonic region. Change one input at a time.</div>
 <tbody>
 <tr><td>Density altitude</td><td>Drag</td><td>Cards for e.g. 0 / 3,000 / 6,000 ft DA, or recompute on the day</td></tr>
 <tr><td>Ammo temperature</td><td>MV (temp sensitivity, 0.3–1.5 fps/°F)</td><td>Chrono at several temps; keep ammo out of direct sun</td></tr>
-<tr><td>Shot angle</td><td>Gravity's component across the line of sight</td><td>Rifleman's rule: use range × cos(angle) for elevation (approximate)</td></tr>
+<tr><td>Shot angle</td><td>Gravity's component across the line of sight</td><td>Rifleman's rule: use range × cos(angle) — the cosine of the angle — for elevation (approximate)</td></tr>
 <tr><td>Cold / clean bore</td><td>First shot may land differently</td><td>Record cold-bore impacts separately in your data book</td></tr>
 </tbody></table>
 <pre class="code">angle   cos    600 yd LOS → "shoot it as"
@@ -564,7 +564,7 @@ same place. Spend on barrel, optic and support before cosmetics.</div>
 <tr><td>Tripod with ARCA clamp</td><td>Standing/kneeling positions, spotting, hunting</td></tr>
 <tr><td>Sling</td><td>Adds tension and stability in field positions</td></tr>
 </tbody></table>
-<div class="callout try"><b>Verify:</b> on the <a data-goto="range">Range</a>, change "Position" from prone + rear bag to kneeling and watch the reticle sway.</div>`,
+<div class="callout try"><b>Verify:</b> in the <a data-goto="range">Range</a> Setup, change "Position" from prone + rear bag to kneeling and watch the reticle sway.</div>`,
         quiz: [
           { q: 'What most reduces reticle wobble in prone?', options: ['Rear bag', 'Higher magnification', 'Faster trigger pull'], answer: 0, why: 'Supporting the rear of the rifle removes most movement.' },
         ],
@@ -583,6 +583,7 @@ same place. Spend on barrel, optic and support before cosmetics.</div>
         html: `
 <div class="callout rule"><b>Rule:</b> Every cartridge is a trade-off between <b>wind performance</b> (BC + velocity), <b>recoil</b> (can you spot your hits?),
 <b>barrel life</b> and <b>ammo cost/availability</b>. The table below is computed live by this app's solver at sea level, 10 mph full-value (straight-across) wind.</div>
+<p class="hint">Terms in the table that module 07 explains fully: <b>G7</b> is the bullet's drag rating (ballistic coefficient), <b>Sg</b> its spin-stability factor (above 1.4 is good), <b>transonic</b> the distance where it slows to near the speed of sound, and <b>full value</b> a wind blowing straight across the range.</p>
 <div data-widget="cartridge-table"></div>
 <table class="tbl text">
 <thead><tr><th>Category</th><th>Examples</th><th>Best for</th></tr></thead>
@@ -652,14 +653,14 @@ extreme spread (ES) depends on how many shots you fired.</div>
 <div class="callout rule"><b>Rule:</b> Powder burns faster when warm, so <b>MV rises with ammo temperature</b>. A temp-stable powder may change 0.3 fps/°F;
 a sensitive one 1.5 fps/°F or more.</div>
 <pre class="code">MV_today = MV_chrono + sensitivity × (ammo_temp − chrono_temp)
-example: 2710 + 0.8 × (95 − 59) = 2739 fps   → ≈ 0.1 mil less at 800 yd</pre>
+example: 2710 + 0.8 × (95 − 59) = 2739 fps   → ≈ 0.1–0.15 mil less at 800 yd</pre>
 <ul>
 <li>Keep ammo in the shade — a round sitting in a hot chamber or in the sun can be 30°F+ hotter than the air.</li>
 <li>Chronograph at two temperatures to measure your sensitivity, then enter it in your solver.</li>
 </ul>
 <h4>Barrel life</h4>
 <p>Hot, high-capacity cartridges in small bores erode the throat fastest. As the throat wears, MV usually drops and you must re-chrono.
-Rough accuracy life: <b>.223/.308: 5,000+</b> · <b>6.5 CM: 2,500–3,500</b> · <b>6mm CM: 2,000–3,000</b> · <b>6.5 PRC / .300 magnums: 1,500–2,500</b>. Varies widely.</p>`,
+Rough accuracy life: <b>.223/.308: 5,000+</b> · <b>6.5 CM: 2,500–3,500</b> · <b>6mm CM: 2,000–3,000</b> · <b>6.5 PRC / .300 magnums: 1,500–2,500</b> · <b>.338 Lapua: 2,000–3,000</b>. Varies widely.</p>`,
         quiz: [
           { q: 'Ammo chronographed at 59°F is shot at 95°F with 1 fps/°F sensitivity. MV changes by…', options: ['+36 fps', '−36 fps', '0'], answer: 0, why: '1 × (95 − 59) = +36 fps.' },
         ],
@@ -761,7 +762,7 @@ positions rehearsed, and a rule for when to skip a target.</div>
 <ul>
 <li>Write a <b>stage card</b>: target, range, elevation, wind hold, position.</li>
 <li>Dial for the farthest target and <b>hold</b> under for closer ones (or dial each if time allows).</li>
-<li>Time budget: e.g. 2 min for 10 shots = 12 s per shot including transitions.</li>
+<li>Time budget (the stage's par time): e.g. 2 min for 10 shots = 12 s per shot including transitions.</li>
 <li>If you miss twice on a target, decide in advance whether to move on.</li>
 <li>Prone is the most stable; barricades and props reward practice with bags.</li>
 </ul>

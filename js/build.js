@@ -33,7 +33,7 @@
 
   function valid(p) {
     return p.muzzleVelocityFps > 500 && p.bc > 0.05 && p.zeroYards > 0 && p.clickSize > 0 &&
-      p.rangeEnd > p.rangeStart && p.rangeStep > 0;
+      p.rangeEnd > p.rangeStart && p.rangeStart <= 2500 && p.rangeStep > 0 && L.rangeList(p).length > 0;
   }
 
   let lastCard = null;
@@ -41,16 +41,24 @@
   function render() {
     const p = L.profile;
     lastCard = L.computeCard(p);
-    $('#card-output').innerHTML = L.cardHtml(p, lastCard, false);
     const rows = lastCard.rows;
+    if (!rows.length) {
+      $('#card-output').innerHTML = '<div class="card"><p class="hint">This load does not reach any of the card\'s ranges. Check the velocity, BC and range settings.</p></div>';
+      $('#build-tiles').innerHTML = '';
+      $('#chart-build').innerHTML = '';
+      return;
+    }
+    $('#card-output').innerHTML = L.cardHtml(p, lastCard, false);
     const last = rows[rows.length - 1];
     const trans = rows.find((r) => r.mach < 1.2);
     const tile = (label, value, unit) =>
       `<div class="tile"><div class="label">${label}</div><div class="value">${value}<small>${unit}</small></div></div>`;
     $('#build-tiles').innerHTML =
       tile('Density altitude', Math.round(lastCard.atmosphere.densityAltitudeFt), 'ft') +
-      tile('Stability Sg', lastCard.sg.toFixed(2), lastCard.sg < 1 ? 'unstable' : lastCard.sg < 1.4 ? 'marginal' : 'stable') +
-      (Math.round(lastCard.mv) !== +p.muzzleVelocityFps ? tile('MV at card temp', Math.round(lastCard.mv), 'fps') : '') +
+      (lastCard.sgEstimated
+        ? tile('Stability Sg', '–', 'needs twist + bullet size')
+        : tile('Stability Sg', lastCard.sg.toFixed(2), lastCard.sg < 1 ? 'unstable' : lastCard.sg < 1.4 ? 'marginal' : 'stable')) +
+      (Math.round(lastCard.mv) !== Math.round(+p.muzzleVelocityFps) ? tile('MV at card temp', Math.round(lastCard.mv), 'fps') : '') +
       tile(`Elev @${last.yards}`, L.fmtClick(last.elev, +p.clickSize), p.unit) +
       tile('Turret clicks', last.clicks, 'clk') +
       tile('Transonic', trans ? trans.yards : `>${last.yards}`, 'yd') +
@@ -110,7 +118,7 @@
   });
 
   L.onProfile(render);
-  window.addEventListener('themechange', render);
+  form.addEventListener('submit', (e) => e.preventDefault());
   fillForm(L.profile);
   render();
 })();

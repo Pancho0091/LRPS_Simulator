@@ -6,6 +6,11 @@
 (function () {
   'use strict';
 
+  // Safari < 16.4 and Firefox < 112 have no roundRect; fall back to a plain rectangle
+  if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); return this; };
+  }
+
   const L = window.LRPS;
   const RANGE = (window.LRPS_RANGE = window.LRPS_RANGE || {});
   const B = L.B;
@@ -126,8 +131,8 @@
     else drawSteel(ctx, st, cx, cy, groundY, toPx, px, dpr, now);
 
     // misses: lingering dust and (if a spotter is calling) numbered rings
-    st.puffs = st.puffs.filter((p) => now - p.t0 < 5200);
-    st.puffs.forEach((p) => {
+    const puffs = st.puffs.filter((p) => now - p.t0 < 5200);
+    puffs.forEach((p) => {
       const age = now - p.t0;
       const x = cx + p.right * px, y = cy - p.up * px;
       if (age < 1300) {
@@ -345,7 +350,7 @@
       ctx.lineWidth = 2 * dpr * sp.k;
       ctx.beginPath(); ctx.moveTo(baseX, groundY); ctx.lineTo(baseX, topY); ctx.stroke();
       const sp01 = Math.min(1, w.speed / 18);
-      const droop = (1 - sp01) * 1.25;
+      const droop = Math.PI / 2 * (1 - Math.min(1, w.speed / 22.5)); // angle from the pole ≈ 4° per mph, the rule the Academy teaches
       const dir = sinC > 0.05 ? -1 : sinC < -0.05 ? 1 : (Math.cos(a) > 0 ? 1 : -1);
       const len = W * 0.12 * sp.k * Math.max(0.3, Math.abs(sinC));
       const wid = 12 * dpr * sp.k;

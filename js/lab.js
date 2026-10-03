@@ -62,8 +62,8 @@
       muzzleVelocityFps: s.mv, bc: s.bc, dragModel: 'G7', bulletWeightGr: 140, sightHeightIn: 1.9,
       zeroYards: s.zero, altitudeFt: s.alt, tempF: s.temp, windMph: s.wind, windClock: s.clock,
     }, RANGES);
-    const rows = res.rows;
-    const at = (y) => rows.find((r) => r.yards === y);
+    const rows = res.rows.filter(Boolean);
+    const at = (y) => rows.find((r) => r.yards === y) || rows[rows.length - 1];
     const trans = rows.find((r) => r.mach < 1.2);
     return { s: Object.assign({}, s), rows, atm: res.atmosphere, r1000: at(1000), transYards: trans ? trans.yards : null };
   }
@@ -230,5 +230,4 @@
   syncSliders();
   render();
   showChallenge();
-  window.addEventListener('themechange', render);
 })();
