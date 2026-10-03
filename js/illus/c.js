@@ -34,8 +34,12 @@
     const q = s.P(p);
     let dx = sx - q[0];
     if (Math.abs(dx) < 0.5) dx = 0.5;
-    s.label(p, text, Object.assign({}, o || {}, { dx, dy: sy - q[1] }));
+    lab(s, p, text, Object.assign({}, o || {}, { dx, dy: sy - q[1] }));
   }
+
+  // The engine sizes pills at ~0.56 em per glyph, a little tight for bold UI text.
+  // Trailing spaces widen the pill but collapse when the SVG renders.
+  function lab(s, p, text, o) { s.label(p, text + ' '.repeat(Math.ceil(String(text).length * 0.09)), o); }
 
   // deterministic pseudo-random
   function rng(seed) { let x = seed || 7; return () => ((x = (x * 16807) % 2147483647) / 2147483647); }
@@ -111,7 +115,7 @@
   function bulletAxis(s, x, y, z, r, type, axis, dir, color) {
     let prof = bulletProf(r, type);
     if (dir < 0) prof = prof.map(([t, rr]) => [-t, rr]).reverse();
-    s.lathe(x, y, z, prof, { axis, color: color || C.copper, segments: 22 });
+    s.lathe(x, y, z, prof, { axis, color: color || C.copper, segments: 16 });
   }
 
   /*
@@ -210,9 +214,9 @@
     s.disc(45.5, 10, 10.6, 1.5, { plane: 'xz', fill: C.ink });
     s.shadow(58, -6, 6, 6); s.box(58, -6, 0, 5, 5, 3, { color: C.ink });
     s.poly([[63, -5, 0.6], [63, -2, 0.6], [63, -2, 2.6], [63, -5, 2.6]], { fill: C.sky });
-    s.label(r.scope, 'Scope', { dx: -30, dy: -40, n: 1 });
-    s.label([33, 11, 4], 'Rangefinder', { dx: -70, dy: 50, n: 2, color: C.coral });
-    s.label([45.5, 10, 10], 'Weather meter', { dx: 40, dy: 40, n: 3, color: C.amber });
+    pin(s, r.scope, 'Scope', 120, 36, { n: 1 });
+    pin(s, [33, 11, 4], 'Rangefinder', 160, 262, { n: 2, color: C.coral });
+    pin(s, [45.5, 10, 10], 'Weather meter', 470, 270, { n: 3, color: C.amber });
     return s.svg();
   });
 
@@ -260,7 +264,7 @@
       pin(s, hz(80, 0, 58), 'Internal: chamber → muzzle', 40, 34, { n: 1, color: C.purple });
       pin(s, tr(0.3), 'External: muzzle → target', 280, 72, { n: 2, color: C.blue });
       pin(s, hz(600, 0, 96), 'Terminal: at the target', 700, 34, { n: 3, color: C.pink });
-      s.label(hz(372, 24, 20), 'The dope card lives here', { dx: 30, dy: 50, n: '★', color: C.amber });
+      lab(s, hz(372, 24, 20), 'The dope card lives here', { dx: 30, dy: 50, n: '★', color: C.amber });
       s.text(130, 330, 'Sets MV & SD: ammo, barrel', { anchor: 'middle', size: 12 });
       s.text(365, 330, 'Drop · drift · time of flight', { anchor: 'middle', size: 12 });
       s.text(600, 330, 'Energy · ring / no ring', { anchor: 'middle', size: 12 });
@@ -312,8 +316,8 @@
       const m500 = T[10].mil, ghostZ = zl - 2 * m500 * 36 * kz;
       dot(s, hz(dAt(1000), 3, ghostZ), 6, 'none', { stroke: C.slate, sw: 2, dash: '3 3' });
       pin(s, hz(dAt(1000), 3, ghostZ), '2× the 500 yd hold would hit high', 704, 60, { size: 11 });
-      s.label(hz(dAt(80), 0, zl), 'Line of sight', { dx: 0, dy: -46, n: 1, color: C.blue });
-      s.label(hz(dAt(500), 0, zAt(T[10])), 'Bullet path', { dx: -150, dy: 50, n: 2, color: C.coral });
+      lab(s, hz(dAt(80), 0, zl), 'Line of sight', { dx: 0, dy: -46, n: 1, color: C.blue });
+      lab(s, hz(dAt(500), 0, zAt(T[10])), 'Bullet path', { dx: -150, dy: 50, n: 2, color: C.coral });
       s.text(18, 30, 'Drop at each board (MIL) and time of flight', { size: 14, weight: 700 });
       s.text(18, 48, '6.5 Creedmoor · 140 gr · 2,710 fps · 100 yd zero', { size: 11, weight: 500 });
       return s.svg();
@@ -492,9 +496,9 @@
       [-14, -7, 7, 14].forEach((o) => s.curve((u) => hz(t3 - 90 + 120 * u, 0, z + o * (1 + 0.5 * Math.sin(u * Math.PI))), 0, 1, { color: C.sky, width: 1.6, samples: 20 }));
       sideBullet(s, t3 - len, 0, z, len, 'otm', { rot: -0.18 });
       s.curve((u) => hz(t3 - len / 2 + 44 * Math.cos(u), 0, z + 44 * Math.sin(u)), 0.5, 1.3, { color: C.coral, width: 2.2, arrow: true, samples: 12 });
-      s.label(hz(t1 - 50, 0, z + 60), 'Sharp shock cone, steady drag', { dx: -40, dy: -80, n: 1, color: C.green });
-      s.label(hz(t2 + 8, 0, z + 40), 'Shocks shift, drag spikes, yaw grows', { dx: -120, dy: -60, n: 2, color: C.amber });
-      s.label(hz(t3, 0, z + 20), 'Calm, but may tumble', { dx: -40, dy: -110, n: 3, color: C.coral });
+      lab(s, hz(t1 - 50, 0, z + 60), 'Sharp shock cone, steady drag', { dx: -40, dy: -80, n: 1, color: C.green });
+      lab(s, hz(t2 + 8, 0, z + 40), 'Shocks shift, drag spikes, yaw grows', { dx: -120, dy: -60, n: 2, color: C.amber });
+      lab(s, hz(t3, 0, z + 20), 'Calm, but may tumble', { dx: -40, dy: -110, n: 3, color: C.coral });
       return s.svg();
     },
   });
@@ -528,10 +532,10 @@
       [[0, C.blue], [9000, C.coral]].forEach(([ft, col]) => { const a = ang(ft); g += `<line x1="${gx}" y1="${gy}" x2="${f1(gx + (R - 8) * Math.cos(a))}" y2="${f1(gy - (R - 8) * Math.sin(a))}" stroke="${col}" stroke-width="3.5" stroke-linecap="round"/>`; });
       g += `<circle cx="${gx}" cy="${gy}" r="5" fill="${C.ink}"/><text x="${gx}" y="${gy + 22}" font-size="12" font-weight="700" text-anchor="middle" fill="var(--illus-ink)">Density altitude (ft)</text>`;
       s.raw(g);
-      s.label(hz(200, -6, 150), 'Sea level · 59°F · 29.92 inHg', { dx: -150, dy: -40, n: 1, color: C.blue });
-      s.label(hz(200, 26, 40), 'DA 0 ft → 8.8 mil @ 1,000 yd', { dx: -150, dy: 54, n: '↑', color: C.blue });
-      s.label([mc[0], mc[1], 270], '6,000 ft · 85°F · 23.98 inHg station', { dx: -120, dy: -16, n: 2, color: C.coral });
-      s.label([mc[0] + 30, mc[1] + 30, 150], 'DA ≈ 9,000 ft → 7.8 mil (−24% air)', { dx: 30, dy: 120, n: '↓', color: C.coral });
+      lab(s, hz(200, -6, 150), 'Sea level · 59°F · 29.92 inHg', { dx: -150, dy: -40, n: 1, color: C.blue });
+      lab(s, hz(200, 26, 40), 'DA 0 ft → 8.8 mil @ 1,000 yd', { dx: -150, dy: 54, n: '↑', color: C.blue });
+      lab(s, [mc[0], mc[1], 270], '6,000 ft · 85°F · 23.98 inHg station', { dx: -120, dy: -16, n: 2, color: C.coral });
+      lab(s, [mc[0] + 30, mc[1] + 30, 150], 'DA ≈ 9,000 ft → 7.8 mil (−24% air)', { dx: 30, dy: 120, n: '↓', color: C.coral });
       return s.svg();
     },
   });
@@ -540,17 +544,17 @@
   ISO.lesson('wind', {
     caption: '<b>Crosswind pushes the bullet sideways, more and more.</b> Wind from 3 o\'clock is full value. The drift grows with lag time, so most of it happens in the second half of the flight; see the bullet\'s ground track curve away from the aim line.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 380, origin: [240, 44], scale: 3.7 });
+      const s = ISO.scene({ w: 720, h: 380, origin: [150, 100], scale: 3.3 });
       s.floor(-8, -24, 140, 58, { grid: 8 });
-      const rose = [16, 22];
-      s.disc(rose[0], rose[1], 0.05, 9, { fill: C.white, stroke: C.steel, width: 1.5 });
+      const rose = [16, 24];
+      s.disc(rose[0], rose[1], 0.05, 10, { fill: C.white, stroke: C.steel, width: 1.5 });
       for (let h = 1; h <= 12; h++) {
         const th = h * Math.PI / 6;
-        const p = [rose[0] + Math.cos(th) * 7.3, rose[1] - Math.sin(th) * 7.3, 0.1];
+        const p = [rose[0] + Math.cos(th) * 8.2, rose[1] - Math.sin(th) * 8.2, 0.1];
         s.text3(p, String(h), { anchor: 'middle', dy: 4, size: h % 3 ? 9 : 12, weight: h % 3 ? 500 : 800, color: h === 3 ? C.coral : 'var(--illus-ink)' });
       }
       s.line([[rose[0] + 0.5, rose[1] - 13, 0.2], [rose[0] + 0.5, rose[1] - 2.5, 0.2]], { color: C.coral, width: 3, arrow: true });
-      s.line([[rose[0] + 9.5, rose[1], 0.2], [rose[0] + 14, rose[1], 0.2]], { color: C.ink, width: 2, arrow: true });
+      s.line([[rose[0] + 10.5, rose[1], 0.2], [rose[0] + 15, rose[1], 0.2]], { color: C.ink, width: 2, arrow: true });
       P.mat(s, -2, -6, 58, 12, { color: C.teal });
       const rf = P.rifle(s, 0, 0, 0.4, { bag: true });
       P.flag(s, 70, -20, 18, 1, { color: C.coral });
@@ -569,10 +573,11 @@
       const end = path(1);
       dot(s, end, 4.5, C.coral, { stroke: '#fff', sw: 1.5 });
       s.line([[tx, 0, 0.1], [tx, end[1], 0.1]], { color: C.amber, width: 3 });
-      s.label([84, -6, 11], 'Crosswind from 3 o\'clock (full value)', { dx: -150, dy: -40, n: 1, color: C.teal });
-      s.label([tx, end[1] * 0.5, 0.1], 'Drift = crosswind × lag time', { dx: 20, dy: 46, n: 2, color: C.amber });
-      s.label([rose[0], rose[1], 0.1], 'Clock: target = 12', { dx: -50, dy: 50, n: 3, color: C.coral });
-      s.label([70, -20, 18], 'Flags show it', { dx: -30, dy: -26, n: 4, color: C.slate });
+      pin(s, [108, -14, 11], 'Crosswind from 3 o\'clock (full value)', 300, 30, { n: 1, color: C.teal });
+      pin(s, [tx, end[1] * 0.5, 0.1], 'Drift = crosswind × lag time', 700, 350, { n: 2, color: C.amber });
+      pin(s, [rose[0], rose[1] + 9, 0.1], 'Clock: target = 12', 20, 350, { n: 3, color: C.coral });
+      pin(s, [70, -20, 18], 'Flags show it', 270, 70, { n: 4, color: C.slate });
+      pin(s, [m[0] + 30, path(0.4)[1], path(0.4)[2]], 'Aim line vs bullet path', 20, 250, { n: 5, color: C.blue });
       return s.svg();
     },
   });
@@ -582,7 +587,7 @@
     at: 'after:table',
     caption: '<b>Only the sideways part counts.</b> Split each wind into a crosswind (coral) and a head/tail part (grey). Crosswind = wind × |sin(clock × 30°)|: 3 o\'clock is full value, 2 o\'clock ≈ 0.87 (treat as full), 1 o\'clock is half.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 300, origin: [0, 160], scale: 1 });
+      const s = ISO.scene({ w: 720, h: 260, origin: [0, 118], scale: 1 });
       const Rr = 62, k = Math.SQRT1_2;
       const Dh = [k, -k], Rt = [-k, -k];
       [[3, 130], [2, 360], [1, 590]].forEach(([hr, d]) => {
@@ -603,10 +608,10 @@
         s.line([c, cross], { color: C.coral, width: 4, arrow: true, arrowSize: 11 });
         dot(s, c, 4, C.ink);
         const val = Math.abs(sv);
-        s.text(d, 270, hr + ' o\'clock', { anchor: 'middle', size: 14, weight: 800 });
-        s.text(d, 288, 'value ' + (val > 0.99 ? '1.0 · full' : val > 0.8 ? val.toFixed(2) + ' · near full' : val.toFixed(1) + ' · half'), { anchor: 'middle', size: 12, color: C.coral, weight: 700 });
+        s.text(d, 222, hr + ' o\'clock', { anchor: 'middle', size: 14, weight: 800 });
+        s.text(d, 241, 'value ' + (val > 0.99 ? '1.0 · full' : val > 0.8 ? val.toFixed(2) + ' · near full' : val.toFixed(1) + ' · half'), { anchor: 'middle', size: 12, color: C.coral, weight: 700 });
       });
-      s.text(130, 26, 'target (12) →', { anchor: 'middle', size: 11, weight: 600 });
+      s.text(20, 26, 'Top view · you at the centre · 12 = the target (downrange →)', { size: 12, weight: 600 });
       return s.svg();
     },
   });
@@ -614,8 +619,8 @@
   ISO.lesson('stability', {
     caption: '<b>Spin keeps the nose forward.</b> The rifling twist spins the bullet like a gyroscope. A fast enough twist for its length (A, 1:8 → Sg ≈ 1.6) flies point-first; the same long bullet from a slow 1:12 twist (B, Sg ≈ 0.7) is overpowered by the air and tumbles.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 390, origin: [190, 30], scale: 7.4 });
-      s.floor(-4, -6, 66, 40, { grid: 4 });
+      const s = ISO.scene({ w: 720, h: 400, origin: [236, 84], scale: 6.6 });
+      s.floor(-3, -5, 63, 37, { grid: 4 });
       const z = 5;
       const lanes = [{ y: 0, pitch: 4, tag: 'A' }, { y: 15, pitch: 7, tag: 'B' }];
       lanes.forEach((ln, li) => {
@@ -660,11 +665,11 @@
         s.lathe(x, gy + 1.5, 0.8, [[0, 1], [2.6, 0.05]], { axis: 'z', color: col, segments: 14 });
         s.text3([x, gy + 1.5, 3.6], t, { anchor: 'middle', dy: -2, size: 13, weight: 800, color: col });
       });
-      s.label([2, 0, z + 1.9], 'A · 1:8 twist (fast)', { dx: -70, dy: -40, n: 'A', color: C.green });
-      s.label([33, 0, z + 1], 'Spins like a gyroscope: nose-first', { dx: 30, dy: -60, n: 1, color: C.green });
-      s.label([2, 15, z + 1.9], 'B · 1:12 twist (slow)', { dx: -60, dy: 50, n: 'B', color: C.coral });
-      s.label([44, 15, z + 1], 'Under-spun: tumbles', { dx: 40, dy: 30, n: 2, color: C.coral });
-      s.label([x0 + 0.5 * k, gy, 0.8], 'Unstable < 1.0 · marginal · > 1.4 good', { dx: -60, dy: 50, n: 'Sg', color: C.slate });
+      pin(s, [3, 0, z + 1.9], 'A · 1:8 twist (fast)', 20, 30, { n: 'A', color: C.green });
+      pin(s, [33, 0, z + 1], 'Spins like a gyroscope: nose-first', 470, 40, { n: 1, color: C.green });
+      pin(s, [3, 15, z + 1.9], 'B · 1:12 twist (slow)', 20, 150, { n: 'B', color: C.coral });
+      pin(s, [44, 15, z + 1], 'Under-spun: tumbles', 560, 250, { n: 2, color: C.coral });
+      pin(s, [x0 + 2.0 * k, gy + 3, 0.8], 'Sg: < 1.0 unstable · 1.0–1.4 marginal · > 1.4 good', 700, 384, { n: 'Sg', color: C.slate, size: 11 });
       return s.svg();
     },
   });
@@ -672,19 +677,19 @@
   ISO.lesson('small-effects', {
     caption: '<b>Three small pushes.</b> Right-twist spin drift curves the bullet right, more with time of flight. In the northern hemisphere Coriolis deflects every shot right. A crosswind at the muzzle tips a right-twist bullet: wind from the left throws it high (from the right, low).',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 330, origin: [120, 180], scale: 5 });
-      const off = (k) => [k * 27, -k * 27];
+      const s = ISO.scene({ w: 720, h: 330, origin: [128, 170], scale: 6 });
+      const off = (k) => [k * 22, -k * 22];
       // A · spin drift (top-down on the floor; shooter's right = -y)
       {
         const [ox, oy] = off(0);
-        s.floor(ox - 14, oy - 10, 28, 20, { grid: 4 });
+        s.floor(ox - 12, oy - 8, 24, 16, { grid: 4 });
         s.line([[ox - 11, oy + 3, 0.1], [ox + 13, oy + 3, 0.1]], { color: C.slate, width: 2, dash: '5 5' });
         const p = (t) => [ox - 11 + 24 * t, oy + 3 - 7 * Math.pow(t, 2.2), 0.2];
         s.curve(p, 0, 1, { color: C.coral, width: 3, arrow: true, samples: 30 });
         bulletAxis(s, ox - 11, oy + 3, 1.2, 0.9, 'otm', 'x', 1);
         s.disc(ox - 9, oy + 3, 1.2, 1.6, { plane: 'yz', stroke: C.green, width: 2 });
-        s.text3([ox - 2, oy - 10, 0], 'SPIN DRIFT', { anchor: 'middle', dy: -12, size: 13, weight: 800 });
-        s.label(p(1), 'Right twist → drifts right', { dx: -40, dy: 54, n: 1, color: C.coral, size: 11 });
+        s.text(128, 34, 'SPIN DRIFT', { anchor: 'middle', size: 14, weight: 800 });
+        pin(s, p(1), 'Right twist → drifts right', 20, 300, { n: 1, color: C.coral, size: 11 });
       }
       // B · Coriolis globe
       {
@@ -698,23 +703,23 @@
         s.curve((u) => [ox + 3.4 * Math.cos(u), oy + 3.4 * Math.sin(u), cz + R + 2.6], -0.6, 3.6, { color: C.ink, width: 2, arrow: true, samples: 20 });
         s.curve((t) => sp(12 + 46 * t, 45), 0, 1, { color: C.white, width: 2, dash: '3 3', samples: 16 });
         s.curve((t) => sp(12 + 46 * t, 45 + 30 * t * t), 0, 1, { color: C.coral, width: 3, arrow: true, samples: 20 });
-        s.text3([ox, oy, 0], 'CORIOLIS', { anchor: 'middle', dy: 34, size: 13, weight: 800 });
-        s.label(sp(58, 75), 'North: always right', { dx: 30, dy: -24, n: 2, color: C.coral, size: 11 });
-        s.label(sp(-30, 45), 'South: left', { dx: 30, dy: 30, n: 'S', color: C.slate, size: 11 });
+        s.text(356, 34, 'CORIOLIS', { anchor: 'middle', size: 14, weight: 800 });
+        pin(s, sp(58, 75), 'North: always right', 300, 62, { n: 2, color: C.coral, size: 11 });
+        pin(s, sp(-30, 45), 'South: left', 300, 300, { n: 'S', color: C.slate, size: 11 });
       }
       // C · aerodynamic jump (wind from the shooter's left = +y)
       {
         const [ox, oy] = off(2);
-        s.floor(ox - 14, oy - 10, 28, 20, { grid: 4 });
+        s.floor(ox - 12, oy - 8, 24, 16, { grid: 4 });
         const z = 4;
         s.lathe(ox - 14, oy, z, [[0, 0.75], [9, 0.6]], { axis: 'x', color: C.gunmetal });
         s.lathe(ox - 5, oy, z, [[0, 0.8], [2, 0.8]], { axis: 'x', color: C.black });
         s.line([[ox - 3, oy, z], [ox + 13, oy, z]], { color: C.slate, width: 2, dash: '5 5' });
         s.curve((t) => [ox - 3 + 16 * t, oy, z + 3.4 * t], 0, 1, { color: C.coral, width: 3, arrow: true });
-        [-6, 0, 6].forEach((x) => s.line([[ox + x, oy + 10, z + 1], [ox + x, oy + 3, z + 1]], { color: C.teal, width: 2.5, arrow: true }));
-        s.text3([ox + 2, oy - 10, 0], 'AERO JUMP', { anchor: 'middle', dy: -12, size: 13, weight: 800 });
-        s.label([ox + 13, oy, z + 3.4], 'Wind from left → high', { dx: -30, dy: -46, n: 3, color: C.coral, size: 11 });
-        s.label([ox, oy + 8, z + 1], 'Crosswind at the muzzle', { dx: -40, dy: 40, n: '~', color: C.teal, size: 11 });
+        [-6, 0, 6].forEach((x) => s.line([[ox + x, oy + 8, z + 1], [ox + x, oy + 3, z + 1]], { color: C.teal, width: 2.5, arrow: true }));
+        s.text(584, 34, 'AERO JUMP', { anchor: 'middle', size: 14, weight: 800 });
+        pin(s, [ox + 13, oy, z + 3.4], 'Wind from left → high', 700, 62, { n: 3, color: C.coral, size: 11 });
+        pin(s, [ox - 6, oy + 6, z + 1], 'Crosswind at the muzzle', 700, 300, { n: '~', color: C.teal, size: 11 });
       }
       return s.svg();
     },
@@ -733,16 +738,16 @@
       tiers.forEach((col, i) => s.floor(0, i * 10 + 0.6, 64, 8.8, { color: col + '30' }));
       // 0 · safety: glasses, ear muffs, chamber flag
       let y = 5;
-      s.disc(8, y - 1.4, 0.4, 1.8, { fill: C.sky, stroke: C.ink, width: 2 });
-      s.disc(8, y + 1.4, 0.4, 1.8, { fill: C.sky, stroke: C.ink, width: 2 });
-      s.line([[8, y - 3.2, 0.4], [3, y - 3.4, 0.4]], { color: C.ink, width: 2 });
-      s.line([[8, y + 3.2, 0.4], [3, y + 3.4, 0.4]], { color: C.ink, width: 2 });
-      s.shadow(18, y - 4, 6, 8);
-      s.curve((t) => [21, y + 3 * Math.cos(t), 2.2 + 3.4 * Math.sin(t)], 0, Math.PI, { color: C.ink, width: 4, samples: 14 });
-      s.lathe(21, y - 3.2, 2.2, [[0, 2.2], [1.6, 2.2]], { axis: 'y', color: C.amber });
-      s.lathe(21, y + 1.6, 2.2, [[0, 2.2], [1.6, 2.2]], { axis: 'y', color: C.amber });
-      s.box(31, y - 0.6, 0, 6, 1.2, 0.4, { color: C.amber });
-      s.box(31, y - 2, 0, 2.2, 4, 0.6, { color: C.coral });
+      s.disc(40, y - 1.4, 0.4, 1.8, { fill: C.sky, stroke: C.ink, width: 2 });
+      s.disc(40, y + 1.4, 0.4, 1.8, { fill: C.sky, stroke: C.ink, width: 2 });
+      s.line([[40, y - 3.2, 0.4], [35, y - 3.4, 0.4]], { color: C.ink, width: 2 });
+      s.line([[40, y + 3.2, 0.4], [35, y + 3.4, 0.4]], { color: C.ink, width: 2 });
+      s.shadow(47, y - 4, 6, 8);
+      s.curve((t) => [50, y + 3 * Math.cos(t), 2.2 + 3.4 * Math.sin(t)], 0, Math.PI, { color: C.ink, width: 4, samples: 14 });
+      s.lathe(50, y - 3.2, 2.2, [[0, 2.2], [1.6, 2.2]], { axis: 'y', color: C.amber });
+      s.lathe(50, y + 1.6, 2.2, [[0, 2.2], [1.6, 2.2]], { axis: 'y', color: C.amber });
+      s.box(56, y - 0.6, 0, 6, 1.2, 0.4, { color: C.amber });
+      s.box(56, y - 2, 0, 2.2, 4, 0.6, { color: C.coral });
       // 1 · rifle + scope + torque wrench
       y = 15;
       s.shadow(1, y - 3, 54, 6);
@@ -777,8 +782,8 @@
       [[-1.2, 0], [0, 0], [1.2, 0]].forEach(([dy]) => s.line([[33, y + dy, 0.6], [46, y + dy * 0.4, 0.6]], { color: C.slate, width: 3 }));
       s.box(31.4, y - 1.3, 0, 2, 2.6, 1.4, { color: C.ink });
       s.lathe(50, y, 1.1, [[0, 1.1], [9, 1.1]], { axis: 'x', color: C.gunmetal, capColor: C.black });
-      names.forEach((n, i) => s.label([0, i * 10 + 5, 0], n, { dx: -24, dy: -12, n: i, color: tiers[i] }));
-      s.label(r.scope, 'Scope that tracks = best buy', { dx: 40, dy: -16, n: '★', color: C.amber });
+      names.forEach((n, i) => lab(s, [0, i * 10 + 5, 0], n, { dx: -24, dy: -12, n: i, color: tiers[i] }));
+      lab(s, r.scope, 'Scope that tracks = best buy', { dx: 40, dy: -16, n: '★', color: C.amber });
       return s.svg();
     },
   });
@@ -786,37 +791,38 @@
   ISO.lesson('optics-gear', {
     caption: '<b>A scope is a measuring instrument.</b> Matched MIL turrets with 0.1 mil clicks and a zero stop, a 34–35 mm tube for travel, parallax adjustment, and a mount that never moves: torqued rings on a canted base plus a bubble level.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 380, origin: [150, 64], scale: 26 });
+      const s = ISO.scene({ w: 720, h: 380, origin: [170, 112], scale: 21 });
       s.floor(-1.5, -4, 21, 8, { grid: 1 });
       s.shadow(0, -1.2, 18, 2.4);
-      // canted base rail + rings
-      s.extrude([[0, 0], [17, 0], [17, 0.55], [0, 0.35]], -0.55, 1.1, { plane: 'xz', at: [0.5, 0, 0], color: C.gunmetal });
-      const zc = 2.5;
-      [5, 11.2].forEach((x) => {
+      // base rail, taller at the rear (canted ≈6 mil) + rings
+      s.extrude([[0, 0], [17, 0], [17, 0.35], [0, 0.55]], -0.55, 1.1, { plane: 'xz', at: [0.2, 0, 0], color: C.gunmetal });
+      const zc = 2.5, TE = 9.6;
+      [6.9, 12.1].forEach((x) => {
         s.box(x, -0.5, 0.4, 1.2, 1, zc - 0.6, { color: C.black });
         s.lathe(x, 0, zc, [[0, 0.84], [1.2, 0.84]], { axis: 'x', color: C.black });
       });
-      // scope body: objective bell, tube, power ring (ridged), eyepiece
-      const prof = [[0, 1.25], [2.6, 1.25], [3.8, 0.66], [10.5, 0.66], [11.2, 0.95], [12.8, 0.95], [13.1, 0.82], [15.2, 0.82], [15.4, 0.95], [17.2, 0.98]];
-      const cols = [C.ink, C.ink, C.ink, C.ink, C.blue, C.ink, C.ink, C.ink, C.ink];
+      // scope body along +x: eyepiece (rear) → power ring → tube → objective bell (front)
+      const fwd = [[0, 1.25], [2.6, 1.25], [3.8, 0.66], [10.5, 0.66], [11.2, 0.95], [12.8, 0.95], [13.1, 0.82], [15.2, 0.82], [15.4, 0.95], [17.2, 0.98]];
+      const prof = fwd.map(([t, r]) => [17.2 - t, r]).reverse();
+      const cols = [C.ink, C.ink, C.ink, C.ink, C.blue, C.ink, C.ink, C.ink, C.ink].reverse();
       s.lathe(0, 0, zc, prof, { axis: 'x', color: C.ink, colors: cols, capColor: C.sky });
-      for (let k = 0; k < 5; k++) s.lathe(11.45 + k * 0.28, 0, zc, [[0, 0.98], [0.12, 0.98]], { axis: 'x', color: C.blue, segments: 22 });
-      // turrets
-      s.lathe(7.8, 0, zc + 0.6, [[0, 0.75], [0.6, 0.75], [0.6, 0.95], [1.5, 0.95]], { axis: 'z', color: C.amber, segments: 24 });
-      s.lathe(7.8, 0, zc + 2.1, [[0, 0.95], [0.12, 0.0]], { axis: 'z', color: C.amber });
-      s.lathe(7.8, -0.6, zc, [[0, 0.6], [-0.9, 0.6]].reverse().map(([t, r]) => [t, r]), { axis: 'y', color: C.steel });
-      s.lathe(7.8, 0.6, zc, [[0, 0.62], [0.5, 0.62], [0.5, 0.95], [1.1, 0.95]], { axis: 'y', color: C.gunmetal });
-      // bubble level on the tube
-      s.box(13.6, -0.5, zc + 0.85, 0.8, 1, 0.5, { color: C.black });
-      s.disc(14, 0, zc + 1.37, 0.3, { fill: C.green });
-      s.label([12, 0.9, zc + 0.6], 'Magnification ring · 4–25×', { dx: 40, dy: 90, n: 1 });
-      s.label([7.8, 0, zc + 2.2], 'Elevation: 0.1 mil clicks, zero stop', { dx: -60, dy: -36, n: 2, color: C.amber });
-      s.label([7.8, -1.5, zc], 'Windage (right side)', { dx: 70, dy: -50, n: 3, color: C.slate });
-      s.label([7.8, 1.7, zc], 'Parallax / side focus', { dx: -170, dy: 70, n: 4, color: C.blue });
-      s.label([4.2, 0.6, zc + 0.5], '34–35 mm tube = more travel', { dx: -150, dy: -80, n: 5, color: C.purple });
-      s.label([11.8, 0.5, 1.4], 'Rings on a canted (≈6 mil) base, torqued', { dx: 60, dy: 70, n: 6, color: C.slate });
-      s.label([14, 0, zc + 1.4], 'Bubble level: no cant', { dx: 60, dy: -34, n: 7, color: C.green });
-      s.label([0, 0.6, zc], 'FFP MIL reticle', { dx: -60, dy: 40, n: 8, color: C.coral });
+      for (let k = 0; k < 5; k++) s.lathe(4.65 + k * 0.28, 0, zc, [[0, 0.98], [0.12, 0.98]], { axis: 'x', color: C.blue, segments: 22 });
+      // turrets: elevation on top, windage on the right (-y), parallax on the left (+y)
+      s.lathe(TE, 0, zc + 0.6, [[0, 0.75], [0.6, 0.75], [0.6, 0.95], [1.5, 0.95]], { axis: 'z', color: C.amber, segments: 24 });
+      s.lathe(TE, 0, zc + 2.1, [[0, 0.95], [0.12, 0.0]], { axis: 'z', color: C.amber });
+      s.lathe(TE, -0.6, zc, [[-0.9, 0.6], [0, 0.6]], { axis: 'y', color: C.steel });
+      s.lathe(TE, 0.6, zc, [[0, 0.62], [0.5, 0.62], [0.5, 0.95], [1.1, 0.95]], { axis: 'y', color: C.gunmetal });
+      // bubble level on the tube behind the turret
+      s.box(6.0, -0.5, zc + 0.62, 0.8, 1, 0.5, { color: C.black });
+      s.disc(6.4, 0, zc + 1.14, 0.3, { fill: C.green });
+      pin(s, [5.3, 0.98, zc], 'Magnification ring · 4–25×', 20, 250, { n: 1 });
+      pin(s, [TE, 0, zc + 2.2], 'Elevation: 0.1 mil clicks, zero stop', 330, 30, { n: 2, color: C.amber });
+      pin(s, [TE, -1.5, zc], 'Windage (right side)', 560, 76, { n: 3, color: C.slate });
+      pin(s, [TE, 1.7, zc], 'Parallax / side focus', 20, 300, { n: 4, color: C.blue });
+      pin(s, [11.5, 0.66, zc + 0.3], '34–35 mm tube: more travel', 690, 250, { n: 5, color: C.purple });
+      pin(s, [13.3, 0.5, 1.4], 'Rings on a canted (≈6 mil) base, torqued', 330, 352, { n: 6, color: C.slate });
+      pin(s, [6.4, 0, zc + 1.2], 'Bubble level: no cant', 20, 76, { n: 7, color: C.green });
+      pin(s, [17.2, 0.6, zc + 0.6], 'FFP MIL reticle · MIL turrets', 700, 300, { n: 8, color: C.coral });
       return s.svg();
     },
   });
@@ -824,8 +830,8 @@
   ISO.lesson('measure', {
     caption: '<b>Every number on the card is measured.</b> A Doppler chronograph tracks the bullet to give MV and its spread (SD, ES); a laser rangefinder gives line-of-sight range; a weather meter reads temperature, station pressure and DA, and the wind only where you stand.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 380, origin: [150, 110], scale: 3.6 });
-      s.floor(-8, -30, 150, 52, { grid: 10 });
+      const s = ISO.scene({ w: 720, h: 390, origin: [125, 92], scale: 4.2 });
+      s.floor(-6, -28, 124, 50, { grid: 10 });
       P.mat(s, -2, -6, 58, 12, { color: C.teal });
       const rf = P.rifle(s, 0, 0, 0.4, { bag: true });
       // 1 · Doppler chronograph beside the muzzle, beam downrange
@@ -833,12 +839,12 @@
       s.shadow(cx, cy - 2, 6, 5);
       s.box(cx, cy - 2, 0, 5, 4, 3.2, { color: C.ink, top: C.gunmetal });
       s.poly([[cx + 5.05, cy - 1.5, 0.6], [cx + 5.05, cy + 1.5, 0.6], [cx + 5.05, cy + 1.5, 2.8], [cx + 5.05, cy - 1.5, 2.8]], { fill: C.sky });
-      s.poly([[cx + 5, cy, 1.7], [cx + 70, cy - 9, 9], [cx + 70, cy + 9, 18]], { fill: C.sky, opacity: 0.2 });
+      s.poly([[cx + 5, cy, 1.7], [cx + 70, cy - 9, 9], [cx + 70, cy + 9, 18]], { fill: C.sky, opacity: 0.32 });
       for (let k = 1; k < 4; k++) s.curve((t) => [cx + 5 + k * 9, cy + (t - 0.5) * k * 1.6, 1.7 + k * 1.1 + (t - 0.5) * k * 1.6], 0, 1, { color: C.blue, width: 2, samples: 6, opacity: 0.8 });
       // bullet in flight
       bulletAxis(s, 82, 0, 7.7, 0.6, 'otm', 'x', 1);
       // 2 · rangefinder on the right of the mat, laser to the plate
-      const tx = 136, ty = -24;
+      const tx = 112, ty = -22;
       const pl = P.plate(s, tx, ty, 0, 3.2);
       const lx = 20, ly = 12, lz = 0;
       s.shadow(lx, ly - 1, 7, 4);
@@ -854,10 +860,9 @@
       s.disc(wx + 1.2, wy + 0.6, 10.5, 1.4, { plane: 'xz', fill: C.ink });
       s.poly([[wx + 0.4, wy + 1.22, 3], [wx + 2, wy + 1.22, 3], [wx + 2, wy + 1.22, 7], [wx + 0.4, wy + 1.22, 7]], { fill: C.mint });
       [8, 11.5].forEach((z) => s.line([[wx - 10, wy - 9, z], [wx + 8, wy + 9, z]].map(([x, y, zz]) => [x + 2, y - 10 + 10, zz]), { color: C.teal, width: 2.4, arrow: true }));
-      s.label([cx + 2.5, cy, 3.2], 'Doppler chronograph → MV, SD, ES', { dx: -40, dy: -70, n: 1, color: C.blue });
-      s.label(pl.center, 'Laser rangefinder → range (and angle)', { dx: -280, dy: 30, n: 2, color: C.red });
-      s.label([lx + 3, ly + 1, 3.2], 'Rangefinder', { dx: 40, dy: 60, n: 2, color: C.red });
-      s.label([wx + 1.2, wy + 0.6, 9], 'Weather meter → temp, pressure, DA, wind here', { dx: -40, dy: 120, n: 3, color: C.amber });
+      pin(s, [cx + 2.5, cy, 3.2], 'Doppler chronograph → MV, SD, ES', 330, 40, { n: 1, color: C.blue });
+      pin(s, [lx + 3, ly + 1, 3.2], 'Laser rangefinder → line-of-sight range', 330, 350, { n: 2, color: C.red });
+      pin(s, [wx + 1.2, wy + 0.6, 7], 'Weather meter → temp, pressure, DA, wind here', 20, 300, { n: 3, color: C.amber });
       return s.svg();
     },
   });
@@ -865,7 +870,7 @@
   ISO.lesson('support', {
     caption: '<b>Stability is precision.</b> The dashed ring at each muzzle is the wobble you fight. Prone on a bipod with a rear bag is the smallest; a tripod with an ARCA clamp and a barricade bag make standing and prop positions steady enough to hit.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 380, origin: [70, 168], scale: 3.3 });
+      const s = ISO.scene({ w: 720, h: 380, origin: [60, 196], scale: 3.6 });
       const st = (k) => [k * 31, -k * 31];
       const wob = (m, r) => { s.disc(m[0] + 3, m[1], m[2], r, { plane: 'yz', stroke: C.coral, width: 2, dash: '4 3' }); dot(s, [m[0] + 3, m[1], m[2]], 2.5, C.coral); };
       // 1 · prone: bipod + rear bag on a mat
@@ -875,8 +880,8 @@
         P.mat(s, x - 2, y - 6, 58, 12, { color: C.teal });
         const r = P.rifle(s, x, y, 0.4, { bag: true });
         wob(r.muzzle, 1.6);
-        s.label(r.bipod, 'Bipod: prone foundation', { dx: 20, dy: 70, n: 1, color: C.blue });
-        s.label([x + 6, y, 3.6], 'Rear bag: squeeze to fine-tune', { dx: -40, dy: 100, n: 2, color: C.amber });
+        lab(s, r.bipod, 'Bipod: prone foundation', { dx: 20, dy: 70, n: 1, color: C.blue });
+        lab(s, [x + 6, y, 3.6], 'Rear bag: squeeze to fine-tune', { dx: -40, dy: 100, n: 2, color: C.amber });
       }
       // 2 · tripod with ARCA clamp
       {
@@ -889,7 +894,7 @@
         s.box(hx - 3, y - 1.2, H - 0.4, 6, 2.4, 0.8, { color: C.gunmetal });
         const r = P.rifle(s, x, y, H - 3.4 + 0.4, { bipod: false });
         wob(r.muzzle, 3);
-        s.label([hx, y, H - 1], 'Tripod + ARCA clamp', { dx: 40, dy: -70, n: 3, color: C.purple });
+        lab(s, [hx, y, H - 1], 'Tripod + ARCA clamp', { dx: 40, dy: -70, n: 3, color: C.purple });
       }
       // 3 · barricade with a bag
       {
@@ -903,9 +908,9 @@
         s.extrude([[0, 0], [7, 0], [6.2, 3], [0.8, 3]], -2.6, 5.2, { plane: 'xz', at: [bx - 2.2, y, H + 2], color: C.green });
         const r = P.rifle(s, x, y, H + 2 + 3 - 3.4, { bipod: false });
         wob(r.muzzle, 2.2);
-        s.label([bx + 1, y + 2.6, H + 4], 'Barricade bag', { dx: 30, dy: 90, n: 4, color: C.green });
+        lab(s, [bx + 1, y + 2.6, H + 4], 'Barricade bag', { dx: 30, dy: 90, n: 4, color: C.green });
       }
-      s.label([st(0)[0] + 56, st(0)[1], 7.3], 'Wobble', { dx: 20, dy: -70, n: '◌', color: C.coral });
+      lab(s, [st(0)[0] + 56, st(0)[1], 7.3], 'Wobble', { dx: 20, dy: -70, n: '◌', color: C.coral });
       return s.svg();
     },
   });

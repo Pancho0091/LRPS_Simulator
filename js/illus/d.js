@@ -207,9 +207,12 @@
     return g;
   }
 
+  // Callout with padding: the engine's pill-width estimate runs short for long labels
+  const lab = (s, p, text, o) => s.label(p, text + '\u00a0'.repeat(Math.ceil(String(text).length * 0.08)), o);
+
   // Screen-space numbered pill (for callouts on 2D insets)
   function tag(s, x, y, n, text, color, anchor) {
-    const fs = 12, tw = text.length * fs * 0.56 + (n != null ? 22 : 0) + 16;
+    const fs = 12, tw = text.length * fs * 0.6 + (n != null ? 22 : 0) + 16;
     const x0 = anchor === 'middle' ? x - tw / 2 : anchor === 'end' ? x - tw : x;
     let g = `<rect x="${f1(x0)}" y="${f1(y - fs * 0.95)}" width="${f1(tw)}" height="${fs * 1.9}" rx="${fs * 0.95}" fill="#fff" stroke="rgba(31,39,51,.14)"/>`;
     let tx = x0 + 10;
@@ -326,11 +329,11 @@
       [[-48, 7, 5], [-62, 8, 4], [-30, 7, 6], [-12, 8, 6], [1, -7, 3], [1, 14, 3], [6, 0, 4], [32, 0, 4]].forEach(([x, y, r]) => g(x, y, r));
       P.rifle(s, 0, 0, 0.4, { bag: true });
       person(s, pronePose([0, 0, 0.4], 0));
-      s.label([-30, 7, 4], 'Chest + hips + legs down', { dx: -110, dy: -50, n: 1, color: C.green });
-      s.label([1, 14, 1.5], 'Elbows: bone, not muscle', { dx: -150, dy: 64, n: 2, color: C.green });
-      s.label([32, 0, 0.4], 'Bipod + rear bag', { dx: -70, dy: 64, n: 3, color: C.green });
-      s.label([sx + 5, sy + 6, 0.2], 'Two feet + tripod', { dx: 30, dy: 64, n: '!', color: C.coral });
-      s.label([sx + 1, sy - 4, 44], 'Muscle holds it up', { dx: -190, dy: -10, n: '!', color: C.coral });
+      lab(s, [-30, 7, 4], 'Chest + hips + legs down', { dx: -110, dy: -50, n: 1, color: C.green });
+      lab(s, [1, 14, 1.5], 'Elbows: bone, not muscle', { dx: -150, dy: 64, n: 2, color: C.green });
+      lab(s, [32, 0, 0.4], 'Bipod + rear bag', { dx: -70, dy: 64, n: 3, color: C.green });
+      lab(s, [sx + 5, sy + 6, 0.2], 'Two feet + tripod', { dx: 30, dy: 64, n: '!', color: C.coral });
+      lab(s, [sx + 1, sy - 4, 44], 'Muscle holds it up', { dx: -190, dy: -10, n: '!', color: C.coral });
       s.text(24, 36, 'PRONE  ≈ 0.1–0.2 mil wobble', { size: 13, weight: 800, color: C.green });
       s.text(24, 54, 'many bone + ground contacts', { size: 11.5, weight: 600 });
       s.text(706, 326, 'STANDING  ≈ 1.3 mil', { size: 13, weight: 800, color: C.coral, anchor: 'end' });
@@ -364,11 +367,11 @@
       tag(s, bx, by - 70, 6, 'Check NPA', C.blue, 'middle');
       s.text(bx, by + 70, 'Relaxed reticle drifted?', { anchor: 'middle', size: 11, weight: 600 });
       s.text(bx, by + 85, 'Move your body, not arms', { anchor: 'middle', size: 11, weight: 700 });
-      s.label([-60, 0, 1.6], 'Align: body behind the bore', { dx: -20, dy: 74, n: 1, color: C.coral });
-      s.label([36, 7, 0.6], 'Lean into the bipod', { dx: 10, dy: 46, n: 2 });
-      s.label([5.5, -2.2, 2.5], 'Rear bag under the toe', { dx: 70, dy: -86, n: 3 });
-      s.label(add(J.head, [0, 0, 3]), 'Cheek weld: same spot', { dx: -120, dy: -78, n: 4 });
-      s.label(J.handL, 'Support hand on the bag', { dx: -160, dy: 60, n: 5 });
+      lab(s, [-60, 0, 1.6], 'Align: body behind the bore', { dx: -20, dy: 74, n: 1, color: C.coral });
+      lab(s, [36, 7, 0.6], 'Lean into the bipod', { dx: 10, dy: 46, n: 2 });
+      lab(s, [5.5, -2.2, 2.5], 'Rear bag under the toe', { dx: 70, dy: -86, n: 3 });
+      lab(s, add(J.head, [0, 0, 3]), 'Cheek weld: same spot', { dx: -120, dy: -78, n: 4 });
+      lab(s, J.handL, 'Support hand on the bag', { dx: -160, dy: 60, n: 5 });
       return s.svg();
     },
   });
@@ -467,8 +470,8 @@
       s.text(108, 66, '→ you see the hit', { size: 11.5, weight: 600 });
       s.text(612, 50, 'Pivots off target', { size: 12, weight: 800, color: C.coral, anchor: 'end' });
       s.text(612, 66, 'no call, no spotting', { size: 11.5, weight: 600, anchor: 'end' });
-      s.label([-30, 3.8, 9], 'Recoil straight back into you', { dx: -70, dy: 90, n: '✓', color: C.green });
-      s.label([136, -94, 14], 'Muzzle jumps sideways', { dx: 10, dy: 56, n: '✗', color: C.coral });
+      lab(s, [-30, 3.8, 9], 'Recoil straight back into you', { dx: -70, dy: 90, n: '✓', color: C.green });
+      lab(s, [136, -94, 14], 'Muzzle jumps sideways', { dx: 10, dy: 56, n: '✗', color: C.coral });
       return s.svg();
     },
   });
@@ -608,18 +611,18 @@
   ISO.lesson('anatomy', {
     caption: '<b>A card is a UI for a stressed brain.</b> Header says when it is valid; one row per range; elevation in mil <i>and</i> 0.1-mil clicks; wind brackets you can scale; the transonic row flagged where the data stops being trustworthy.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 340, origin: [118, 186], scale: 7.0 });
+      const s = ISO.scene({ w: 720, h: 340, origin: [140, 184], scale: 6.2 });
       s.floor(-4, -50, 42, 54, { round: 8 });
       const c = flatCard(s, 0, 0, 0.6, 46, DOPE, { fs: 1.6, rh: 2.35, hh: 6 });
       // grease pencil
       s.lathe(36.5, -30, 0.9, [[0, 0.6], [12, 0.6], [13.6, 0.15]], { axis: 'y', color: C.amber, colors: [C.amber, C.ink] });
       const w = 46;
-      s.label(c.at(w * 0.62, 1), 'Header: load, MV, zero, DA, unit', { dx: 40, dy: -40, n: 1 });
-      s.label(c.at(c.cx[0], c.rowY(5) - 0.6), 'Range steps', { dx: -110, dy: 10, n: 2 });
-      s.label(c.at(c.cx[1], c.rowY(8) - 0.6), 'Elevation (mil)', { dx: -150, dy: 46, n: 3 });
-      s.label(c.at(c.cx[2] + 0.5, c.rowY(9) - 0.6), 'Clicks (0.1 mil)', { dx: -40, dy: 74, n: 4 });
-      s.label(c.at(w * 0.9, c.rowY(1) - 0.6), 'Wind brackets 5 / 10 mph', { dx: 60, dy: -10, n: 5 });
-      s.label(c.at(w * 0.96, c.rowY(9) - 0.6), 'Transonic: data limit', { dx: 60, dy: 40, n: 6, color: C.coral });
+      lab(s, c.at(w * 0.62, 1), 'Header: load, MV, zero, DA, unit', { dx: 40, dy: -40, n: 1 });
+      lab(s, c.at(c.cx[0], c.rowY(5) - 0.6), 'Range steps', { dx: -110, dy: 10, n: 2 });
+      lab(s, c.at(c.cx[1], c.rowY(8) - 0.6), 'Elevation (mil)', { dx: -150, dy: 46, n: 3 });
+      lab(s, c.at(c.cx[2] + 0.5, c.rowY(9) - 0.6), 'Clicks (0.1 mil)', { dx: -40, dy: 74, n: 4 });
+      lab(s, c.at(w * 0.9, c.rowY(1) - 0.6), 'Wind brackets 5 / 10 mph', { dx: 60, dy: -10, n: 5 });
+      lab(s, c.at(w * 0.96, c.rowY(9) - 0.6), 'Transonic: data limit', { dx: 60, dy: 40, n: 6, color: C.coral });
       return s.svg();
     },
   });
@@ -691,10 +694,10 @@
       s.lathe(kx, ky, 3.6, [[0, 5.2], [0.4, 0]], { axis: 'z', color: C.purple });
       s.line([[kx, ky, 4.1], [kx - 3.6, ky - 2.4, 4.1]], { color: '#fff', width: 3 });
       s.curve((k) => { const a = -0.2 - k * 1.3; return [kx + 8 * Math.cos(a), ky + 8 * Math.sin(a), 4]; }, 0, 1, { color: C.purple, width: 2.5, arrow: true, arrowSize: 8 });
-      s.label([kx, ky + 3, 3], 'MV 2710 → 2680 fps', { dx: -150, dy: 40, n: 4, color: C.purple });
-      s.label([bx, 0, bz + 18], 'Card predicts here', { dx: -140, dy: -50, n: 2, color: C.blue });
-      s.label([bx, 0, bz + 4], 'Group: 0.3 mil low', { dx: 40, dy: 70, n: 3, color: C.coral });
-      s.label(rf.scope, 'Zero + tracking confirmed', { dx: -40, dy: -70, n: 1 });
+      lab(s, [kx, ky + 3, 3], 'MV 2710 → 2680 fps', { dx: -150, dy: 40, n: 4, color: C.purple });
+      lab(s, [bx, 0, bz + 18], 'Card predicts here', { dx: -140, dy: -50, n: 2, color: C.blue });
+      lab(s, [bx, 0, bz + 4], 'Group: 0.3 mil low', { dx: 40, dy: 70, n: 3, color: C.coral });
+      lab(s, rf.scope, 'Zero + tracking confirmed', { dx: -40, dy: -70, n: 1 });
       s.text(704, 30, '800 yd · supersonic', { size: 12.5, weight: 800, anchor: 'end' });
       s.text(704, 48, 'then BC / DSF near transonic', { size: 11.5, weight: 600, anchor: 'end', color: C.slate });
       return s.svg();
@@ -718,7 +721,7 @@
         ['600', '800', '1000'].forEach((r, k) => { g += T(1.4, 8.4 + k * 3.6, r, { size: 2.4, mono: true }) + T(W - 5.6, 8.4 + k * 3.6, v[k].toFixed(1), { size: 2.6, mono: true, anchor: 'end', color: C.blue }); });
         panel(s, x + 2, y + 2, hz, W - 4, 17, g, { legs: false });
         if (i === 1) {
-          s.label([x + W / 2, y + 2.9, hz + 17.5], 'Today DA 3,400 ft → use this card', { dx: -60, dy: -60, n: '✓', color: C.green });
+          lab(s, [x + W / 2, y + 2.9, hz + 17.5], 'Today DA 3,400 ft → use this card', { dx: -60, dy: -60, n: '✓', color: C.green });
         }
       }
       s.text(26, 330, 'Higher DA → thinner air → less drag → less elevation (1,000 yd: 9.4 → 8.4 mil)', { size: 12, weight: 600 });
@@ -730,7 +733,7 @@
     at: 'before:pre.code',
     caption: '<b>Uphill or downhill, dial for the horizontal distance.</b> Gravity only bends the path across the horizontal part of the flight: 600 yd line of sight at 30° → dial for 600 × cos 30° ≈ 520 yd. Angle always means <i>less</i> elevation.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 340, origin: [96, 262], scale: 4.0 });
+      const s = ISO.scene({ w: 720, h: 340, origin: [150, 262], scale: 3.15 });
       const X = 90, ang = 30 * Math.PI / 180, H = X * Math.tan(ang);
       const d = [Math.SQRT1_2, -Math.SQRT1_2, 0], n = [Math.SQRT1_2, Math.SQRT1_2, 0];
       const at = (u, z, off) => [d[0] * u + n[0] * off, d[1] * u + n[1] * off, z];
@@ -753,10 +756,10 @@
       s.line([Bp, Cp], { color: '#fff', width: 2, dash: '3 4' });
       s.curve((k) => { const a = ang * k; return at(4 + 18 * Math.cos(a), 4 + 18 * Math.sin(a), w + 1); }, 0, 1, { color: C.ink, width: 1.8 });
       s.text3(at(24, 6, w + 1), '30°', { size: 13, weight: 800, dx: 4, dy: 2 });
-      s.line([at(X - 14, H + 30, w + 1), at(X - 14, H + 14, w + 1)], { color: C.slate, width: 3, arrow: true });
-      s.label(lerp(A, Cp, 0.45), 'Line of sight: 600 yd', { dx: -150, dy: -70, n: 1, color: C.blue });
-      s.label(lerp(A, Bp, 0.5), 'Dial for 600 × cos 30° ≈ 520 yd', { dx: -60, dy: 50, n: 2, color: C.coral });
-      s.label(at(X - 14, H + 26, w + 1), 'Gravity: only the horizontal part', { dx: -270, dy: -10, n: 3 });
+      s.line([at(X - 14, H + 22, w + 1), at(X - 14, H + 8, w + 1)], { color: C.slate, width: 3, arrow: true });
+      lab(s, lerp(A, Cp, 0.45), 'Line of sight: 600 yd', { dx: -150, dy: -70, n: 1, color: C.blue });
+      lab(s, lerp(A, Bp, 0.5), 'Dial for 600 × cos 30° ≈ 520 yd', { dx: -60, dy: 50, n: 2, color: C.coral });
+      lab(s, at(X - 14, H + 20, w + 1), 'Gravity: only the horizontal part', { dx: -250, dy: 0, n: 3 });
       s.text(706, 300, 'cos 10° = 0.985 · 20° = 0.940 · 30° = 0.866', { size: 11.5, weight: 700, anchor: 'end', mono: true });
       s.text(706, 320, 'same rule uphill and downhill', { size: 11.5, weight: 600, anchor: 'end' });
       return s.svg();
@@ -790,11 +793,11 @@
       // 5 phone app
       s.box(48, -14, 0, 4.5, 8, 0.6, { color: C.ink });
       onTop(s, [48.4, -13.6, 0.62], `<rect x="0" y="0" width="3.7" height="7.2" rx="0.4" fill="${C.navy}"/>` + T(0.4, 2, '6.0', { size: 1.2, mono: true, color: C.mint }) + T(0.4, 3.4, 'MIL', { size: 0.6, color: C.white }));
-      s.label([ocx - 0.3, 0, sz + 4.6], 'Scope cap: no head movement', { dx: -60, dy: -60, n: 1 });
-      s.label([7, 1.05, zb + 1.5], 'Stock panel: both columns', { dx: -110, dy: 40, n: 2 });
-      s.label([37.5, 16, 4], 'Wrist coach: DA bands, stage notes', { dx: 40, dy: 44, n: 3 });
-      s.label([10, 16, 1.5], 'Data book: every string', { dx: -90, dy: 84, n: 4, color: C.coral });
-      s.label([50, -10, 0.6], 'App / LRF: exact, needs batteries', { dx: 20, dy: -60, n: 5, color: C.slate });
+      lab(s, [ocx - 0.3, 0, sz + 4.6], 'Scope cap: no head movement', { dx: -60, dy: -60, n: 1 });
+      lab(s, [7, 1.05, zb + 1.5], 'Stock panel: both columns', { dx: -110, dy: 40, n: 2 });
+      lab(s, [37.5, 16, 4], 'Wrist coach: DA bands, stage notes', { dx: 40, dy: 44, n: 3 });
+      lab(s, [10, 16, 1.5], 'Data book: every string', { dx: -90, dy: 84, n: 4, color: C.coral });
+      lab(s, [50, -10, 0.6], 'App / LRF: exact, needs batteries', { dx: 20, dy: -60, n: 5, color: C.slate });
       return s.svg();
     },
   });
@@ -804,6 +807,261 @@
     s.floor(-4, -44, 42, 48, { round: 8 });
     flatCard(s, 0, 0, 0.6, 40, DOPE.slice(2, 9), { fs: 2.1, rh: 3.2, hh: 7 });
     s.lathe(33, -3, 0.9, [[0, 0.8], [16, 0.8], [18, 0.2]], { axis: 'y', color: C.amber, colors: [C.amber, C.ink] });
+    return s.svg();
+  });
+
+
+  // ------------------------------------------------------------- m-field
+
+  // Wavy heat-shimmer line: rises at x, leans toward -y by `lean` (0 = boiling, 1 = flat)
+  function mirage(s, x, y, z, len, lean, col) {
+    s.curve((k) => {
+      const a = lean * Math.PI / 2, wob = Math.sin(k * Math.PI * 4) * 0.6;
+      return [x + wob * Math.sin(a) * 0.3, y - k * len * Math.sin(a) + wob * Math.cos(a), z + k * len * Math.cos(a) + wob * Math.sin(a)];
+    }, 0, 1, { color: col || C.amber, width: 2, samples: 30, opacity: 0.85 });
+  }
+  function windArrow(s, x, y, z, len, col) {
+    s.line([[x, y + len / 2, z], [x, y - len / 2, z]], { color: col || C.blue, width: 5, arrow: true, arrowSize: 13, opacity: 0.55 });
+  }
+
+  ISO.lesson('read-wind', {
+    caption: '<b>Read every zone, then call a bracket.</b> Near: the flag hangs at ~24° (÷ 4 ≈ 6 mph). Mid: leaves and twigs in constant motion (5–8 mph). Far: mirage leaning hard (~8). Call 6–8 mph from 9 o\'clock, hold for the middle, and refine with the impact.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 360, origin: [178, 96], scale: 2.75 });
+      const zones = [[0, 50, C.sky, 'NEAR'], [50, 100, C.mint, 'MID'], [100, 150, C.yellow, 'FAR']];
+      s.floor(-14, -26, 176, 54, { grid: 10 });
+      zones.forEach(([a, b, c]) => s.floor(a, -24, b - a, 50, { color: c, z: 0.02 }));
+      zones.forEach(([a, , , n]) => s.text3([a + 25, 26, 0], n, { size: 12, weight: 800, dx: -14, dy: 18, anchor: 'middle' }));
+      P.berm(s, 152, -26, 54, 8);
+      // far: plate + mirage
+      P.plate(s, 146, -2, 0, 3);
+      for (let k = 0; k < 6; k++) mirage(s, 108 + k * 7, 12 - (k % 2) * 8, 1, 9, 0.8);
+      // mid: bushes with motion marks
+      [[64, -16], [80, 10], [92, -10]].forEach(([x, y]) => {
+        s.sphere(x, y, 3, 4, { color: C.grassDark, rings: 6 });
+        s.line([[x, y - 5, 5], [x, y - 9, 5.5]], { color: C.grassDark, width: 2 });
+        s.line([[x, y - 5, 3], [x, y - 8, 3]], { color: C.grassDark, width: 2 });
+      });
+      // near: flag at ~24 deg + grass
+      P.flag(s, 34, 12, 22, -1, { len: 6, droop: 2.2, color: C.coral });
+      for (let k = 0; k < 8; k++) { const gx = 8 + k * 5, gy = 18 - (k % 3) * 9; s.line([[gx, gy, 0], [gx, gy - 1.2, 3]], { color: C.grassDark, width: 2 }); }
+      // shooter
+      P.mat(s, -12, -6, 22, 12, { color: C.teal });
+      sized(0.32, () => { slimRifle(s, [-1, 0, 1.1], [1, 0, 0], 0.32); person(s, pronePose([-1, 0, 0.4], 0)); });
+      // wind arrows from the left (+y) blowing toward -y
+      [25, 75, 125].forEach((x) => windArrow(s, x, 0, 18, 30));
+      lab(s, [34, 12, 20], 'Flag ~24° ÷ 4 ≈ 6 mph', { dx: -190, dy: 40, n: 1, color: C.coral });
+      lab(s, [80, 10, 4], 'Leaves + twigs moving: 5–8', { dx: -60, dy: 80, n: 2, color: C.green });
+      lab(s, [122, 6, 6], 'Mirage leaning hard: ~8', { dx: 30, dy: 60, n: 3, color: ISO.shade(C.amber, -0.3) });
+      tag(s, 560, 34, '→', 'Call: 6–8 mph from 9 o\'clock', C.blue, 'middle');
+      s.text(560, 64, 'hold for 7, then refine with the impact', { size: 11.5, weight: 600, anchor: 'middle' });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('read-wind', {
+    at: 'after:ul',
+    caption: '<b>Two gauges you always carry.</b> A flag\'s angle from the pole ÷ 4 ≈ mph. Mirage through the scope (focus slightly short of the target): boiling = no crosswind or a switch coming, slight lean ≈ 1–4, running flat ≈ 8–12, gone ≈ 12+.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 262, origin: [34, 150], scale: 4.1 });
+      const W = 24, H = 22, SP = 19;
+      const views = [
+        ['Boiling', '0 / switch', 0], ['Slight lean', '1–4 mph', 0.35], ['Running flat', '8–12 mph', 0.92], ['Gone', '12+ mph', -1],
+      ];
+      // flag gauge panel
+      const gauge = () => {
+        let g = `<rect x="0" y="0" width="${W}" height="${H}" fill="#fff"/>` + T(1.4, 3.4, 'FLAG ÷ 4', { size: 2.4, weight: 800, color: C.coral });
+        const ox = 4, oy = 19, r = 15;
+        g += `<path d="M${ox} ${oy - r} A${r} ${r} 0 0 1 ${ox + r} ${oy}" fill="none" stroke="${C.steel}" stroke-width="0.35"/>` + L(ox, oy - r, ox, oy, C.slate, 0.6);
+        [[0, '0'], [24, '6'], [48, '12'], [72, '18']].forEach(([a, mph]) => {
+          const rad = a * Math.PI / 180, x = ox + Math.sin(rad) * r, y = oy - Math.cos(rad) * r;
+          g += L(ox + Math.sin(rad) * (r - 1), oy - Math.cos(rad) * (r - 1), x, y, C.ink, 0.3) + T(ox + Math.sin(rad) * (r + 1.8), oy - Math.cos(rad) * (r + 1.8) + 0.6, mph, { size: 1.7, mono: true, anchor: 'middle' });
+        });
+        const fa = 48 * Math.PI / 180;
+        g += `<path d="M${ox} ${oy - r + 1} L${(ox + Math.sin(fa) * 11).toFixed(2)} ${(oy - r + 1 + (1 - Math.cos(fa)) * 11).toFixed(2)} L${ox} ${oy - r + 6} Z" fill="${C.coral}"/>`;
+        g += T(W - 1.2, H - 1.2, '48° ≈ 12', { size: 1.8, anchor: 'end', mono: true });
+        return g;
+      };
+      const view = (lean) => {
+        let g = `<rect x="0" y="0" width="${W}" height="${H}" fill="#fff"/><circle cx="${W / 2}" cy="${H / 2 + 1}" r="9" fill="#eef3f8"/>`;
+        g += `<circle cx="${W / 2}" cy="${H / 2 + 2}" r="2.6" fill="${C.steel}"/>`;
+        if (lean >= 0) for (let k = 0; k < 5; k++) {
+          const a = lean * Math.PI / 2, bx = W / 2 - 6 + k * 3, by = H / 2 + 6;
+          let d = '';
+          for (let j = 0; j <= 16; j++) { const u = j / 16, w = Math.sin(u * Math.PI * 4 + k) * 0.6; const x = bx + u * 9 * Math.sin(a) + w * Math.cos(a), y = by - u * 9 * Math.cos(a) + w * Math.sin(a) - (lean > 0.8 ? u * 1.5 : 0); d += (j ? ' L' : 'M') + x.toFixed(2) + ' ' + y.toFixed(2); }
+          g += `<path d="${d}" fill="none" stroke="${C.amber}" stroke-width="0.45" opacity=".9"/>`;
+        }
+        g += L(W / 2 - 9, H / 2 + 1, W / 2 + 9, H / 2 + 1, C.ink, 0.25) + L(W / 2, H / 2 - 8, W / 2, H / 2 + 10, C.ink, 0.25);
+        return g;
+      };
+      const slots = [0, 1.35, 2.35, 3.35, 4.35];
+      const qs = slots.map((sl, i) => {
+        const x = sl * SP, y = -sl * SP;
+        s.shadow(x, y - 2, W, 4);
+        panel(s, x, y - 0.45, 3, W, H, i ? view(views[i - 1][2]) : gauge());
+        return s.P([x + W / 2, y, 0]);
+      });
+      qs.forEach((q, i) => {
+        const [a, b] = i ? views[i - 1] : ['Flag angle', '÷ 4 ≈ mph'];
+        s.text(q[0], q[1] + 24, a, { anchor: 'middle', size: 12.5, weight: 800 });
+        s.text(q[0], q[1] + 40, b, { anchor: 'middle', size: 11.5, weight: 600, mono: true, color: i ? ISO.shade(C.amber, -0.35) : C.coral });
+      });
+      s.text(706, 28, 'Mirage through the scope · wind from the left →', { size: 12, weight: 700, color: C.slate, anchor: 'end' });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('corrections', {
+    caption: '<b>Correct by the opposite of the miss.</b> The impact sits 0.3 mil low and 0.2 mil left of the aim point, so the next shot goes UP 0.3 and RIGHT 0.2 — elevation 5.0 → 5.3 (+3 clicks), wind 0.2 right (+2 clicks or hold).',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 360, origin: [64, 196], scale: 3.9 });
+      const W = 40, H = 36, M = 22; // M = local units per mil
+      s.floor(-4, -10, 48, 16, { grid: 4 });
+      s.floor(44, -66, 30, 26, { grid: 4 });
+      s.shadow(0, -2, W, 4);
+      let g = `<rect x="0" y="0" width="${W}" height="${H}" fill="#fff"/>`;
+      const cx = W / 2, cy = H / 2 + 1, rad = 16;
+      g += `<circle cx="${cx}" cy="${cy}" r="${rad}" fill="#f2f5fa"/><circle cx="${cx}" cy="${cy}" r="${0.21 * M}" fill="${C.steel}"/>`;
+      g += L(cx - rad, cy, cx + rad, cy, C.ink, 0.25) + L(cx, cy - rad, cx, cy + rad, C.ink, 0.25);
+      for (let k = -7; k <= 7; k++) { if (!k) continue; const tk = k % 5 ? 0.6 : 1.2; g += L(cx + k * M / 10, cy - tk, cx + k * M / 10, cy + tk, C.ink, 0.15) + L(cx - tk, cy + k * M / 10, cx + tk, cy + k * M / 10, C.ink, 0.15); }
+      const ix = cx - 0.2 * M, iy = cy + 0.3 * M;
+      g += `<circle cx="${ix}" cy="${iy}" r="0.9" fill="${C.coral}"/><circle cx="${ix}" cy="${iy}" r="2" fill="none" stroke="${C.coral}" stroke-width="0.35"/>`;
+      g += `<path d="M${ix} ${iy - 2.2} L${ix} ${cy + 0.9}" stroke="${C.green}" stroke-width="0.7"/><path d="M${ix - 1} ${cy + 1.6} L${ix} ${cy} L${ix + 1} ${cy + 1.6} Z" fill="${C.green}"/>`;
+      g += `<path d="M${ix + 1} ${cy} L${cx - 0.9} ${cy}" stroke="${C.blue}" stroke-width="0.7"/>`;
+      g += T(ix - 0.8, (iy + cy) / 2 + 0.6, 'UP 0.3', { size: 2, anchor: 'end', color: ISO.shade(C.green, -0.3) });
+      g += T(cx + 1, cy - 1.6, 'RIGHT 0.2', { size: 2, color: C.blue });
+      g += T(1.6, 3.6, 'IMPACT: 0.3 LOW · 0.2 LEFT', { size: 2.2, weight: 800, color: C.coral });
+      panel(s, 0, -0.45, 2, W, H, g);
+      // turrets on a scope body
+      const tx = 58, ty = -54;
+      s.shadow(tx - 12, ty - 4, 26, 8);
+      s.lathe(tx - 12, ty, 6, [[0, 3.4], [24, 3.4]], { axis: 'x', color: C.ink });
+      s.lathe(tx, ty, 8.6, [[0, 4.4], [4.4, 4.4], [5, 3.6]], { axis: 'z', color: C.amber, colors: [C.amber, ISO.shade(C.amber, -0.2)] });
+      s.lathe(tx, ty + 2.8, 6, [[0, 3.2], [3.6, 3.2]], { axis: 'y', color: C.steel });
+      s.curve((k) => { const a = -2.4 + k * 1.8; return [tx + 6.4 * Math.cos(a), ty + 6.4 * Math.sin(a), 14]; }, 0, 1, { color: C.green, width: 3, arrow: true, arrowSize: 9 });
+      lab(s, [tx, ty, 13.6], 'Elevation 5.0 → 5.3 (+3 clicks)', { dx: -40, dy: -50, n: 1, color: C.green });
+      lab(s, [tx, ty + 6.4, 6], 'Wind 0.2 right (+2 clicks or hold)', { dx: 30, dy: 44, n: 2, color: C.blue });
+      tag(s, 600, 296, null, '“Up 0.3, right 0.2”', C.ink, 'middle');
+      s.text(600, 324, 'spotter call: elevation, then wind', { size: 11.5, weight: 600, anchor: 'middle' });
+      s.text(706, 40, 'new dial = old dial − impact offset', { size: 12.5, weight: 800, anchor: 'end', mono: true });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('stages', {
+    caption: '<b>Plan before the buzzer.</b> A PRS-style stage: three positions, three targets at different ranges and one clock. Write the stage card first (target, range, elevation, wind, position), dial for the farthest target and hold under for the closer ones.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 370, origin: [190, 196], scale: 1.75 });
+      s.floor(-40, -46, 188, 88, { grid: 10 });
+      // stage box
+      s.poly([[-34, -40, 0.1], [36, -40, 0.1], [36, 38, 0.1], [-34, 38, 0.1]], { fill: C.sky, opacity: 0.18, stroke: C.blue, width: 1.5, dash: '6 5' });
+      P.berm(s, 146, -46, 88, 10);
+      const tg = [[96, -34, 3.6, 'T1 · 420 yd · 2.3 mil'], [118, -6, 3.6, 'T2 · 610 yd · 3.8 mil'], [138, 24, 3.6, 'T3 · 880 yd · 6.6 mil']];
+      tg.forEach(([x, y, r]) => P.plate(s, x, y, 0, r));
+      // position 1: barricade
+      s.box(14, -30, 0, 3, 16, 46, { color: C.wood });
+      s.box(14, -30, 22, 3, 16, 2, { color: ISO.shade(C.wood, -0.25) });
+      s.box(13, -24, 46, 6, 6, 3, { color: C.sand });
+      person(s, standPose([-10, -22, 0]), { shirt: C.purple });
+      slimRifle(s, [-12, -25.5, 47], [1, 0, 0], 1.1);
+      // position 2: tire
+      s.lathe(10, 6, 0, [[0, 8], [5, 8], [5, 0.1]], { axis: 'z', color: C.ink, segments: 20 });
+      s.disc(10, 6, 5.05, 4, { fill: C.gunmetal });
+      // position 3: prone mat
+      P.mat(s, -26, 22, 40, 12, { color: C.teal });
+      // timer on a post + stage card table
+      s.box(-30, -6, 0, 1.5, 1.5, 30, { color: C.steel });
+      s.box(-32, -7, 30, 6, 4, 5, { color: C.ink });
+      face(s, [-32, -3, 34.2], [1, 0, 0], [0, 0, -1], `<rect x="0.4" y="0.5" width="5.2" height="3" rx="0.4" fill="${C.green}"/>` + T(3, 2.8, '1:48', { size: 2.4, mono: true, anchor: 'middle', color: C.ink }));
+      s.box(-28, 10, 0, 10, 8, 18, { color: C.slate });
+      s.box(-27, 11, 18, 8, 6, 0.4, { color: C.white });
+      onTopY(s, [-27, 17, 18.4], T(0.4, 1.4, 'T1 420 2.3 0.4', { size: 0.9, mono: true }) + T(0.4, 2.8, 'T2 610 3.8 0.6', { size: 0.9, mono: true }) + T(0.4, 4.2, 'T3 880 6.6 1.0', { size: 0.9, mono: true }));
+      // movement path between positions
+      s.curve((k) => [lerp([4, -16, 0.3], [6, 2, 0.3], k)[0] - Math.sin(Math.PI * k) * 6, lerp([4, -16, 0.3], [6, 2, 0.3], k)[1], 0.3], 0, 1, { color: C.blue, width: 2.5, dash: '5 4', arrow: true });
+      s.curve((k) => [lerp([4, 14, 0.3], [0, 22, 0.3], k)[0], lerp([4, 14, 0.3], [0, 22, 0.3], k)[1], 0.3], 0, 1, { color: C.blue, width: 2.5, dash: '5 4', arrow: true });
+      tg.forEach(([x, y, r, n], i) => lab(s, [x, y, r * 3.2], n, { dx: 24, dy: [-40, -40, -40][i] }));
+      lab(s, [15, -22, 46], 'Barricade + bag', { dx: 50, dy: -30, n: 1, color: C.purple });
+      lab(s, [10, 6, 5], 'Tire prop', { dx: 50, dy: 60, n: 2, color: C.purple });
+      lab(s, [-6, 28, 0.4], 'Prone', { dx: -20, dy: 46, n: 3, color: C.purple });
+      lab(s, [-29, -5, 35], 'Timer: 2:00 / 10 shots = 12 s each', { dx: -60, dy: -40, n: '⏱', color: C.coral });
+      lab(s, [-23, 14, 18.4], 'Stage card, written first', { dx: -110, dy: 40, n: '✎', color: C.green });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('mistakes', {
+    caption: '<b>Check the procedure before blaming the wind.</b> Each mistake leaves a fingerprint: exactly one turret revolution, twice the correction, sideways misses that grow with elevation, misses that move with your head, a ×3.4 unit error, or everything consistently high or low.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 270, origin: [72, 126], scale: 2.92 });
+      const N = 6, SP = 22, B = 18, Z = 3;
+      const cols = [C.amber, C.sky, C.lilac, C.mint, C.pink, C.yellow];
+      const names = [['Turret rev', 'off exactly 10 mil'], ['Wrong way', '2× the correction'], ['Cant', 'side miss grows'], ['Parallax', 'follows your head'], ['Wrong unit', 'off by ×3.4'], ['Wrong DA card', 'all high or all low']];
+      for (let i = N - 1; i >= 0; i--) {
+        const x = i * SP, y = -i * SP, cx = x + B / 2, cy = y + B / 2;
+        s.shadow(x, y, B, B);
+        s.box(x, y, 0, B, B, Z, { color: cols[i], top: ISO.shade(cols[i], 0.6) });
+        // checkbox
+        s.box(x + 1, y + B - 4, Z, 3, 3, 0.6, { color: C.white });
+        onTop(s, [x + 1, y + B - 4, Z + 0.6], `<path d="M0.6 1.6 L1.3 2.3 L2.5 0.7" fill="none" stroke="${C.green}" stroke-width="0.5"/>`);
+        if (i === 0) {
+          s.lathe(cx, cy - 1, Z, [[0, 4.4], [2, 4.4], [2.2, 3.6], [5, 3.6], [5.4, 3]], { axis: 'z', color: C.ink, colors: [C.gunmetal, C.gunmetal, C.amber, C.amber] });
+          s.disc(cx, cy - 1, Z + 5.45, 3, { fill: ISO.shade(C.amber, 0.3) });
+          s.text3([cx, cy - 1, Z + 6], '10.0?', { size: 11, weight: 800, anchor: 'middle', mono: true, dy: -6 });
+        } else if (i === 1) {
+          s.line([[cx - 5, cy, Z + 6], [cx + 5, cy, Z + 6]], { color: C.green, width: 3.5, arrow: true });
+          s.line([[cx + 3, cy + 2, Z + 2.5], [cx - 7, cy + 2, Z + 2.5]], { color: C.coral, width: 3.5, arrow: true });
+        } else if (i === 2) {
+          panel(s, x + 2, cy - 1, Z, 14, 12, reticle2d(7, 6.4, 5.4, 2.4, {}).replace('<circle', '<g transform="rotate(14 7 6.4)"><circle').concat('</g>') + `<rect x="3.5" y="10.2" width="7" height="1.4" rx="0.7" fill="${C.mint}"/><circle cx="9.4" cy="10.9" r="0.55" fill="${C.coral}"/>`, { legs: false });
+        } else if (i === 3) {
+          panel(s, x + 2, cy - 1, Z, 14, 12, reticle2d(7, 6, 5.4, 2.4, { plate: 1.3, plateDx: 1.4 }) + `<circle cx="7" cy="6" r="1.3" fill="${C.steel}" opacity=".45"/>`, { legs: false });
+          s.lathe(cx + 6, cy + 2, Z + 2, [[0, 1.6], [1.6, 1.6]], { axis: 'y', color: C.ink });
+        } else if (i === 4) {
+          s.box(cx - 6, cy - 4, Z, 6, 6, 3, { color: C.blue });
+          s.box(cx + 1, cy - 4, Z, 6, 6, 3, { color: C.coral });
+          onTopY(s, [cx - 6, cy + 2, Z + 3], T(0.6, 3.6, 'MIL', { size: 2.2, color: '#fff' }));
+          onTopY(s, [cx + 1, cy + 2, Z + 3], T(0.4, 3.6, 'MOA', { size: 2.2, color: '#fff' }));
+          s.text3([cx, cy, Z + 6], '×3.4', { size: 12, weight: 800, anchor: 'middle', dy: -6 });
+        } else {
+          flatCard(s, cx - 7, cy + 4, Z, 11, DOPE.slice(4, 7), { fs: 0.8, rh: 1.2, hh: 2.8, title: 'DA 0 FT', sub: 'MIL' });
+          flatCard(s, cx - 3, cy + 2, Z + 1.4, 11, DOPE.slice(4, 7), { fs: 0.8, rh: 1.2, hh: 2.8, title: 'DA 6,000 FT', sub: 'MIL' });
+        }
+      }
+      for (let i = 0; i < N; i++) {
+        const q = s.P([i * SP + B, -i * SP + B, 0]);
+        caption2(s, q[0], q[1] + 22, i + 1, names[i][0], names[i][1], ISO.shade(cols[i], -0.4));
+      }
+      s.text(20, 30, 'Check in order — before blaming the wind', { size: 13, weight: 800 });
+      return s.svg();
+    },
+  });
+
+  ISO.module('m-field', () => {
+    const s = ISO.scene({ w: 520, h: 270, origin: [130, 92], scale: 3.0 });
+    s.floor(-10, -26, 100, 50, { grid: 10 });
+    P.berm(s, 70, -26, 50, 9);
+    P.plate(s, 66, 0, 0, 4.5, { hit: true });
+    P.flag(s, 22, 10, 24, -1, { len: 12, droop: 0.3, color: C.coral });
+    P.flag(s, 46, -12, 24, -1, { len: 12, droop: 0.5, color: C.amber });
+    [30, 50].forEach((x) => windArrow(s, x, 4, 26, 30));
+    for (let k = 0; k < 4; k++) mirage(s, 52 + k * 4, 8 - k * 3, 1, 8, 0.7);
+    return s.svg();
+  });
+
+  ISO.module('m-glossary', () => {
+    const s = ISO.scene({ w: 520, h: 270, origin: [180, 120], scale: 5.0 });
+    s.floor(-6, -36, 52, 44, { round: 8 });
+    // closed book
+    s.shadow(22, -30, 18, 26);
+    s.box(22.4, -29.6, 0, 17.2, 25.2, 3.8, { color: C.paper });
+    s.box(22, -30, 3.8, 18, 26, 0.8, { color: C.blue });
+    onTopY(s, [24, -6, 4.62], T(1, 6, 'GLOSSARY', { size: 3.2, color: '#fff' }) + T(1, 11, 'A – Z', { size: 4.2, color: C.amber }));
+    // index cards with tabs
+    [[C.coral, 'MIL', 'milliradian'], [C.green, 'DOPE', 'your data'], [C.amber, 'BC', 'drag ratio']].forEach(([c, a, b], k) => {
+      const x = k * 1.2, y = 4 - k * 1.6, z = k * 0.9;
+      s.box(x, y - 24, z, 16, 24, 0.6, { color: C.white });
+      s.box(x + 4 + k * 4, y - 26, z, 4, 2, 0.6, { color: c });
+      if (k === 2) onTopY(s, [x, y, z + 0.6], T(2, 6, a, { size: 4.4, color: C.ink }) + T(2, 10.5, b, { size: 2.4, color: C.slate, weight: 600 }) + L(2, 12.5, 21, 12.5, C.sky, 0.3) + L(2, 14.5, 18, 14.5, C.sky, 0.3));
+    });
     return s.svg();
   });
 

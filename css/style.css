@@ -147,7 +147,8 @@ a { color: var(--accent); text-underline-offset: 2px; }
 
 /* keyboard focus is always visible; pointer focus never adds noise */
 :focus { outline: none; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a:focus-visible, summary:focus-visible { border-radius: 6px; }
 input:focus-visible, select:focus-visible { outline: none; }
 
 ::selection { background: var(--accent); color: var(--accent-text); }
@@ -894,21 +895,13 @@ td.cell .exp { display: block; font: 600 11px var(--mono); color: var(--bad); ma
 .turret .dir { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
 .feedback { min-height: 24px; }
-.feedback .verdict { font: 800 22px var(--sans); letter-spacing: 0.02em; display: inline-block; animation: verdict-in 0.55s var(--ease-spring) both; transform-origin: left center; }
-.feedback .verdict.hit { color: var(--good); animation: verdict-in 0.55s var(--ease-spring) both, verdict-glow 1.2s var(--ease-out); }
-.feedback .verdict.miss { color: var(--bad); animation: verdict-in 0.55s var(--ease-spring) both, shake 0.4s var(--ease-out) 0.1s; }
-.feedback .verdict + div { animation: fade-in var(--dur-3) var(--ease-out) 0.12s both; }
-@keyframes verdict-in { 0% { opacity: 0; transform: scale(0.7) translateY(4px); } 100% { opacity: 1; transform: none; } }
-@keyframes verdict-glow { 0% { text-shadow: 0 0 0 transparent; } 30% { text-shadow: 0 0 18px var(--good-soft), 0 0 6px var(--good); } 100% { text-shadow: 0 0 0 transparent; } }
+.feedback .verdict { font: 800 22px var(--sans); letter-spacing: 0.02em; }
+.feedback .verdict.hit { color: var(--good); }
+.feedback .verdict.miss { color: var(--bad); }
 .feedback pre { white-space: pre-wrap; margin-top: 10px; }
 
-details.plain summary { cursor: pointer; font-weight: 700; padding: 4px 0; list-style: none; display: flex; align-items: center; gap: 8px; border-radius: 6px; }
-details.plain summary::-webkit-details-marker { display: none; }
-details.plain summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); margin: 0 4px 0 2px; transition: transform var(--dur-3) var(--ease-spring), border-color var(--dur-2); }
-details.plain summary:hover::before { border-color: var(--accent); }
-details.plain[open] summary::before { transform: rotate(45deg) translate(-1px, -1px); }
+details.plain summary { cursor: pointer; font-weight: 700; padding: 4px 0; }
 details.plain[open] summary { margin-bottom: 10px; }
-details.plain[open] > :not(summary) { animation: fade-in var(--dur-3) var(--ease-out); }
 
 .range-modes { display: flex; flex-wrap: wrap; gap: 8px; }
 .keys { text-align: center; margin-top: 12px; line-height: 2; }
@@ -924,16 +917,13 @@ details.plain[open] > :not(summary) { animation: fade-in var(--dur-3) var(--ease
 @media (max-width: 420px) { .k-grid { grid-template-columns: repeat(2, 1fr); } }
 .stage-list { margin-top: 12px; border-radius: 12px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--border); }
 .stage-list .k-head { color: var(--accent); }
-.st-row { display: grid; grid-template-columns: 36px 1fr 50px 60px; gap: 6px; padding: 5px 6px; border-radius: 8px; font: 600 13px var(--mono); transition: background var(--dur-3) var(--ease-out), transform var(--dur-3) var(--ease-out); }
-.st-row.on { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.st-row { display: grid; grid-template-columns: 36px 1fr 50px 60px; gap: 6px; padding: 5px 6px; border-radius: 8px; font: 600 13px var(--mono); }
+.st-row.on { background: var(--accent-soft); }
 .st-n { color: var(--muted); }
 .st-r { text-align: right; }
 .st-r.hit { color: var(--good); }
 .st-r.miss { color: var(--bad); }
-#breath-btn.on { background: var(--info); color: #fff; border-color: var(--info); animation: breath 4s var(--ease-in-out) infinite; }
-@keyframes breath { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 35%, transparent); } 50% { box-shadow: 0 0 0 8px transparent; } }
-#fire-btn { transition: transform var(--dur-1) var(--ease-out), box-shadow var(--dur-2), opacity var(--dur-2), filter var(--dur-2); }
-#fire-btn:disabled { opacity: 0.7; transform: scale(0.98); }
+#breath-btn.on { background: var(--info); color: #fff; border-color: var(--info); }
 #breath-btn, #level-btn { flex: 1; }
 
 /* =========================================================== toasts / confetti */

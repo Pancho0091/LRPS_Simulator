@@ -368,6 +368,15 @@
     $('.xp-chip').title = `${xp} XP · next rank at ${r.next}`;
   }
 
+  /* Re-run a CSS animation class on an element (remove, reflow, add). */
+  L.replay = (el, cls, ms) => {
+    if (!el) return;
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+    setTimeout(() => el.classList.remove(cls), ms || 600);
+  };
+
   L.addXp = (n, why) => {
     if (!n) return;
     const before = rankInfo(xp).level;
@@ -375,10 +384,21 @@
     L.store.set('xp', xp);
     renderXp();
     L.toast(`+${n} XP · ${why}`, 'xp');
+    // "+N" floats out of the chip and the level badge bumps
+    const chip = $('.xp-chip');
+    if (chip && !L.reducedMotion()) {
+      const f = document.createElement('span');
+      f.className = 'xp-float';
+      f.textContent = `+${n}`;
+      chip.appendChild(f);
+      setTimeout(() => f.remove(), 1200);
+    }
+    L.replay($('#xp-level'), 'bump', 500);
     const after = rankInfo(xp);
     if (after.level > before) {
       setTimeout(() => {
         L.toast(`Rank up: ${after.name}!`, 'xp big');
+        L.replay(chip, 'rank-up', 2600);
         L.confetti();
         L.sfx.good();
       }, 400);
@@ -431,12 +451,64 @@
 
   const tabListeners = {};
   L.onTab = (name, fn) => { (tabListeners[name] = tabListeners[name] || []).push(fn); };
+
+  /*
+   * Sliding indicator: an absolutely positioned pill inside a container that
+   * glides to whichever child matches `activeSel`. Used by the tab bar and
+   * every segmented control. Position is written to --x / --w; CSS animates.
+   */
+  function slidingIndicator(container, activeSel, cls) {
+    const ind = document.createElement('span');
+    ind.className = cls;
+    ind.setAttribute('aria-hidden', 'true');
+    container.prepend(ind);
+    let raf = 0;
+    const place = () => {
+      raf = 0;
+      const a = $(activeSel, container);
+      container.classList.toggle('none', !a);
+      if (!a) return;
+      ind.style.setProperty('--x', a.offsetLeft + 'px');
+      ind.style.setProperty('--w', a.offsetWidth + 'px');
+      if (!container.classList.contains('ready')) requestAnimationFrame(() => container.classList.add('ready'));
+    };
+    const update = () => { if (!raf) raf = requestAnimationFrame(place); };
+    if (window.ResizeObserver) new ResizeObserver(update).observe(container);
+    else window.addEventListener('resize', update);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(update);
+    new MutationObserver(update).observe(container, { attributes: true, attributeFilter: ['class'], subtree: true });
+    update();
+    return update;
+  }
+  const placeTabIndicator = slidingIndicator($('.tabs'), '.tab.active', 'tab-indicator');
+
+  /* Mark a root with .enter for one frame-set so its children stagger in (CSS .enter rules). */
+  const enterTimers = new WeakMap();
+  L.enter = (root) => {
+    if (!root || L.reducedMotion()) return;
+    clearTimeout(enterTimers.get(root));
+    root.classList.remove('enter');
+    void root.offsetWidth;
+    root.classList.add('enter');
+    enterTimers.set(root, setTimeout(() => root.classList.remove('enter'), 900));
+  };
+
+  const TAB_ORDER = $$('.tab').map((b) => b.dataset.tab);
   L.showTab = (name) => {
     if (name === 'learn') name = 'lab';
     if (!$('#tab-' + name)) name = 'academy';
-    $$('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+    // direction-aware panel transition: forward slides from the right, back from the left
+    const from = TAB_ORDER.indexOf(L.currentTab), to = TAB_ORDER.indexOf(name);
+    $('main').dataset.dir = from >= 0 && to < from ? 'back' : 'fwd';
+    $$('.tab').forEach((b) => {
+      const on = b.dataset.tab === name;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
     $$('.panel').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
+    if (L.currentTab !== name) L.enter($('#tab-' + name));
     L.currentTab = name;
+    placeTabIndicator();
     (tabListeners[name] || []).forEach((fn) => fn());
   };
   $$('.tab').forEach((btn) => btn.addEventListener('click', () => {
@@ -457,9 +529,11 @@
 
   /* Segmented control helper: calls onChange(value) on selection. */
   L.seg = (el, onChange) => {
+    slidingIndicator(el, 'button.on', 'seg-indicator');
     el.addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
+      if (!b.classList.contains('on')) L.sfx.click();
       $$('button', el).forEach((x) => x.classList.toggle('on', x === b));
       onChange(b.dataset.v);
     });

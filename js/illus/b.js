@@ -554,7 +554,7 @@
   // =====================================================================
 
   ISO.module('m-calibers', () => {
-    const { s, st } = rowScene(3, 120, 56, 640, 300, 250);
+    const { s, st } = rowScene(3, 112, 64, 640, 300, 262);
     [['.223 Rem', C.slate], ['6.5 CM', C.blue], ['.338 Lapua', C.purple]].forEach(([n, col], i) => {
       const [x, y] = row(0, 0, i, st);
       plinth(s, x - 0.45, y - 0.45, 0.9, 0.9, 0.18, col);
@@ -581,7 +581,7 @@
       // read-out on the sliding jaw
       s.box(xb + 0.2, beamY - 0.07, 0.42, 0.78, 0.14, 0.5, { color: C.ink });
       s.poly([[xb + 0.27, beamY + 0.071, 0.5], [xb + 0.91, beamY + 0.071, 0.5], [xb + 0.91, beamY + 0.071, 0.84], [xb + 0.27, beamY + 0.071, 0.84]], { fill: '#bdf5d8' });
-      s.text3([xb + 0.59, beamY + 0.072, 0.67], '0.308"', { size: 16, weight: 800, anchor: 'middle', mono: true, color: C.ink, dy: 6 });
+      s.text3([xb + 0.59, beamY + 0.072, 0.67], '0.308"', { size: 16, weight: 800, anchor: 'middle', mono: true, color: C.ink, dx: 4, dy: 6 });
       // cartridge
       s.lathe(0, 0, 0, cp.prof, { axis: 'x', colors: cp.cols, color: C.brass, capColor: sh(C.brass, -0.1), segments: 24 });
       s.box(xb - 0.07, beamY, r, 0.14, 0.92, 0.07, { color: C.steel });
@@ -737,4 +737,104 @@
     },
   });
 
+  // =====================================================================
+  // m-optics — Optics & the MIL
+  // =====================================================================
+
+  // Riflescope lying along x (eyepiece at x, objective toward +x). ~14 units.
+  function scope(s, x, y, z, o) {
+    o = o || {};
+    s.lathe(x, y, z, [[0, 0.95], [3, 0.95], [4.2, 0.6], [10, 0.6], [11.5, 1.05], [14, 1.1]], { axis: 'x', color: o.color || C.ink, opacity: o.opacity, segments: o.segments || 24 });
+  }
+
+  ISO.module('m-optics', () => {
+    const s = ISO.scene({ w: 640, h: 300, origin: [150, 120], scale: 15 });
+    s.floor(-4, -6, 22, 12, { grid: 2, color: 'none' });
+    s.shadow(1, -1.5, 15, 3);
+    s.box(3, -0.6, 0, 1.2, 1.2, 1.6, { color: C.black });
+    s.box(10, -0.6, 0, 1.2, 1.2, 1.6, { color: C.black });
+    scope(s, 0, 0, 2.2);
+    s.lathe(6.8, 0, 2.2 + 0.6, [[0, 1.0], [0.4, 1.15], [1.6, 1.15], [1.8, 0.9]], { axis: 'z', color: C.amber, segments: 24 });
+    s.lathe(6.8, 0.6, 2.2, [[0, 0.75], [1.2, 0.75]], { axis: 'y', color: C.steel, segments: 18 });
+    sightPicture(s, 500, 130, { r: 92, mil: 15, scene: `<circle cx="${500 + 15}" cy="${130}" r="13" fill="${C.white}" stroke="${C.slate}" stroke-width="2"/>` });
+    return s.svg();
+  });
+
+  ISO.lesson('mil-moa', {
+    caption: '<b>One angle, every distance.</b> The 1-mil wedge leaving the scope covers 3.6" at 100 yd, 18" at 500 yd and 36" at 1,000 yd — ten times the distance, ten times the inches, same angle. That is why dope, holds and corrections are all written in mils (angle exaggerated here).',
+    draw: () => {
+      const sc = 3.4;
+      const s = ISO.scene({ w: 720, h: 380, origin: [150, 318], scale: sc });
+      s.floor(-14, -106, 28, 116, { grid: 10 });
+      const h0 = 3, k = 0.22;
+      const T = [[10, '100 yd', '1 mil = 3.6"', '0.1 mil click = 0.36"'], [50, '500 yd', '1 mil = 18"', 'click = 1.8"'], [100, '1,000 yd', '1 mil = 36"', 'click = 3.6"']];
+      // distance markers on the ground
+      T.forEach(([D, name]) => s.line([[-10, -D, 0.02], [10, -D, 0.02]], { color: C.slate, width: 1.2, dash: '3 4', opacity: 0.6 }));
+      // the wedge between the line of sight and a line raised 1 mil
+      s.poly([[0, 0, h0], [0, -100, h0], [0, -100, h0 + 100 * k]], { fill: C.blue, opacity: 0.16 });
+      // targets far → near
+      T.slice().reverse().forEach(([D, name]) => {
+        const span = D * k, w = Math.max(5, span * 0.55), top = h0 + span + Math.max(2, span * 0.12);
+        s.line([[-w * 0.4, -D, 0], [-w * 0.4, -D, h0 - 0.5]], { color: C.wood, width: 2.5 });
+        s.line([[w * 0.4, -D, 0], [w * 0.4, -D, h0 - 0.5]], { color: C.wood, width: 2.5 });
+        s.poly([[-w / 2, -D, h0 - 1], [w / 2, -D, h0 - 1], [w / 2, -D, top], [-w / 2, -D, top]], { fill: C.white, stroke: C.slate, width: 1.4, opacity: 0.95 });
+        s.line([[0, -D, h0], [0, -D, h0 + span]], { color: C.amber, width: 5 });
+        s.line([[-0.8, -D, h0 + span], [0.8, -D, h0 + span]], { color: C.amber, width: 2.5 });
+        s.line([[-0.8, -D, h0], [0.8, -D, h0]], { color: C.amber, width: 2.5 });
+      });
+      // wedge edges on top
+      s.line([[0, 0, h0], [0, -100, h0]], { color: C.blue, width: 2 });
+      s.line([[0, 0, h0], [0, -100, h0 + 100 * k]], { color: C.blue, width: 2, dash: '6 5' });
+      // scope seen from behind (eyepiece toward the viewer)
+      s.box(-1.2, 3, 0, 2.4, 9, h0 - 1.4, { color: C.gunmetal });
+      s.lathe(0, 0, h0, [[0, 1.5], [3.5, 1.45], [5.5, 0.85], [12, 0.85], [13.5, 1.3], [17, 1.3]], { axis: 'y', color: C.ink, segments: 22 });
+      s.curve((t) => [0, -16 * Math.cos(t * 0.215), h0 + 16 * Math.sin(t * 0.215)], 0, 1, { color: C.blue, width: 2, samples: 10 });
+      s.label([0, -16, h0 + 1.9], '1 mil angle (exaggerated)', { dx: -40, dy: -70, n: '∠', color: C.blue });
+      T.forEach(([D, name, a, b], i) => {
+        const span = D * k;
+        s.label([0, -D, h0 + span / 2], `${name}: ${a}`, { dx: [44, 60, 40][i], dy: [16, 34, 30][i], n: i + 1, color: C.amber });
+      });
+      pill(s, 704, 352, 'inches = mils × 3.6 × yards ÷ 100', { size: 12.5, anchor: 'end', mono: true, fill: C.navy });
+      s.text(704, 318, 'one click (0.1 mil) = 0.36" per 100 yd', { size: 11.5, weight: 600, anchor: 'end' });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('reticles', {
+    caption: '<b>FFP: the reticle zooms with the target.</b> A 1-mil plate always spans 1 mil, at any power. <b>SFP:</b> the reticle stays the same size while the target grows, so mil readings are only true at the calibrated (usually max) magnification.',
+    draw: () => {
+      const sc = 13;
+      const s = ISO.scene({ w: 720, h: 380, origin: [196, 78], scale: sc });
+      const rows = [{ y: 0, ffp: true, name: 'FFP', sub: 'reticle ahead of the zoom' }, { y: 12.9, ffp: false, name: 'SFP', sub: 'reticle behind the zoom' }];
+      rows.forEach((rw) => {
+        const y = rw.y, z = 1.4, x0 = rw.y;
+        s.shadow(x0 + 1, y - 1.2, 13, 2.4, { opacity: 0.1 });
+        s.lathe(x0 + 5, y, z, [[0, 0.38], [4.2, 0.38]], { axis: 'x', color: C.purple, segments: 16 });
+        const rx = x0 + (rw.ffp ? 10.4 : 4.0);
+        s.disc(rx, y, z, 0.55, { plane: 'yz', fill: C.amber, stroke: sh(C.amber, -0.4), width: 1.5 });
+        s.line([[rx, y - 0.55, z], [rx, y + 0.55, z]], { color: C.ink, width: 1.2 });
+        s.line([[rx, y, z - 0.55], [rx, y, z + 0.55]], { color: C.ink, width: 1.2 });
+        scope(s, x0, y, z, { opacity: 0.38, color: C.slate, segments: 22 });
+        s.label([rx, y, z + 0.55], 'Reticle', { dx: rw.ffp ? -10 : 30, dy: rw.ffp ? -52 : 70, n: rw.ffp ? 1 : 2, color: C.amber });
+        if (rw.ffp) s.label([x0 + 7, y + 0.3, z - 0.3], 'Zoom (erector)', { dx: 30, dy: 44, color: C.purple });
+        const q = s.P([x0, y, z]);
+        s.text(q[0] - 16, q[1] + 2, rw.name, { size: 18, weight: 800, anchor: 'end' });
+        s.text(q[0] - 16, q[1] + 18, rw.sub, { size: 11, weight: 600, anchor: 'end' });
+        s.text(q[0] - 16, q[1] + 32, 'eyepiece → objective', { size: 10, weight: 500, anchor: 'end' });
+      });
+      // sight pictures: columns 10x, 25x; rows FFP, SFP
+      const cols = [[490, '10×', 8], [638, '25×', 20]];
+      const rowsY = [104, 262];
+      cols.forEach(([cx, mag]) => s.text(cx + 72, 26, mag, { size: 14, weight: 800, anchor: 'end' }));
+      rowsY.forEach((cy, ri) => cols.forEach(([cx, mag, tw], ci) => {
+        const mil = ri === 0 ? tw : 20; // FFP reticle scales with the image; SFP stays fixed
+        const plate = `<line x1="${cx + tw / 2}" y1="${cy + tw * 0.7}" x2="${cx + tw / 2}" y2="${cy + tw * 1.6}" stroke="${C.wood}" stroke-width="${Math.max(1.2, tw / 8)}"/><rect x="${cx}" y="${cy - tw * 0.7}" width="${tw}" height="${tw * 1.4}" fill="${C.white}" stroke="${C.coral}" stroke-width="2"/>`;
+        sightPicture(s, cx, cy, { r: 58, mil, scene: plate, horizon: 0.5, hash: Math.floor(55 / mil) });
+        const ok = ri === 0 || ci === 1;
+        const read = ok ? '✓ reads 1.0 mil' : '✗ reads 0.4 mil';
+        pill(s, cx, cy + 82, read, { size: 12, anchor: 'middle', fill: ok ? C.green : C.coral });
+      }));
+      return s.svg();
+    },
+  });
 })();

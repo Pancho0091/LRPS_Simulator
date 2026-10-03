@@ -20,8 +20,11 @@
   $('#drill-new').addEventListener('click', newDrill);
 
   function renderStats() {
-    $('#drill-streak').textContent = st.streak;
-    $('#drill-acc').textContent = st.cellsTotal ? Math.round(st.cellsRight / st.cellsTotal * 100) + '%' : '–';
+    const streak = String(st.streak);
+    const acc = st.cellsTotal ? Math.round(st.cellsRight / st.cellsTotal * 100) + '%' : '–';
+    const sEl = $('#drill-streak'), aEl = $('#drill-acc');
+    if (sEl.textContent !== streak) { sEl.textContent = streak; L.replay(sEl.closest('.pill-stat'), 'pop', 600); }
+    if (aEl.textContent !== acc) { aEl.textContent = acc; L.replay(aEl.closest('.pill-stat'), 'pop', 600); }
   }
 
   function startTimer() {
@@ -58,6 +61,7 @@
       <div class="actions"><button id="drill-check" class="btn primary">Check answers</button></div>
       <div id="drill-explain"></div></div>`;
     $('#drill-check').addEventListener('click', check);
+    L.enter($('#drill-body'));
     const first = $('#drill-body input');
     if (first) first.focus({ preventScroll: true });
     startTimer();

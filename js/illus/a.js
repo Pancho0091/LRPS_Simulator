@@ -235,14 +235,13 @@
     for (let i = 0; i < prof.length; i++) { const p = prof[i], q = prof[(i + 1) % prof.length]; area += p[0] * q[1] - q[0] * p[1]; }
     const pr = area > 0 ? prof : prof.slice().reverse();
     const at = (u, v, w) => add3(add3(add3(o, U, u), V, v), W, w);
-    const sgn = dot3(cross3(U, V), W) > 0 ? 1 : -1; // handedness of (U,V,W)
     const faces = [
       { pts: pr.map(([u, v]) => at(u, v, w1)), n: W, col: opt.face || color },
       { pts: pr.map(([u, v]) => at(u, v, w0)), n: W.map((c) => -c), col: opt.face || color },
     ];
     for (let i = 0; i < pr.length; i++) {
       const j = (i + 1) % pr.length, du = pr[j][0] - pr[i][0], dv = pr[j][1] - pr[i][1];
-      const n = nrm3(add3(U.map((c) => c * dv * sgn), V, -du * sgn));
+      const n = nrm3(add3(U.map((c) => c * dv), V, -du));
       faces.push({ pts: [at(pr[i][0], pr[i][1], w0), at(pr[j][0], pr[j][1], w0), at(pr[j][0], pr[j][1], w1), at(pr[i][0], pr[i][1], w1)], n, col: opt.side || color });
     }
     faces3(s, faces, opt);
@@ -252,37 +251,53 @@
   // Text on the viewer-facing side of an H-aligned object is plain screen text
   // Horizontal precision rifle along H (butt at o, o[2] = ground). Returns anchors.
   // o: { stock, metal, blen, br (barrel radius), sporter, scope (len), scopeR, bipod, brake, rest, bag }
+  // Tilted axis: runs ~10° below screen-horizontal, so depth still reads as iso
+  const T = nrm3([1, -0.62, 0]);
+  const perp = (U) => nrm3([-U[1], U[0], 0]); // horizontal, toward the viewer
+  // Floor tile aligned with axis U (length L) and its perpendicular (depth ±D), grid g
+  function tile(s, o, U, L, D, g) {
+    const W = perp(U);
+    const at = (u, w) => add3(add3([o[0], o[1], 0], U, u), W, w);
+    s.poly([at(0, -D), at(L, -D), at(L, D), at(0, D)], { fill: 'var(--illus-floor)' });
+    if (g) {
+      for (let u = g; u < L - 0.01; u += g) s.line([at(u, -D), at(u, D)], { color: 'var(--illus-grid)', width: 1 });
+      for (let w = -D + g; w < D - 0.01; w += g) s.line([at(0, w), at(L, w)], { color: 'var(--illus-grid)', width: 1 });
+    }
+  }
   function hRifle(s, o, opt) {
-    opt = Object.assign({ stock: C.slate, metal: C.gunmetal, blen: 24, br: 0.42, sporter: false, scope: 14, scopeR: 0.8, bipod: true, brake: true, rest: false, bag: false, mag: true }, opt || {});
-    const zb = o[2] + (opt.bipod || opt.rest ? 3.4 : 1.2), ax = zb + 3.5;
-    const A = (u, v) => along([o[0], o[1], 0], H, u, v);
+    opt = Object.assign({ U: H, stock: C.slate, metal: C.gunmetal, blen: 24, br: 0.42, sporter: false, scope: 14, scopeR: 0.8, bipod: true, brake: true, rest: false, bag: false, mag: true }, opt || {});
+    const U = opt.U, W = perp(U), ax3 = { U, W };
+    const zb = o[2] + 3.4, ax = zb + 3.5;
+    const A = (u, v) => along([o[0], o[1], 0], U, u, v);
     const bipodAt = 31;
-    if (opt.bipod) s.line([A(bipodAt, zb), add3(A(bipodAt - 1.5, o[2]), F, -1.6)], { color: opt.metal, width: 3 });
-    if (opt.bag) obox(s, A(2.5, o[2]), 6, 3.6, zb - o[2] + 0.3, C.sand);
+    if (opt.bipod) s.line([A(bipodAt, zb), add3(A(bipodAt - 1.5, o[2]), W, -1.8)], { color: opt.metal, width: 3 });
+    if (opt.bag) obox(s, A(2.5, o[2]), 6, 3.6, zb - o[2] + 0.3, C.sand, ax3);
     const prof = opt.sporter
       ? [[0, 1.6], [7, 2.6], [13, 3.4], [16.5, 2.4], [18.5, 3.6], [33, 4.4], [34, 5.5], [17, 5.8], [12.5, 5.2], [0.4, 6.2]]
       : [[0, 1.2], [12, 2.6], [14.5, 0.2], [17.5, 0.2], [18.5, 3.4], [36, 3.4], [36, 6], [19, 6.1], [15, 6.2], [0.4, 6]];
-    oext(s, A(0.9, zb - 3.4), prof, -0.9, 0.9, opt.stock);
-    obox(s, A(0, zb - 2.2), 1.1, 2.1, opt.sporter ? 5.8 : 5.6, C.black);
-    if (!opt.sporter) obox(s, A(5, zb + 2.6), 8, 1.5, 1.1, ISO.shade(opt.stock, -0.15));
-    if (opt.mag) obox(s, A(20, zb - 2.2), 2.6, 1.3, 2.4, C.black);
-    lathe3(s, A(15.5, ax), H, [[0, 0.8], [11, 0.8]], { color: opt.metal, segments: 14 });
-    lathe3(s, A(26.5, ax), H, [[0, opt.br * 1.45], [3, opt.br * 1.35], [opt.blen, opt.br]], { color: opt.metal, segments: 14 });
+    if (opt.rest) { obox(s, A(30, o[2]), 4, 3.2, zb - o[2] - 0.4, C.slate, ax3); obox(s, A(30.5, zb - 0.6), 3, 2.4, 0.6, C.black, ax3); }
+    oext(s, A(0.9, zb - 3.4), prof, -0.9, 0.9, opt.stock, ax3);
+    obox(s, A(0, zb - 2.2), 1.1, 2.1, opt.sporter ? 5.8 : 5.6, C.black, ax3);
+    if (!opt.sporter) obox(s, A(5, zb + 2.6), 8, 1.5, 1.1, ISO.shade(opt.stock, -0.15), ax3);
+    if (opt.mag) obox(s, A(20, zb - 2.2), 2.6, 1.3, 2.4, C.black, ax3);
+    lathe3(s, A(15.5, ax), U, [[0, 0.8], [11, 0.8]], { color: opt.metal, segments: 14 });
+    lathe3(s, A(26.5, ax), U, [[0, opt.br * 1.45], [3, opt.br * 1.35], [opt.blen, opt.br]], { color: opt.metal, segments: 14 });
+    const knob = add3(A(21.6, ax - 0.9), W, 2.4);
+    if (opt.handle !== false) { s.line([A(21.6, ax), knob], { color: C.steel, width: 2.6 }); s.sphere(...knob, 0.55, { color: C.steel, rings: 5, segments: 10 }); }
     let muz = 26.5 + opt.blen;
-    if (opt.brake) { lathe3(s, A(muz, ax), H, [[0, opt.br * 1.5], [2.8, opt.br * 1.5]], { color: C.black, segments: 12 }); muz += 2.8; }
+    if (opt.brake) { lathe3(s, A(muz, ax), U, [[0, opt.br * 1.5], [2.8, opt.br * 1.5]], { color: C.black, segments: 12 }); muz += 2.8; }
     const sz = ax + 1.6 + opt.scopeR * 1.2;
     let sc = null;
     if (opt.scope) {
       const L = opt.scope, sR = opt.scopeR, s0 = 13.5;
-      obox(s, A(17.2, ax + 0.5), 1, 1.1, sz - ax - 0.7, C.black);
-      obox(s, A(s0 + L * 0.72, ax + 0.5), 1, 1.1, sz - ax - 0.7, C.black);
-      lathe3(s, A(s0, sz), H, [[0, sR * 1.2], [3, sR * 1.2], [4.2, sR * 0.75], [L - 2.5, sR * 0.75], [L - 1, sR * 1.35], [L + 1.5, sR * 1.4]], { color: C.ink, segments: 14 });
+      obox(s, A(17.2, ax + 0.5), 1, 1.1, sz - ax - 0.7, C.black, ax3);
+      obox(s, A(s0 + L * 0.72, ax + 0.5), 1, 1.1, sz - ax - 0.7, C.black, ax3);
+      lathe3(s, A(s0, sz), U, [[0, sR * 1.2], [3, sR * 1.2], [4.2, sR * 0.75], [L - 2.5, sR * 0.75], [L - 1, sR * 1.35], [L + 1.5, sR * 1.4]], { color: C.ink, segments: 14 });
       s.lathe(...A(s0 + L * 0.5, sz + sR * 0.6), [[0, 0.55], [0.9, 0.55]], { axis: 'z', color: C.amber, segments: 12 });
       sc = A(s0 + L * 0.5, sz + sR);
     }
-    if (opt.bipod) s.line([A(bipodAt, zb), add3(A(bipodAt - 1.5, o[2]), F, 1.6)], { color: opt.metal, width: 3 });
-    if (opt.rest) { obox(s, A(30, o[2]), 4, 3.2, zb - o[2] - 0.4, C.slate); obox(s, A(30.5, zb - 0.6), 3, 2.4, 0.6, C.black); }
-    return { A, zb, ax, sz, muzzle: A(muz, ax), scope: sc, eye: A(13.5, sz), cheek: A(9, zb + 3.7), butt: A(0.5, zb + 0.5), trigger: A(17.9, zb - 1), grip: A(16, zb - 1.5), mag: A(21.3, zb - 1.6), action: A(21, ax + 0.8), barrel: A(26.5 + opt.blen * 0.6, ax), forend: A(28, zb), len: muz };
+    if (opt.bipod) s.line([A(bipodAt, zb), add3(A(bipodAt - 1.5, o[2]), W, 1.8)], { color: opt.metal, width: 3 });
+    return { A, U, W, zb, ax, sz, knob, muzzle: A(muz, ax), scope: sc, eye: A(13.5, sz), cheek: A(9, zb + 3.7), butt: A(0.5, zb + 0.5), trigger: A(17.9, zb - 1), grip: A(16, zb - 1.5), mag: A(21.3, zb - 1.6), action: A(21, ax + 0.8), barrel: A(26.5 + opt.blen * 0.6, ax), forend: A(28, zb), len: muz };
   }
 
   // ------------------------------------------------------- module heroes
@@ -697,6 +712,176 @@
       s.label([23.1, 11.5, 1.2], 'Weather meter · 1990s', { dx: -60, dy: 74, n: 3, color: '#d9912a' });
       s.label([30, 12.2, 2.6], 'Laser rangefinder · 1990s', { dx: 30, dy: 64, n: 2, color: C.coral });
       s.label([51, -6.5, 3.2], 'Doppler chronograph · 2010s', { dx: 10, dy: -60, n: 5, color: C.green });
+      return s.svg();
+    },
+  });
+
+  // ---------------------------------------------------------- m-platforms
+
+  // Row offset that moves straight down the screen when using axis T
+  const rowOff = (r) => add3(perp(T).map((c) => c * r), T, 0.235 * r);
+
+  ISO.lesson('actions', {
+    caption: '<b>Bolt action: you cycle it. Semi-auto: the shot cycles it.</b> On a bolt gun nothing moves during the shot until your hand lifts, pulls, pushes and closes the bolt. A semi-auto taps gas from the barrel to drive the bolt carrier back, and a spring returns it — faster, but with more parts moving.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 400, origin: [60, 150], scale: 9 });
+      const ax3 = { U: T, W: perp(T) }, W = perp(T);
+      // --- row 1: bolt action
+      tile(s, add3([0, 0, 0], W, 0), T, 52, 3.6, 4);
+      const r = hRifle(s, [0, 0, 0], { U: T, blen: 22 });
+      const kn = add3(r.knob, W, 0.6);
+      const up = add3(kn, Z, 2.8);
+      s.curve((t) => add3(add3(kn, Z, 2.6 * Math.sin(t * Math.PI / 2)), W, -0.8 * (1 - Math.cos(t * Math.PI / 2))), 0.15, 1, { color: C.blue, width: 3, arrow: true, arrowSize: 9, samples: 12 });
+      s.line([add3(add3(up, W, -0.8), T, -0.4), add3(add3(up, W, -0.8), T, -7)], { color: C.blue, width: 3, arrow: true, arrowSize: 9 });
+      s.line([add3(add3(kn, Z, 1.2), T, -7), add3(add3(kn, Z, 1.2), T, -1)], { color: C.green, width: 3, arrow: true, arrowSize: 9 });
+      s.curve((t) => add3(add3(add3(kn, T, -0.6), Z, 1.0 - 1.2 * t), W, 0.4 * t), 0, 1, { color: C.green, width: 3, arrow: true, arrowSize: 9, samples: 6 });
+      [['1', add3(add3(kn, T, 1.4), Z, 1.6)], ['2', add3(add3(up, T, -7.8), Z, 0)], ['3', add3(add3(kn, T, -8), Z, 1.2)], ['4', add3(add3(kn, T, -1.6), Z, -0.6)]].forEach(([t, p], i) => s.text3(p, t, { size: 14, weight: 800, color: i < 2 ? C.blue : '#239e6f', anchor: 'middle', dy: 5 }));
+      s.text3(r.A(0, 13), 'Bolt action', { size: 17, weight: 800, color: C.blue });
+      s.text3(r.A(0, 13), '1 lift · 2 pull back · 3 push forward · 4 close — by hand', { size: 12.5, weight: 500, dy: 18 });
+      // --- row 2: semi-auto (AR style) with the gas loop
+      const o2 = rowOff(24);
+      tile(s, o2, T, 52, 3.6, 4);
+      const A = (u, v) => along([o2[0], o2[1], 0], T, u, v);
+      const zb = 3.4, ax = zb + 3.6;
+      s.line([A(33, zb + 1), add3(A(31.5, 0), W, -1.8)], { color: C.gunmetal, width: 3 });
+      lathe3(s, A(2, ax - 0.6), T, [[0, 0.75], [10, 0.75]], { color: C.black, segments: 12 });
+      oext(s, A(0, zb - 1.6), [[0, 0], [1.2, 0], [5.5, 3.6], [6, 5.4], [1, 5.6], [0, 4.8]], -0.8, 0.8, C.black, ax3);
+      oext(s, A(15, zb - 2.6), [[0, 0], [1.5, 0], [3.4, 2.8], [1.8, 2.9]], -0.7, 0.7, C.black, ax3);
+      oext(s, A(19.6, zb - 3.4), [[0.4, 0], [3, 0.4], [3.1, 4], [0, 4]], -0.7, 0.7, C.black, ax3);
+      obox(s, A(13.5, ax - 0.9), 8, 1.2, 1.6, C.amber, ax3); // bolt carrier
+      obox(s, A(12, zb + 0.2), 14, 2.2, 4.4, C.gunmetal, Object.assign({ opacity: 0.45 }, ax3)); // receiver (see-through)
+      lathe3(s, A(26, ax), T, [[0, 0.45], [28, 0.42]], { color: C.gunmetal, segments: 12 });
+      obox(s, A(38, ax - 0.7), 1.6, 1.4, 2.6, C.slate, ax3);
+      s.line([A(38.8, ax + 1.6), A(22, ax + 1.6), A(22, ax + 0.4)], { color: C.coral, width: 3.2 });
+      lathe3(s, A(26, ax + 0.2), T, [[0, 1.6], [12, 1.6]], { color: C.slate, opacity: 0.32, segments: 14 });
+      obox(s, A(15, ax + 2.2), 1, 1.1, 1.0, C.black, ax3); obox(s, A(23, ax + 2.2), 1, 1.1, 1.0, C.black, ax3);
+      lathe3(s, A(11.5, ax + 3.6), T, [[0, 0.95], [2.5, 0.95], [3.5, 0.6], [12, 0.6], [13, 1.0], [15, 1.05]], { color: C.ink, segments: 14 });
+      s.line([A(33, zb + 1), add3(A(31.5, 0), W, 1.8)], { color: C.gunmetal, width: 3 });
+      s.line([A(38, ax + 6.4), A(29, ax + 6.4)], { color: C.coral, width: 3, arrow: true, arrowSize: 10 });
+      s.line([add3(A(13.5, ax - 1.6), W, 1.8), add3(A(6.5, ax - 1.6), W, 1.8)], { color: C.blue, width: 3, arrow: true, arrowSize: 9 });
+      s.line([add3(A(6.5, ax - 3.1), W, 1.8), add3(A(13.5, ax - 3.1), W, 1.8)], { color: C.green, width: 3, arrow: true, arrowSize: 9 });
+      s.text3(A(0, 13), 'Semi-automatic', { size: 17, weight: 800, color: C.coral });
+      s.text3(A(0, 13), 'the fired round’s own gas cycles the bolt', { size: 12.5, weight: 500, dy: 18 });
+      s.label(A(34, ax + 1.6), 'Gas tapped from the barrel runs back', { dx: 30, dy: -46, n: 1, color: C.coral });
+      s.label(add3(A(10, ax - 1.6), W, 1.8), 'Carrier slams back, spring returns it', { dx: 40, dy: 66, n: 2, color: C.blue });
+      s.label(r.A(24, r.ax + 0.6), 'Locked shut during the shot', { dx: 70, dy: -40, n: '✓', color: C.green });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('barrels', {
+    caption: '<b>The rifling is a spiral: lands grip, grooves give room.</b> Twist rate is how far the bullet travels for one full turn — 1:8 means one turn every 8 inches. The muzzle crown is the last thing the bullet touches, so damage there ruins accuracy.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 340, origin: [40, 120], scale: 13.5 });
+      const o = [0, 0, 0], L = 21, Rb = 1.9, Ro = 3.1, pitch = 8;
+      helix3(s, add3(o, H, 2), H, 16, Rb, pitch, { color: C.coral, width: 3, opacity: 0.3, phase: Math.PI }, 'back');
+      helix3(s, add3(o, H, 2), H, 16, Rb, pitch, { color: '#d6343a', width: 3, opacity: 0.35 }, 'back');
+      lathe3(s, o, H, [[0, Ro], [L, Ro * 0.94]], { color: C.steel, opacity: 0.3, segments: 22 });
+      helix3(s, add3(o, H, 2), H, 16, Rb, pitch, { color: C.coral, width: 2.6, opacity: 0.6, phase: Math.PI }, 'front');
+      helix3(s, add3(o, H, 2), H, 16, Rb, pitch, { color: '#d6343a', width: 4 }, 'front');
+      const [e1] = basis(H);
+      [0, 1, 2].forEach((k) => s.sphere(...add3(add3(o, H, 2 + k * pitch), e1, Rb), 0.32, { color: '#d6343a', rings: 4, segments: 8 }));
+      const dz = -Ro - 1.4;
+      s.line([along(o, H, 2, dz), along(o, H, 2 + 2 * pitch, dz)], { color: C.ink, width: 1.8 });
+      [2, 2 + pitch, 2 + 2 * pitch].forEach((u) => s.line([along(o, H, u, dz - 0.5), along(o, H, u, dz + 0.5)], { color: C.ink, width: 1.8 }));
+      s.text3(along(o, H, 2 + pitch / 2, dz - 1.3), '8 in = 1 full turn', { size: 13, weight: 800, anchor: 'middle', color: 'var(--illus-ink)' });
+      s.text3(along(o, H, 2 + pitch * 1.5, dz - 1.3), '8 in = next turn', { size: 12, weight: 600, anchor: 'middle', color: C.slate });
+      s.text3(along(o, H, 0, Ro + 1.6), 'Twist 1:8', { size: 18, weight: 800, color: C.coral });
+      // the muzzle end-on: a slice standing on its own (its +x face looks at us)
+      const cx = 35, cy = -12, cz = 4.4, R = 4.2, rb = 1.3, rg = 1.65, n = 6;
+      s.shadow(cx - 1.4, cy - R, 3, R * 2);
+      s.lathe(cx - 1.8, cy, cz, [[0, R], [1.8, R]], { axis: 'x', color: C.steel, segments: 28 });
+      const ring = [];
+      for (let i = 0; i < n * 2; i++) {
+        const a0 = i / (n * 2) * TAU, a1 = (i + 1) / (n * 2) * TAU, rr = i % 2 ? rb : rg;
+        for (let j = 0; j <= 3; j++) { const a = a0 + (a1 - a0) * j / 3; ring.push([cx, cy + rr * Math.cos(a), cz + rr * Math.sin(a)]); }
+      }
+      s.disc(cx, cy, cz, R * 0.8, { plane: 'yz', fill: ISO.shade(C.steel, 0.25), stroke: ISO.shade(C.steel, -0.25), width: 1.4 });
+      s.poly(ring, { fill: C.ink, stroke: C.gunmetal, width: 1 });
+      const ang = (k) => TAU * k / 12;
+      s.label([cx, cy + rb * Math.cos(ang(1.5)), cz + rb * Math.sin(ang(1.5))], 'Land (ridge)', { dx: 60, dy: -46, n: 1, color: C.slate });
+      s.label([cx, cy + rg * Math.cos(ang(6.5)), cz + rg * Math.sin(ang(6.5))], 'Groove (channel)', { dx: 60, dy: 56, n: 2, color: C.slate });
+      s.label([cx, cy - R * 0.9, cz + 1.4], 'Crown: protect it', { dx: -40, dy: -60, n: 3, color: C.coral });
+      s.text3([cx, cy, cz - R], 'Muzzle, end-on', { size: 13, weight: 700, anchor: 'middle', dy: 24 });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('barrels', {
+    at: 'after:table',
+    caption: '<b>A longer barrel buys velocity, slowly.</b> The gas keeps pushing as long as the bullet is still in the bore — typically ~15–35 fps per extra inch (≈25 shown). A heavier contour adds no speed, but it stays steadier and heats up more slowly.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 340, origin: [60, 86], scale: 9.4 });
+      const ax3 = { U: T, W: perp(T) };
+      const rows = [[20, 2600, C.sky], [24, 2700, C.blue], [28, 2800, C.navy]];
+      const bx = 40;
+      rows.forEach(([len, v, col], i) => {
+        const o = rowOff(12.5 * i);
+        const A = (u, z) => along(o, T, u, z);
+        tile(s, o, T, 60, 2.8, 4);
+        obox(s, A(0, 0), 6, 2.6, 3.4, C.gunmetal, ax3);
+        lathe3(s, A(6, 2.2), T, [[0, 0.7], [3, 0.62], [len * 1.05, 0.48]], { color: C.gunmetal, segments: 14 });
+        s.text3(A(6 + len * 0.55, 2.2), len + '" barrel', { size: 13, weight: 800, anchor: 'middle', dy: -13, color: 'var(--illus-ink)' });
+        const bl = (v - 2300) / 25 * 0.5;
+        obox(s, A(bx, 0), bl, 2.4, 1.8, col, ax3);
+        s.text3(A(bx + bl + 0.8, 0.9), v.toLocaleString('en-US') + ' fps', { size: 14, weight: 800, dy: 6 });
+      });
+      s.text3(along([0, 0, 0], T, 0, 6.5), 'Same ammo, three barrel lengths', { size: 15, weight: 800, color: C.blue });
+      s.label(along(rowOff(25), T, 6 + 28 * 1.05, 2.2), '+8 in ≈ +200 fps', { dx: -60, dy: 50, n: '+', color: C.green });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('stocks-triggers', {
+    caption: '<b>Fit puts your eye right behind the scope, every time.</b> Set length of pull so your finger falls naturally on the trigger, then raise the cheek riser until your eye lines up with the scope without lifting your head. The ARCA rail lets bipods and tripods clamp on anywhere.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 360, origin: [52, 214], scale: 11.4 });
+      const W = perp(T);
+      tile(s, [0, 0, 0], T, 50, 3.6, 4);
+      const r = hRifle(s, [0, 0, 0], { U: T, blen: 18 });
+      const A = r.A;
+      obox(s, A(24, r.zb - 0.5), 12, 1.2, 0.5, C.silver, { U: T, W });
+      for (let u = 24.6; u < 36; u += 1.2) s.line([add3(A(u, r.zb - 0.5), W, 0.61), add3(A(u, r.zb), W, 0.61)], { color: C.slate, width: 1 });
+      s.line([A(1.6, r.sz), A(13.4, r.sz)], { color: C.green, width: 2.4, dash: '5 4' });
+      s.sphere(...A(1.2, r.sz), 0.6, { color: C.green, rings: 5, segments: 10 });
+      const lz = -1.4;
+      s.line([A(17.9, lz), A(0.1, lz)], { color: C.blue, width: 2.4, arrow: true, arrowSize: 9 });
+      s.line([A(0.1, lz), A(17.9, lz)], { color: C.blue, width: 2.4, arrow: true, arrowSize: 9 });
+      s.line([A(0.05, lz - 0.5), A(0.05, r.zb - 2)], { color: C.blue, width: 1.2, dash: '3 3' });
+      s.line([A(17.9, lz - 0.5), A(17.9, r.zb - 1.4)], { color: C.blue, width: 1.2, dash: '3 3' });
+      s.text3(A(9, lz), 'Length of pull (LOP)', { size: 13, weight: 800, anchor: 'middle', dy: 18, color: C.blue });
+      s.line([A(9, r.zb + 4.2), A(9, r.zb + 6.2)], { color: C.coral, width: 2.8, arrow: true, arrowSize: 8 });
+      s.line([A(9, r.zb + 4.2), A(9, r.zb + 2.4)], { color: C.coral, width: 2.8, arrow: true, arrowSize: 8 });
+      s.label(A(9, r.zb + 6.2), 'Cheek riser height', { dx: -20, dy: -50, n: 1, color: C.coral });
+      s.label(A(1.2, r.sz + 0.6), 'Eye centred behind the scope', { dx: 130, dy: -60, n: 2, color: C.green });
+      s.label(r.trigger, 'Trigger: clean break, ~1.5–3 lb', { dx: 20, dy: 96, n: 3, color: C.ink });
+      s.label(r.mag, 'Detachable magazine', { dx: 120, dy: 50, n: 4, color: C.slate });
+      s.label(A(31, r.zb - 0.4), 'ARCA rail', { dx: 60, dy: 40, n: 5, color: C.slate });
+      s.label(r.action, 'Rigid action bedding', { dx: 90, dy: -76, n: 6, color: C.blue });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('platforms-by-use', {
+    caption: '<b>Same system, tuned for a different constraint.</b> Hunters carry their rifle all day, so it is light. PRS rifles are heavy for stability and fast spotting. F-Class rifles sit on a front rest and are as heavy as the rules allow. ELR rifles go big in every dimension to reach 1,500+ yd.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 430, origin: [40, 70], scale: 5.6 });
+      const ax3 = { U: T, W: perp(T) };
+      const rows = [
+        ['Hunting', '7–10 lb · light, carried all day', C.green, { sporter: true, stock: C.wood, blen: 22, br: 0.32, scope: 11, scopeR: 0.7, bipod: false, brake: false }],
+        ['Rimfire (NRL22)', '.22 LR trainer · same skills, cheap', C.purple, { stock: C.purple, blen: 18, br: 0.38, scope: 12, brake: false }],
+        ['PRS / NRL', '14–18 lb · chassis, brake, bipod', C.blue, { blen: 24, br: 0.46 }],
+        ['F-Class', 'very heavy · long barrel, front rest', C.amber, { stock: C.sky, blen: 30, br: 0.52, scope: 16, scopeR: 0.95, bipod: false, rest: true, brake: false }],
+        ['ELR', '25+ lb · magnum, 1,500–3,500 yd', C.coral, { stock: C.navy, blen: 31, br: 0.62, scope: 17, scopeR: 1.05 }],
+      ];
+      rows.forEach(([name, sub, col, opt], i) => {
+        const o = rowOff(18 * i);
+        const A = (u, z) => along(o, T, u, z);
+        obox(s, A(-1, 0), 63, 5, 0.9, ISO.shade(col, 0.5), ax3);
+        hRifle(s, [o[0], o[1], 0.9], Object.assign({ U: T }, opt));
+        s.text3(A(64, 2), name, { size: 15, weight: 800, color: col === C.amber ? '#c9861c' : col, dy: -6 });
+        s.text3(A(64, 2), sub, { size: 11.5, weight: 500, dy: 10 });
+      });
       return s.svg();
     },
   });

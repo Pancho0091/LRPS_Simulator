@@ -272,7 +272,7 @@
         const dx = opt.dx != null ? opt.dx : 40, dy = opt.dy != null ? opt.dy : -30;
         const b = [a[0] + dx, a[1] + dy];
         const fs = opt.size || 12;
-        const tw = String(text).length * fs * 0.56 + (opt.n != null ? 22 : 0) + 16;
+        const tw = String(text).length * fs * 0.6 + (opt.n != null ? 22 : 0) + 16;
         const left = dx < 0;
         // keep the pill inside the frame
         const x0 = Math.max(6, Math.min(o.w - tw - 6, left ? b[0] - tw : b[0]));

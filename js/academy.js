@@ -136,6 +136,8 @@
     $('#toc-expand').addEventListener('click', () => $$('.path-mod', $('#ac-main')).forEach((d) => { d.open = true; }));
     $('#toc-collapse').addEventListener('click', () => $$('.path-mod', $('#ac-main')).forEach((d) => { d.open = false; }));
     renderSide();
+    watchFigures();
+    L.enter($('#ac-main'));
     if (!noScroll) $('#tab-academy').scrollIntoView({ block: 'start' });
   }
 
@@ -180,12 +182,30 @@
     renderNav(l, prev, next);
     renderLessonToc();
     renderSide();
+    watchFigures();
+    L.enter($('#ac-main'));
     if (!noScroll) $('#tab-academy').scrollIntoView({ block: 'start' });
   }
 
   // Isometric illustrations registered in js/illus/*.js (ISO.lesson / ISO.module)
   function figureHtml(svg, caption) {
     return `<figure class="illus">${svg}${caption ? `<figcaption>${caption}</figcaption>` : ''}</figure>`;
+  }
+
+  // Figures rise in as they scroll into view (purely cosmetic; skipped under reduced motion)
+  let figObserver = null;
+  function watchFigures() {
+    if (!('IntersectionObserver' in window) || L.reducedMotion()) return;
+    if (!figObserver) {
+      figObserver = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          e.target.classList.add('in');
+          figObserver.unobserve(e.target);
+        });
+      }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+    }
+    $$('#ac-main figure.illus:not(.io)').forEach((f) => { f.classList.add('io'); figObserver.observe(f); });
   }
   function renderFigures(l) {
     const ISO = window.ISO;
