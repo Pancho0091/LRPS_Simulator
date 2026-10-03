@@ -68,7 +68,7 @@
       </div>`;
     }).join('') + `<label class="check ac-review"><input type="checkbox" id="ac-review"${review ? ' checked' : ''}> Review mode (unlock everything)</label>`;
     $('#ac-review').addEventListener('change', (e) => { review = e.target.checked; L.store.set('academy.review', review); renderSide(); if (view === 'map') showMap(true); });
-    $('#ac-select').innerHTML = '<option value="map">Table of contents</option>' + MODULES.map((m) =>
+    $('#ac-select').innerHTML = '<option value="map">Table of contents</option>' + `<option value="review">${review ? '☑' : '☐'} Review mode (unlock everything)</option>` + MODULES.map((m) =>
       `<optgroup label="${m.reference ? '★' : num(m)} · ${m.title}">${m.lessons.map((l) =>
         `<option value="${l.id}"${l.id === view ? ' selected' : ''}${isUnlocked(l) ? '' : ' disabled'}>${done[l.id] ? '✓ ' : isUnlocked(l) ? '' : '🔒 '}${code(l)} ${l.title}</option>`).join('')}</optgroup>`).join('');
   }
@@ -79,7 +79,10 @@
     const mb = e.target.closest('[data-mod]');
     if (mb && !mb.disabled) openModule(mb.dataset.mod);
   });
-  $('#ac-select').addEventListener('change', (e) => (e.target.value === 'map' ? showMap() : open(e.target.value)));
+  $('#ac-select').addEventListener('change', (e) => {
+    if (e.target.value === 'review') { review = !review; L.store.set('academy.review', review); renderSide(); if (view === 'map') showMap(true); return; }
+    e.target.value === 'map' ? showMap() : open(e.target.value);
+  });
 
   function openModule(id) {
     const m = MODULES.find((x) => x.id === id);

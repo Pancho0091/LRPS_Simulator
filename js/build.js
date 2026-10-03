@@ -32,7 +32,11 @@
   }
 
   function valid(p) {
-    return p.muzzleVelocityFps > 500 && p.bc > 0.05 && p.zeroYards > 0 && p.clickSize > 0 &&
+    const within = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
+    return within(p.muzzleVelocityFps, 500, 5000) && within(p.bc, 0.05, 2) && within(p.zeroYards, 25, 1000) && p.clickSize > 0 &&
+      within(p.sightHeightIn, 0.5, 5) && within(p.tempF, -60, 140) && within(p.altitudeFt, -1000, 15000) &&
+      (p.mvTempF == null || p.mvTempF === '' || within(+p.mvTempF, -60, 140)) &&
+      within(p.bulletWeightGr, 10, 1000) && (!p.bulletDiameterIn || within(p.bulletDiameterIn, 0.1, 1)) && (!p.bulletLengthIn || within(p.bulletLengthIn, 0.2, 4)) &&
       p.rangeEnd > p.rangeStart && p.rangeStart <= 2500 && p.rangeStep > 0 && L.rangeList(p).length > 0;
   }
 
@@ -81,6 +85,8 @@
     timer = setTimeout(() => {
       const p = readForm();
       if (!valid(p)) return;
+      const preset = L.PRESETS[presetSel.value];
+      if (preset && Object.keys(preset).some((k) => k !== 'name' && String(preset[k]) !== String(p[k]))) presetSel.value = '';
       L.setProfile(p);
     }, 150);
   });

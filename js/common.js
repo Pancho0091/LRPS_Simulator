@@ -226,6 +226,8 @@
   // ------------------------------------------------------------ toasts
 
   L.toast = (msg, kind) => {
+    const dup = $$('#toasts .toast').find((t) => t.textContent === msg);
+    if (dup) { dup.remove(); }
     const el = document.createElement('div');
     el.className = 'toast ' + (kind || '');
     el.textContent = msg;
@@ -559,9 +561,10 @@
       const b = e.target.closest('button');
       if (!b) return;
       if (!b.classList.contains('on')) L.sfx.click();
-      $$('button', el).forEach((x) => x.classList.toggle('on', x === b));
+      $$('button', el).forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); });
       onChange(b.dataset.v);
     });
+    $$('button', el).forEach((x) => x.setAttribute('aria-pressed', x.classList.contains('on')));
     return () => $('button.on', el).dataset.v;
   };
 

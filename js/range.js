@@ -216,7 +216,8 @@
     if (!S.world) S.world = RANGE.newWorld(S.setup, S.toggles);
     S.world.start = performance.now();
     S.rifle = RANGE.newRifle(S.setup, S.toggles);
-    S.rifle.setup = Object.assign({}, S.setup); // the rifle keeps the zero distance it was zeroed at
+    S.rifle.setup = Object.assign({}, S.setup);
+    S.zoomIdx = Math.min(S.zoomIdx, S.rifle.optic.zooms.length - 1); renderZoom(); // the rifle keeps the zero distance it was zeroed at
     S.log = []; S.shotNo = 0; S.lrfBad = 0;
     S.chrono = { shots: [] };
     S.session = { shots: 0, hits: 0, targets: 0, firstHits: 0, streak: 0, byRange: {} };
@@ -981,9 +982,9 @@
     $('#scope-zoom').innerHTML = zooms.map((z, i) => `<button type="button" class="${i === S.zoomIdx ? 'on' : ''}" data-z="${i}">${z}×</button>`).join('');
     $$('#scope-zoom button').forEach((b) => b.addEventListener('click', () => { S.zoomIdx = +b.dataset.z; renderZoom(); L.sfx.click(); }));
   }
-  function cycleZoom() {
+  function cycleZoom(dir = 1) {
     const n = (S.rifle ? S.rifle.optic : RANGE.optic(S.setup.optic)).zooms.length;
-    S.zoomIdx = (S.zoomIdx + 1) % n;
+    S.zoomIdx = (S.zoomIdx + dir + n) % n;
     renderZoom(); L.sfx.click();
   }
 
@@ -1055,6 +1056,7 @@
       if (e.target.dataset.toggle) { readToggles(); $$('#range-preset button').forEach((b) => b.classList.remove('on')); S.setup.preset = 'custom'; }
       readSetupForm();
       renderSetupSummary();
+      if (!S.rifle && id === 'rig-optic') { S.zoomIdx = Math.min(S.zoomIdx, RANGE.optic(S.setup.optic).zooms.length - 1); renderZoom(); }
       if (S.rifle) {
         // A session is running: the day stays the same; toggles apply to the next shot
         if (e.target.dataset.toggle) {
@@ -1101,24 +1103,25 @@
       if (L.currentTab !== 'range' || e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = (e.target.tagName || '').toUpperCase();
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
-        if (e.key === 'Enter' && e.target.closest('.turret')) { e.target.dispatchEvent(new Event('change')); fire(); }
+        if (e.key === 'Enter' && e.target.closest('.turret')) { e.target.dispatchEvent(new Event('change')); e.target.blur(); fire(); }
         return;
       }
       if (S.step === 'setup' || S.step === 'debrief') return;
       const k = e.key;
       if (tag === 'SUMMARY') return; // disclosure widgets keep Space/Enter
-      if (tag === 'BUTTON' && k === 'Enter') return;
+      if (tag === 'BUTTON' && (k === 'Enter' || k === ' ')) return; // focused buttons keep their activation keys
       const mult = e.shiftKey ? 5 : 1;
       if (k === 'ArrowUp') nudge('elev', mult);
       else if (k === 'ArrowDown') nudge('elev', -mult);
       else if (k === 'ArrowRight') nudge('wind', mult);
       else if (k === 'ArrowLeft') nudge('wind', -mult);
-      else if (k === ' ' || k === 'Enter' || k === 'f' || k === 'F') { if (tag === 'BUTTON') e.target.blur(); fire(); }
+      else if (k === ' ' || k === 'Enter' || k === 'f' || k === 'F') fire();
       else if (k === 'b' || k === 'B') { if (!e.repeat) holdBreath(); }
       else if (k === 'l' || k === 'L') level();
       else if (k === 'n' || k === 'N') nextTarget();
       else if (k === 'r' || k === 'R') lase();
-      else if (k === 'z' || k === 'Z' || k === '+' || k === '=' || k === '-') cycleZoom();
+      else if (k === 'z' || k === 'Z' || k === '+' || k === '=') cycleZoom(1);
+      else if (k === '-' || k === '_') cycleZoom(-1);
       else if (k === '0') { setDial('elev', 0); setDial('wind', 0); }
       else return;
       e.preventDefault();

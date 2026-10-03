@@ -8,6 +8,7 @@
   --text: #121814;
   --muted: #5f6b63;
   --accent: #d97706;
+  --accent-ink: #9a4700; /* accent for small text: 5.5:1 on --bg */
   --accent-soft: rgba(217, 119, 6, 0.12);
   --accent-text: #ffffff;
   --accent-2: #0f8a5f;
@@ -56,6 +57,7 @@
     --text: #e7ece9;
     --muted: #8b9890;
     --accent: #f59e0b;
+    --accent-ink: #f59e0b;
     --accent-soft: rgba(245, 158, 11, 0.14);
     --accent-text: #1a1204;
     --accent-2: #34d399;
@@ -88,6 +90,7 @@
   --text: #e7ece9;
   --muted: #8b9890;
   --accent: #f59e0b;
+  --accent-ink: #f59e0b;
   --accent-soft: rgba(245, 158, 11, 0.14);
   --accent-text: #1a1204;
   --accent-2: #34d399;
@@ -342,7 +345,7 @@ main[data-dir="back"] .panel { animation-name: panel-in-back; }
 
 .page-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
 .page-head p { color: var(--muted); max-width: 680px; margin: 0; font-size: 15.5px; line-height: 1.6; text-wrap: pretty; }
-.eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 8px; }
 
 .card {
   background: var(--surface);

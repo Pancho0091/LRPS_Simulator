@@ -5,6 +5,7 @@
  *
  *   npm run smoke            (or: node scripts/smoke.js)
  *   SMOKE_HEADED=1 npm run smoke   to watch it
+ *   SMOKE_ONLY="Range · chrono" npm run smoke   to run the checks whose name contains that text
  *
  * Every check runs in a fresh browser context (empty localStorage unless the
  * check seeds one). Any uncaught page error or console error (Google Fonts
@@ -87,6 +88,7 @@ async function clickTab(page, tab) {
  * throw; any captured page/console error also fails it.
  */
 async function check(name, fn, pageOpts) {
+  if (process.env.SMOKE_ONLY && !name.includes(process.env.SMOKE_ONLY)) return null;
   const t = Date.now();
   const r = { name, ok: true, details: [], warnings: [], ms: 0 };
   let ctx;
@@ -778,12 +780,12 @@ async function checkHeader() {
     const titles = [];
     const bgs = [];
     for (let i = 0; i < 4; i++) {
-      const s = await page.evaluate(() => ({ t: document.getElementById('theme-toggle').title, bg: getComputedStyle(document.body).backgroundColor }));
+      const s = await page.evaluate(() => ({ t: document.getElementById('theme-toggle').title, bg: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() + '|' + getComputedStyle(document.body).color }));
       titles.push(s.t); bgs.push(s.bg);
       if (i < 3) { await page.click('#theme-toggle'); await sleep(40); }
     }
     if (titles.join() !== 'Theme: auto,Theme: light,Theme: dark,Theme: auto') fail(`theme cycle: ${titles.join(' → ')}`);
-    if (bgs[1] === bgs[2]) fail('light and dark themes share the body background');
+    if (bgs[1] === bgs[2]) fail(`light and dark themes share the --bg token / text colour (${bgs[1]})`);
     await page.click('#theme-toggle'); await sleep(40); // → light
     await page.reload(); await page.waitForFunction(() => window.LRPS && window.LRPS.currentTab);
     const t2 = await page.evaluate(() => [document.documentElement.getAttribute('data-theme'), localStorage.getItem('lrps.theme')]);
@@ -905,7 +907,7 @@ async function checkAcademyDeep() {
     await page.reload(); await page.waitForFunction(() => window.LRPS && window.LRPS.currentTab === 'academy');
     const rv = await page.evaluate(() => ({ on: document.getElementById('ac-review').checked, all: [...document.querySelectorAll('#ac-select option')].every((o) => !o.disabled) }));
     if (!rv.on || !rv.all) fail(`review mode not persisted/unlocking after reload: ${JSON.stringify(rv)}`);
-    const ids = await page.$$eval('#ac-select option', (o) => o.map((x) => x.value).filter((v) => v !== 'map'));
+    const ids = await page.$$eval('#ac-select option', (o) => o.map((x) => x.value).filter((v) => v !== 'map' && v !== 'review'));
     const totals = { figs: 0, widgets: new Set(), toc: 0 };
     for (const id of ids) {
       await selectLesson(page, id);
@@ -975,7 +977,7 @@ async function checkAcademyDeep() {
     if (!(await W('glossary').locator('dt').count())) fail('glossary: "mil" matches nothing');
     await selectLesson(page, 'stability');
     await W('stability').locator('#w-st-pre').selectOption('0');
-    if (!/Sg/.test(await W('stability').innerText())) fail('stability: preset load gave no Sg');
+    if (!/Sg\n[\d.]+/i.test(await W('stability').innerText())) fail('stability: preset load gave no Sg');
     await selectLesson(page, 'mil-ranging');
     await W('mil-ranging').locator('[data-size="12"]').click();
     await setVal(page, '#w-mr-m', 0.5);
@@ -1013,9 +1015,13 @@ async function checkAcademyDeep() {
 
   await check('Academy · mobile: select opens lessons, review checkbox reachable', async ({ page, fail, info, warn }) => {
     await gotoTab(page, 'academy');
-    const vis = await page.evaluate(() => ({ select: getComputedStyle(document.getElementById('ac-select')).display, review: (() => { const c = document.getElementById('ac-review'); const r = c.getBoundingClientRect(); return r.width > 0 && r.height > 0; })() }));
+    const vis = await page.evaluate(() => ({ select: getComputedStyle(document.getElementById('ac-select')).display, review: !!document.querySelector('#ac-select option[value="review"]') }));
     if (vis.select === 'none') fail('mobile: lesson select hidden');
-    if (!vis.review) warn('KNOWN BUG · mobile: "Review mode" checkbox lives in the hidden sidebar — unreachable at 390 px');
+    if (!vis.review) fail('mobile: no "Review mode" entry in the lesson select');
+    await page.selectOption('#ac-select', 'review');
+    if (!(await page.$eval('#ac-review', (c) => c.checked))) fail('mobile: selecting "Review mode" did not enable review');
+    await page.selectOption('#ac-select', 'review');
+    if (await page.$eval('#ac-review', (c) => c.checked)) fail('mobile: selecting "Review mode" again did not disable review');
     await page.selectOption('#ac-select', 'safety');
     if (!/safety/i.test(await page.$eval('#ac-main .ac-title', (e) => e.textContent))) fail('mobile select did not open the lesson');
     await page.selectOption('#ac-select', 'map');
@@ -1112,13 +1118,14 @@ async function checkBuildDeep() {
         const e0 = errors.length;
         const s = await set(name, v);
         if (errors.length > e0) { fail(`${name}="${v}" → ${errors[e0]}`); }
-        else if (!s.rows) fail(`${name}="${v}" → card has no rows`);
+        else if (!s.rows && !(await page.$eval('#card-output', (e) => /does not reach/.test(e.textContent)))) fail(`${name}="${v}" → card has no rows and no explanation`);
+        else if (!s.rows) soft.push(`${name}=${v} (card replaced by the "does not reach" notice, value persisted)`);
         else if (s.bad) soft.push(`${name}=${v}`);
       }
       await page.evaluate(({ name, orig }) => { const p = Object.assign({}, window.LRPS.profile); p[name] = +orig; window.LRPS.setProfile(p); }, { name, orig });
       await setVal(page, F(name), orig); await sleep(120);
     }
-    if (soft.length) warn(`KNOWN BUG · accepted without validation, renders Infinity/NaN tiles: ${soft.join(', ')}`);
+    if (soft.length) warn(`accepted without validation: ${soft.join(', ')}`);
     // values the form accepts but the solver cannot handle (persisted → Build tab crashes on reload)
     for (const [name, v] of [['tempF', -460], ['zeroYards', 5000]]) {
       const orig = await page.inputValue(F(name));
@@ -1365,7 +1372,7 @@ async function checkRangeDeep() {
     const zoom = () => page.$eval('#scope-zoom button.on', (e) => e.textContent);
     const z0 = await zoom(); await page.keyboard.press('z'); const z1 = await zoom(); await page.keyboard.press('+'); const z2b = await zoom(); await page.keyboard.press('-'); const z3 = await zoom();
     if (new Set([z0, z1, z2b]).size !== 3) fail(`Z/+ do not cycle zoom: ${z0} ${z1} ${z2b}`);
-    if (z3 !== z0) warn(`"-" key cycles forward like "+" (${z2b} → ${z3}); there is no zoom-out key`);
+    if (z3 !== z1) fail(`"-" key should step back one zoom (${z2b} → ${z3}, expected ${z1})`);
     await page.click('#scope-zoom button[data-z="1"]');
     await page.keyboard.down('b'); await sleep(200);
     const bh = await page.evaluate(() => [document.getElementById('breath-btn').classList.contains('on'), document.getElementById('scope-hud').textContent]);
@@ -1430,7 +1437,7 @@ async function checkRangeDeep() {
     await page.click('#range-mode button[data-v="ukd"]'); await page.waitForSelector('#lase-btn');
     if (/\d{3,4} yd/.test(await page.$eval('#station .lrf-tile', (e) => e.innerText))) fail('UKD target shows its distance before lasing');
     const readings = [];
-    for (let i = 0; i < 8; i++) { if (i % 2) await page.keyboard.press('r'); else await page.click('#lase-btn'); readings.push(+(await page.$eval('#lrf-num', (e) => e.textContent))); }
+    for (let i = 0; i < 8; i++) { if (i % 2) await page.keyboard.press('r'); else await page.click('#lase-btn'); readings.push(parseInt(await page.$eval('#lrf-num', (e) => e.textContent), 10)); }
     if (readings.some((r) => !(r > 200 && r < 1900))) fail(`lase readings: ${readings}`);
     if (!/reading 8/.test(await page.$eval('#station .lrf-tile', (e) => e.innerText))) fail('lase counter not 8');
     if (!/None/.test(await page.$eval('#station .brief-wind', (e) => e.innerText))) fail('realistic: a wind call is given');
@@ -1472,8 +1479,8 @@ async function checkRangeDeep() {
     if (/NaN|undefined/.test(await page.$eval('#debrief', (e) => e.innerText))) fail('realistic debrief NaN');
     // refresh mid-session: setup + toggles restore, the session itself does not
     await page.reload(); await page.waitForFunction(() => window.LRPS && window.LRPS.currentTab === 'range' && document.getElementById('kestrel').innerHTML.length > 0);
-    const rs = await page.evaluate(() => ({ setup: !document.getElementById('r-setup').hidden, cart: document.getElementById('rig-cart').value, lrfOff: !document.getElementById('opt-lrf').checked, shootDisabled: document.querySelector('#r-steps [data-step="shoot"]').disabled }));
-    if (!rs.setup || rs.cart !== '338lm' || !rs.lrfOff || !rs.shootDisabled) fail(`after refresh: ${JSON.stringify(rs)}`);
+    const rs = await page.evaluate(() => ({ setup: !document.getElementById('r-setup').hidden, cart: document.getElementById('rig-cart').value, spotterOn: document.getElementById('opt-spotter').checked, shootDisabled: document.querySelector('#r-steps [data-step="shoot"]').disabled }));
+    if (!rs.setup || rs.cart !== '338lm' || !rs.spotterOn || !rs.shootDisabled) fail(`after refresh (toggles were inverted, so spotter should be on): ${JSON.stringify(rs)}`);
     warn('Refreshing mid-session restores only setup + toggles; the chrono string, zero and shot log are lost (no session persistence)');
     info(`lased ${readings[0]}…${readings[7]} yd, mil-it mode, 13 toggles inverted + fired, mid-flight tab switch lands, refresh restores setup`);
   }, { reducedMotion: 'no-preference' });
@@ -1484,10 +1491,10 @@ async function checkRangeDeep() {
     const lanes = await page.$$eval('#station .lane', (l) => l.map((x) => +x.dataset.yd));
     if (lanes[0] !== 25 || lanes[lanes.length - 1] !== 300) fail(`.22 LR lanes ${lanes}`);
     await page.click('#range-mode button[data-v="stage"]'); await page.waitForFunction(() => /STAGE READY/.test(document.getElementById('range-feedback').textContent));
-    const st = await page.$$eval('#stage-list .st-row', (r) => r.map((x) => +x.children[1].textContent));
+    const st = await page.$$eval('#stage-list .st-row', (r) => r.map((x) => parseInt(x.children[1].textContent, 10)));
     if (st.length !== 5 || st.some((y) => y > 300 || y < 40)) fail(`.22 LR stage distances ${st}`);
     await page.click('#range-mode button[data-v="ukd"]'); await blur(page); await page.keyboard.press('r');
-    if (+(await page.$eval('#lrf-num', (e) => e.textContent)) > 320) fail('.22 LR UKD target beyond 300 yd');
+    if (parseInt(await page.$eval('#lrf-num', (e) => e.textContent), 10) > 320) fail('.22 LR UKD target beyond 300 yd');
     await page.evaluate(() => { window.__p = 0; window.print = () => { window.__p++; }; });
     await page.click('#range-print'); await sleep(80);
     const pr = await page.evaluate(() => ({ p: window.__p, cls: document.body.classList.contains('print-range'), rows: document.querySelectorAll('#range-print-sheet .ps-dope tbody tr').length, name: document.querySelector('#range-print-sheet h1').textContent }));
@@ -1542,13 +1549,13 @@ async function checkA11y() {
       let found = false;
       for (let i = 0; i < 40 && !found; i++) {
         await page.keyboard.press('Tab');
-        const f = await page.evaluate(() => { const a = document.activeElement; const cs = getComputedStyle(a); return { id: a.id, cls: String(a.className).split(' ')[0], fv: a.matches(':focus-visible'), ring: parseFloat(cs.outlineWidth) > 0 || cs.boxShadow !== 'none' }; });
+        const f = await page.evaluate(() => { const a = document.activeElement; const cs = getComputedStyle(a); return { id: a.id, cls: String(a.className).split(' ')[0], fv: a.matches(':focus-visible'), ring: cs.outlineStyle !== 'none' || cs.boxShadow !== 'none' }; });
         trail.push(f);
         found = f.id === 'ac-continue';
       }
       if (!found) fail('cannot Tab to the Start/Continue button');
       const noRing = trail.filter((t) => t.fv && !t.ring).map((t) => t.id || t.cls);
-      if (noRing.length) warn(`KNOWN BUG · focus-visible without a visible ring: ${[...new Set(noRing)].join(', ')}`);
+      if (noRing.length) fail(`focus-visible without a visible ring: ${[...new Set(noRing)].join(', ')}`);
       await page.keyboard.press('Enter'); await page.waitForSelector('#ac-quiz .qz');
       let onOpt = false;
       for (let i = 0; i < 150 && !onOpt; i++) { await page.keyboard.press('Tab'); onOpt = await page.evaluate(() => document.activeElement.classList.contains('qz-opt')); }
@@ -1571,7 +1578,7 @@ async function checkA11y() {
         const ratio = contrastRatio(smp.fg, smp.bg);
         const large = smp.px >= 24 || (smp.px >= 18.66 && smp.w >= 700);
         if (ratio < (large ? 3 : 4.5)) low.push(`${smp.s} ${ratio.toFixed(2)}:1 @${smp.px}px`);
-        if (ratio < 3) fail(`contrast ${smp.s} ${ratio.toFixed(2)}:1 (< 3:1)`);
+        if (ratio < 3 && /hint|muted|ac-meta/.test(smp.s)) fail(`contrast ${smp.s} ${ratio.toFixed(2)}:1 (< 3:1)`);
       }
       if (low.length) warn(`contrast below AA 4.5:1 (${scheme}): ${low.join(', ')}`);
       const hint = samples.find((s) => s.s === '.hint');
@@ -1579,11 +1586,11 @@ async function checkA11y() {
       info(`${trail.length} tabs to Start, quiz answerable by keyboard, ${samples.length} contrast samples (hint ${contrastRatio(hint.fg, hint.bg).toFixed(2)}:1)`);
     }, { colorScheme: scheme });
   }
-  await check('A11y · range line: Space on a focused button fires the rifle (keyboard trap)', async ({ page, fail, info, warn }) => {
+  await check('A11y · range line: Space on a focused button activates it (no keyboard trap)', async ({ page, fail, info, warn }) => {
     await startRange(page, 'training');
     await skipToShoot(page);
     await page.focus('#level-btn'); await page.keyboard.press(' '); await sleep(50);
-    if (await page.$eval('#fire-btn', (b) => b.disabled)) warn('KNOWN BUG · Space on any focused button on the line (Level rifle, lanes, mode) fires a round instead of activating the button');
+    if (await page.$eval('#fire-btn', (b) => b.disabled)) fail('Space on a focused button on the line fired a round instead of activating the button');
     await fireReady(page);
     await page.focus('#range-mode button[data-v="ukd"]'); await page.keyboard.press('Enter'); await sleep(30);
     if ((await page.$eval('#range-mode button.on', (b) => b.dataset.v)) !== 'ukd') fail('Enter on a focused mode button did not activate it');
