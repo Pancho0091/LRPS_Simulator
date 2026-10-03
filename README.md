@@ -4,7 +4,7 @@
 
 **Long-range precision shooting academy · ballistic solver · dope card builder · realistic range simulator**
 
-[![Version](https://img.shields.io/badge/version-v2.1.0-f59e0b?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
+[![Version](https://img.shields.io/badge/version-v2.2.0-f59e0b?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
 [![Updated](https://img.shields.io/badge/last%20updated-2026--10--03-6b7280?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
 [![Live](https://img.shields.io/badge/live-pancho0091.github.io%2FLRPS__Simulator-4ade80?style=for-the-badge&labelColor=0a0e0c)](https://pancho0091.github.io/LRPS_Simulator/)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-auto--deploy-222222?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Pancho0091/LRPS_Simulator/actions/workflows/pages.yml)
@@ -19,22 +19,28 @@
 
 ## Overview
 
-A browser-based trainer for learning to **write and use dope cards** for long-range precision shooting. A real
+A browser-based trainer for learning to **write and use dope cards** for long-range precision shooting — starting
+from zero. The Academy is a **beginner-first, linear course**: safety and vocabulary first, then rifles, ammunition
+and calibers, and only then ballistics, optics and card writing. A real
 point-mass ballistic solver sits underneath every screen, so the numbers you practise with are the numbers a
 field solver would give you. The app is built around one idea: a dope card is a **precomputed lookup table**,
 `f(range, conditions) → (elevation, wind)`, and you learn it best by building one and then shooting with it.
 
 ```
 Academy  ──▶  Lab  ──▶  Build Card  ──▶  Drills  ──▶  Range
- 33 lessons    sliders    your rifle        write it      shoot it in
- quizzes       predict    system + card     by hand       real conditions
- calculators   reveal     print / CSV       graded        training → realistic
+ 13 modules    sliders    your rifle        write it      shoot it in
+ 57 lessons    predict    system + card     by hand       real conditions
+ pass to       reveal     print / CSV       graded        training → realistic
+ unlock next
+
+00 Safety ─▶ 01 Terms ─▶ 02 History ─▶ 03 Platforms ─▶ 04 Ammo ─▶ 05 Bullet types ─▶ 06 Calibers
+   ─▶ 07 Ballistics ─▶ 08 Optics ─▶ 09 Equipment ─▶ 10 Positions ─▶ 11 Dope cards ─▶ 12 Field craft
 ```
 
 Everything is in **MIL** — reticle, turrets (0.1 mil clicks), card, spotter calls.
 
 Static site, no build step, no dependencies. Every push to the deploy branch runs the solver tests and
-republishes to GitHub Pages. Progress (XP, rank), your card and preferences live in the browser's localStorage.
+republishes to GitHub Pages. Course progress, XP and rank, your card and preferences live in the browser's localStorage.
 
 ---
 
@@ -49,7 +55,7 @@ republishes to GitHub Pages. Progress (XP, rank), your card and preferences live
 | **Audio** | Web Audio API | Synthesized shot, steel ding, turret clicks — no audio files |
 | **Styling** | CSS custom properties | Light / dark themes, Inter + JetBrains Mono |
 | **Hosting** | GitHub Pages via Actions | `.github/workflows/pages.yml`, deploys only if tests pass |
-| **Testing** | `node:test` | 17 physics checks: zero, wind linearity, DA, angle, stability, Coriolis direction, aero jump sign, temp sensitivity |
+| **Testing** | `node:test` + Playwright | 17 physics checks: zero, wind linearity, DA, angle, stability, Coriolis direction, aero jump sign, temp sensitivity · browser smoke test (`npm run smoke`) |
 
 ---
 
@@ -57,12 +63,39 @@ republishes to GitHub Pages. Progress (XP, rank), your card and preferences live
 
 ### Academy — Step 0
 
-- **33 lessons in 7 chapters**: ballistics foundations · optics & the milliradian · writing a dope card · gear · cartridges & ammunition · field craft · glossary
-- Every lesson leads with the **governing rule**, then tables, the **exceptions** and *why* they happen, then a way to verify it in the app
+A beginner-first, **linear course**: each module builds on the one before it.
+
+- **13 modules · 57 lessons**, numbered `00`–`12` (lessons as `03.2`), plus an always-open **★ Glossary** reference
+- **Unlock in order** — a perfect quiz score unlocks the next lesson; finishing a module unlocks the next module
+- **Review mode** toggle unlocks everything; progress is saved in the browser
+- **Course map** lists every module and lesson with status — completed · in progress · ready · locked
+- **Ammo and calibers before ballistics**, on purpose: drag, BC and stability only make sense once you know what a bullet is
+
+| # | Module | Lessons |
+|---|---|---|
+| 00 | Safety & first principles | 4 |
+| 01 | Terminology & units | 3 |
+| 02 | History: how we got here | 3 |
+| 03 | Weapon platforms | 4 |
+| 04 | Ammunition fundamentals | 3 |
+| 05 | Ammo & bullet types | 5 |
+| 06 | Calibers & cartridges | 4 |
+| 07 | Ballistics | 8 |
+| 08 | Optics & the MIL | 5 |
+| 09 | Equipment | 4 |
+| 10 | Shooting positions & fundamentals | 4 |
+| 11 | Writing a dope card | 6 |
+| 12 | Field craft | 4 |
+| ★ | Glossary | reference |
+
+**Every lesson** shows what it builds on, key-term chips and an "In this lesson" contents box, then leads with the
+**governing rule** → tables → variables and **exceptions** (and *why*) → a technical analog → a way to verify it in
+the app, and closes with a **"What you now know"** recap and a quiz.
+
+- **Interactive widgets**: clickable rifle anatomy diagram, cartridge cutaway, firing-sequence stepper (a state machine), flip flashcards (vocabulary and abbreviations decks), history timelines
 - **11 live calculators** on the real solver — G1 vs G7 drag curves, density altitude, wind clock, Coriolis, Miller stability, unit converter, reticle ranging, card anatomy, cartridge comparison, SD → vertical dispersion, glossary search
 - **Rifle systems compared**: 8 cartridges from .223 to .338 Lapua with 1000 yd elevation, wind, velocity, energy, transonic range, Sg, recoil and barrel life
-- **Bullet & ammo types**: OTM, VLD/secant, tangent, hybrid, polymer-tip, monolithic, FMJ, hunting — plus SD/ES, lots, powder temperature and barrel life
-- Quizzes with instant feedback, per-chapter progress, XP
+- Module completion awards **XP and confetti**
 
 ### Lab
 
@@ -99,17 +132,19 @@ republishes to GitHub Pages. Progress (XP, rank), your card and preferences live
 ## Architecture
 
 ```
-index.html            shell, tabs, static content
-css/style.css         design tokens, light/dark themes, components
-js/ballistics.js      solver (UMD — loads in the browser and in Node tests)
-js/common.js          profile store, unit helpers, card math, sound, XP, toasts, SVG chart
-js/academy-content.js Academy curriculum (lessons, quizzes, glossary)
-js/academy.js         Academy tab: navigation, progress, quizzes, interactive widgets
-js/lab.js             Lab tab: sliders, charts, challenges
-js/build.js           Build Card tab
-js/drills.js          Drills tab
-js/range.js           Range tab: weather, wind field, shooter model, stages, canvas rendering
-test/                 node:test suite for the solver
+index.html                shell, tabs, static content
+css/style.css             design tokens, light/dark themes, components
+js/ballistics.js          solver (UMD — loads in the browser and in Node tests)
+js/common.js              profile store, unit helpers, card math, sound, XP, toasts, SVG chart
+js/academy-content.js     Academy lesson bank (lessons, quizzes, glossary)
+js/academy-curriculum.js  linear course: modules, lesson order, flashcard decks
+js/academy.js             Academy tab: course map, unlocking, progress, quizzes, interactive widgets
+js/lab.js                 Lab tab: sliders, charts, challenges
+js/build.js               Build Card tab
+js/drills.js              Drills tab
+js/range.js               Range tab: weather, wind field, shooter model, stages, canvas rendering
+test/                     node:test suite for the solver
+scripts/smoke.js          Playwright browser smoke test
 ```
 
 ### Solver model
@@ -133,6 +168,7 @@ Validated against published numbers: 6.5 Creedmoor 140 gr ELD-M at 2710 fps, sea
 
 | Version | Date | Notes |
 |---|---|---|
+| **v2.2.0** | 2026-10-03 | **Academy rebuilt as a beginner-first linear course**: 13 modules (00 Safety → 12 Field craft) and 57 lessons plus a glossary; perfect quiz score unlocks the next lesson, finished modules unlock the next, review mode unlocks all. Ammo and calibers now come before ballistics. Course map with lesson status, "In this lesson" contents, key-term chips and "What you now know" recaps. New widgets: rifle anatomy, cartridge cutaway, firing-sequence stepper, flashcards, history timelines. Module completion awards XP and confetti. Playwright smoke test (`npm run smoke`) |
 | **v2.1.0** | 2026-10-03 | **Academy**: 33 lessons with quizzes and 11 solver-backed calculators covering ballistics, optics, card writing, gear, cartridges, bullet types and field craft. **Realistic Range**: range-day weather, shot angles, mil-ranging, near/mid/far wind, position sway and breath control, cant and bubble level, self-spotting, PRS stages and a "what changed vs your card" breakdown. Solver adds Miller stability, aerodynamic jump, Coriolis and powder temperature sensitivity. Eight rifle systems. **MIL only** throughout |
 | **v2.0.0** | 2026-10-03 | Full redesign. Learn becomes an interactive **Ballistics Lab** with live charts and predict-then-reveal challenges. Build Card recomputes live with stat tiles and an elevation chart. Drills gain streaks, timer and XP. Range becomes a scope scene with gusting flags, mirage, swinging steel, clickable turrets, real time of flight and a delayed ding. Light/dark themes, XP ranks, synthesized sound |
 | **v1.1.0** | 2026-10-03 | GitHub Pages deploy workflow — tests gate every publish |
@@ -145,6 +181,7 @@ Validated against published numbers: 6.5 Creedmoor 140 gr ELD-M at 2710 fps, sea
 ```sh
 npm start          # python3 -m http.server 8000 → http://localhost:8000
 npm test           # solver unit tests (Node 18+)
+npm run smoke      # Playwright browser smoke test (scripts/smoke.js)
 ```
 
 **Deploying** — push to the deploy branch; `.github/workflows/pages.yml` runs `npm test`, stages `index.html`, `css/` and `js/`, and publishes to GitHub Pages. A failing test blocks the deploy.

@@ -1,65 +1,167 @@
 /*
- * Academy tab: lesson navigation, progress, quizzes, and interactive
- * widgets that run on the real solver (window.LRPS_ACADEMY holds the content).
+ * Academy tab: a linear, module-based course. Lessons unlock in order —
+ * each one builds on the previous — unless review mode is on.
+ * Course structure: window.LRPS_COURSE (academy-curriculum.js), which reuses
+ * lessons from the bank in window.LRPS_ACADEMY (academy-content.js).
  */
 (function () {
   'use strict';
 
   const L = window.LRPS;
   const { B, $, $$ } = L;
-  const CHAPTERS = window.LRPS_ACADEMY;
 
-  const lessons = [];
-  CHAPTERS.forEach((ch, ci) => ch.lessons.forEach((ls, li) => lessons.push(Object.assign({ ch, ci, li }, ls))));
+  // ------------------------------------------------------------ course
+
+  const bank = {};
+  window.LRPS_ACADEMY.forEach((ch) => ch.lessons.forEach((l) => { bank[l.id] = l; }));
+
+  const MODULES = window.LRPS_COURSE.map((m, mi) => {
+    const lessons = m.lessons.map((x) => {
+      const base = x.ref ? bank[x.ref] : {};
+      return Object.assign({}, base, x, { id: x.ref || x.id });
+    });
+    return Object.assign({}, m, { mi, lessons });
+  });
+  const ORDER = [];   // the linear path (reference modules excluded)
+  MODULES.forEach((m) => m.lessons.forEach((l, li) => {
+    l.m = m; l.li = li;
+    if (!m.reference) { l.idx = ORDER.length; ORDER.push(l); }
+  }));
+  const byId = {};
+  MODULES.forEach((m) => m.lessons.forEach((l) => { byId[l.id] = l; }));
 
   let done = L.store.get('academy.done', {});
-  let current = L.store.get('academy.last', lessons[0].id);
-  if (!lessons.some((l) => l.id === current)) current = lessons[0].id;
+  let review = L.store.get('academy.review', false);
+  let view = 'map';
+
+  const isUnlocked = (l) => review || l.m.reference || l.idx === 0 || done[l.id] || done[ORDER[l.idx - 1].id];
+  const modDone = (m) => m.lessons.filter((l) => done[l.id]).length;
+  const modComplete = (m) => modDone(m) === m.lessons.length;
+  const modUnlocked = (m) => m.lessons.some(isUnlocked);
+  const nextLesson = () => ORDER.find((l) => !done[l.id]) || ORDER[ORDER.length - 1];
+  const num = (m) => String(m.mi).padStart(2, '0');
+  const code = (l) => (l.m.reference ? '★' : `${num(l.m)}.${l.li + 1}`);
+  const mins = (m) => m.lessons.reduce((a, l) => a + (l.mins || 0), 0);
+
+  const LOCK = '<svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+  const CHECK = '<svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>';
 
   // ------------------------------------------------------------ sidebar
 
   function renderSide() {
-    const total = lessons.length;
-    const n = lessons.filter((l) => done[l.id]).length;
-    $('#ac-progress').innerHTML = `<div class="ac-prog-top"><b>${n}/${total}</b> lessons · ${Math.round(n / total * 100)}%</div>
+    const total = ORDER.length;
+    const n = ORDER.filter((l) => done[l.id]).length;
+    const cur = view !== 'map' ? byId[view] : null;
+    $('#ac-progress').innerHTML = `
+      <button class="btn block ac-mapbtn${view === 'map' ? ' on' : ''}" id="ac-map">☰ Table of contents</button>
+      <div class="ac-prog-top"><b>${n}/${total}</b> lessons · ${Math.round(n / total * 100)}%</div>
       <div class="xp-bar"><span style="width:${n / total * 100}%"></span></div>`;
-    $('#ac-nav').innerHTML = CHAPTERS.map((ch, ci) => {
-      const chDone = ch.lessons.filter((l) => done[l.id]).length;
-      return `<div class="ac-ch">
-        <div class="ac-ch-title"><span class="num">${String(ci + 1).padStart(2, '0')}</span>${ch.title}<span class="ac-ch-count">${chDone}/${ch.lessons.length}</span></div>
-        ${ch.lessons.map((l) => `<button class="ac-link${l.id === current ? ' on' : ''}${done[l.id] ? ' done' : ''}" data-lesson="${l.id}">
-          <span class="ac-dot"></span>${l.title}</button>`).join('')}
+    $('#ac-map').addEventListener('click', () => showMap());
+    $('#ac-nav').innerHTML = MODULES.map((m) => {
+      const open = cur && cur.m === m;
+      const unlocked = modUnlocked(m);
+      return `<div class="ac-ch${unlocked ? '' : ' locked'}">
+        <button class="ac-ch-title" data-mod="${m.id}"${unlocked ? '' : ' disabled'}><span class="num">${m.reference ? '★' : num(m)}</span>${m.title}
+          <span class="ac-ch-count">${unlocked ? (m.reference ? '' : `${modDone(m)}/${m.lessons.length}`) : LOCK}</span></button>
+        ${open ? m.lessons.map((l) => `<button class="ac-link${l.id === view ? ' on' : ''}${done[l.id] ? ' done' : ''}" data-lesson="${l.id}"${isUnlocked(l) ? '' : ' disabled'}>
+          <span class="ac-dot"></span><span class="ac-code">${code(l)}</span>${l.title}${isUnlocked(l) ? '' : LOCK}</button>`).join('') : ''}
       </div>`;
-    }).join('');
-    $('#ac-select').innerHTML = lessons.map((l) =>
-      `<option value="${l.id}"${l.id === current ? ' selected' : ''}>${done[l.id] ? '✓ ' : ''}${l.ci + 1}.${l.li + 1} ${l.title}</option>`).join('');
+    }).join('') + `<label class="check ac-review"><input type="checkbox" id="ac-review"${review ? ' checked' : ''}> Review mode (unlock everything)</label>`;
+    $('#ac-review').addEventListener('change', (e) => { review = e.target.checked; L.store.set('academy.review', review); renderSide(); if (view === 'map') showMap(true); });
+    $('#ac-select').innerHTML = '<option value="map">Table of contents</option>' + MODULES.map((m) =>
+      `<optgroup label="${m.reference ? '★' : num(m)} · ${m.title}">${m.lessons.map((l) =>
+        `<option value="${l.id}"${l.id === view ? ' selected' : ''}${isUnlocked(l) ? '' : ' disabled'}>${done[l.id] ? '✓ ' : isUnlocked(l) ? '' : '🔒 '}${code(l)} ${l.title}</option>`).join('')}</optgroup>`).join('');
   }
 
   $('#ac-nav').addEventListener('click', (e) => {
     const b = e.target.closest('[data-lesson]');
-    if (b) open(b.dataset.lesson);
+    if (b && !b.disabled) { open(b.dataset.lesson); return; }
+    const mb = e.target.closest('[data-mod]');
+    if (mb && !mb.disabled) openModule(mb.dataset.mod);
   });
-  $('#ac-select').addEventListener('change', (e) => open(e.target.value));
+  $('#ac-select').addEventListener('change', (e) => (e.target.value === 'map' ? showMap() : open(e.target.value)));
+
+  function openModule(id) {
+    const m = MODULES.find((x) => x.id === id);
+    const target = m.lessons.find((l) => isUnlocked(l) && !done[l.id]) || m.lessons.find(isUnlocked);
+    if (target) open(target.id);
+  }
+
+  // ------------------------------------------------------------ course map
+
+  function showMap(noScroll) {
+    view = 'map';
+    L.store.set('academy.last', 'map');
+    const nx = nextLesson();
+    const started = ORDER.some((l) => done[l.id]);
+    $('#ac-main').innerHTML = `
+      <div class="map-hero">
+        <div><div class="eyebrow">Your path</div><h2 class="ac-title">From first principles to first-round hits</h2>
+        <p class="muted">${ORDER.length} lessons in ${MODULES.filter((m) => !m.reference).length} modules. Each module uses what the previous one taught,
+          so lessons unlock in order: pass a lesson's quiz to open the next.</p></div>
+        <button class="btn primary big" id="ac-continue">${started ? 'Continue' : 'Start'}: ${nx.title} →</button>
+      </div>
+      <div class="toc-tools"><h3>Table of contents</h3>
+        <span><button class="btn" id="toc-expand">Expand all</button> <button class="btn" id="toc-collapse">Collapse all</button></span></div>
+      <div class="path">${MODULES.map((m, k) => {
+        const unlocked = modUnlocked(m);
+        const d = modDone(m);
+        const status = m.reference ? 'Reference' : modComplete(m) ? 'Completed' : !unlocked ? 'Locked' : d ? 'In progress' : 'Ready';
+        const prev = MODULES[k - 1];
+        const openMod = nx.m === m || status === 'In progress';
+        const rows = m.lessons.map((l) => {
+          const ok = isUnlocked(l);
+          const st = done[l.id] ? `<span class="toc-st done">${CHECK}</span>` : !ok ? `<span class="toc-st">${LOCK}</span>` : l === nx ? '<span class="toc-st next">●</span>' : '<span class="toc-st"></span>';
+          return `<button class="toc-row${l === nx ? ' next' : ''}" data-lesson="${l.id}"${ok ? '' : ' disabled'}>
+            <span class="toc-code">${code(l)}</span><span class="toc-title">${l.title}</span>
+            <span class="toc-mins">${l.mins ? l.mins + ' min' : ''}</span>${st}</button>`;
+        }).join('');
+        return `<details class="path-mod ${status.toLowerCase().replace(' ', '-')}"${openMod ? ' open' : ''}>
+          <summary>
+            <span class="path-num">${m.reference ? '★' : modComplete(m) ? CHECK : unlocked ? num(m) : LOCK}</span>
+            <span class="path-body">
+              <span class="path-top"><b>${m.reference ? '' : `Module ${num(m)} · `}${m.title}</b><span class="path-status">${status}</span></span>
+              <span class="path-goal">${m.goal}</span>
+              <span class="path-meta">${m.reference ? 'Always available' : `${m.lessons.length} lessons · ~${mins(m)} min${prev && !prev.reference && k > 0 ? ` · builds on ${num(prev)} ${prev.title}` : ''}`}</span>
+              ${m.reference ? '' : `<span class="path-bar"><span style="width:${d / m.lessons.length * 100}%"></span></span>`}
+            </span>
+          </summary>
+          <div class="toc-list">${rows}</div>
+        </details>`;
+      }).join('')}</div>`;
+    $('#ac-continue').addEventListener('click', () => open(nx.id));
+    $$('.toc-row', $('#ac-main')).forEach((b) => b.addEventListener('click', () => open(b.dataset.lesson)));
+    $('#toc-expand').addEventListener('click', () => $$('.path-mod', $('#ac-main')).forEach((d) => { d.open = true; }));
+    $('#toc-collapse').addEventListener('click', () => $$('.path-mod', $('#ac-main')).forEach((d) => { d.open = false; }));
+    renderSide();
+    if (!noScroll) $('#tab-academy').scrollIntoView({ block: 'start' });
+  }
 
   // ------------------------------------------------------------ lesson
 
   function open(id, noScroll) {
-    current = id;
+    const l = byId[id];
+    if (!l || !isUnlocked(l)) { showMap(noScroll); return; }
+    view = id;
     L.store.set('academy.last', id);
-    const idx = lessons.findIndex((l) => l.id === id);
-    const l = lessons[idx];
-    const prev = lessons[idx - 1], next = lessons[idx + 1];
+    const m = l.m;
+    const prev = l.m.reference ? null : ORDER[l.idx - 1];
+    const next = l.m.reference ? null : ORDER[l.idx + 1];
+    const terms = (l.terms || []).map((t) => `<span class="term">${t}</span>`).join('');
+    const recap = (l.recap || []).map((r) => `<li>${r}</li>`).join('');
     $('#ac-main').innerHTML = `
-      <div class="eyebrow">Chapter ${l.ci + 1} · ${l.ch.title}</div>
-      <h2 class="ac-title">${l.title}</h2>
-      ${l.mins ? `<div class="hint ac-meta">${l.mins} min read${done[l.id] ? ' · <span style="color:var(--good)">completed</span>' : ''}</div>` : ''}
+      <div class="crumb"><a href="#" id="ac-crumb-map">Contents</a> › Module ${m.reference ? '★' : num(m)} · ${m.title} › Lesson ${l.li + 1} of ${m.lessons.length}</div>
+      <h2 class="ac-title"><span class="ac-title-code">${code(l)}</span>${l.title}</h2>
+      <div class="ac-meta hint">${l.mins ? `${l.mins} min read` : ''}${done[l.id] ? ' · <span style="color:var(--good)">completed</span>' : ''}
+        ${prev ? ` · builds on <a href="#" data-open="${prev.id}">${prev.title}</a>` : ''}</div>
+      ${terms ? `<div class="terms"><span class="terms-label">Key terms</span>${terms}</div>` : ''}
+      <nav class="lesson-toc" id="lesson-toc"></nav>
       <div class="ac-body">${l.html}</div>
+      ${recap ? `<div class="recap"><div class="eyebrow" style="margin:0 0 6px">What you now know</div><ul>${recap}</ul></div>` : ''}
       <div id="ac-quiz"></div>
-      <div class="ac-nav-row">
-        ${prev ? `<button class="btn" data-open="${prev.id}">← ${prev.title}</button>` : '<span></span>'}
-        ${next ? `<button class="btn primary" data-open="${next.id}">${next.title} →</button>` : ''}
-      </div>`;
-    // Wide tables scroll inside their own box on small screens
+      <div class="ac-nav-row" id="ac-navrow"></div>`;
+    $('#ac-crumb-map').addEventListener('click', (e) => { e.preventDefault(); showMap(); });
+    $$('.ac-meta [data-open]', $('#ac-main')).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); open(a.dataset.open); }));
     $$('.ac-body table', $('#ac-main')).forEach((t) => {
       if (t.parentElement.classList.contains('table-wrap')) return;
       const w = document.createElement('div');
@@ -67,39 +169,85 @@
       t.replaceWith(w);
       w.appendChild(t);
     });
-    $$('[data-open]', $('#ac-main')).forEach((b) => b.addEventListener('click', () => open(b.dataset.open)));
     $$('[data-widget]', $('#ac-main')).forEach((el) => {
       const w = WIDGETS[el.dataset.widget];
       if (w) w(el);
     });
     renderQuiz(l);
+    renderNav(l, prev, next);
+    renderLessonToc();
     renderSide();
     if (!noScroll) $('#tab-academy').scrollIntoView({ block: 'start' });
+  }
+
+  // "In this lesson": the rule, each section heading, widgets, recap, quiz
+  function renderLessonToc() {
+    const main = $('#ac-main');
+    const items = [];
+    const add = (el, label, kind) => {
+      if (!el) return;
+      el.id = el.id || `sec-${items.length}`;
+      items.push(`<a href="#${el.id}" data-sec="${el.id}" class="lt-${kind}">${label}</a>`);
+    };
+    add($('.ac-body .callout.rule', main), 'The rule', 'rule');
+    $$('.ac-body h4, .ac-body .widget-title', main).forEach((h) => {
+      const isWidget = h.classList.contains('widget-title');
+      const text = isWidget ? 'Try it: ' + h.textContent.replace(/^Try it/, '').trim() : h.textContent.trim();
+      add(isWidget ? h.closest('.widget') : h, text, isWidget ? 'widget' : 'h');
+    });
+    add($('.recap', main), 'What you now know', 'recap');
+    add($('.quiz', main), 'Quiz', 'quiz');
+    const nav = $('#lesson-toc');
+    if (items.length < 3) { nav.remove(); return; }
+    nav.innerHTML = `<div class="lt-head">In this lesson</div><div class="lt-items">${items.join('')}</div>`;
+    $$('[data-sec]', nav).forEach((a) => a.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById(a.dataset.sec).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
+  }
+
+  function renderNav(l, prev, next) {
+    const row = $('#ac-navrow');
+    const nextOpen = next && (review || done[l.id]);
+    const moduleEnd = next && next.m !== l.m;
+    row.innerHTML = `${prev ? `<button class="btn" data-open="${prev.id}">← ${prev.title}</button>` : '<button class="btn" data-map="1">← Table of contents</button>'}
+      ${next ? (nextOpen
+        ? `<button class="btn primary" data-open="${next.id}">${moduleEnd ? `Next module: ${next.m.title}` : next.title} →</button>`
+        : `<button class="btn" disabled>${LOCK} ${l.quiz && l.quiz.length ? 'Pass the quiz to unlock the next lesson' : 'Finish this lesson to continue'}</button>`)
+        : l.m.reference ? '' : '<button class="btn primary" data-map="1">Course complete — back to contents</button>'}`;
+    $$('[data-open]', row).forEach((b) => b.addEventListener('click', () => open(b.dataset.open)));
+    $$('[data-map]', row).forEach((b) => b.addEventListener('click', () => showMap()));
   }
 
   function complete(l, xp) {
     if (done[l.id]) return;
     done[l.id] = true;
     L.store.set('academy.done', done);
-    renderSide();
     L.addXp(xp, 'lesson complete');
-    const chDone = l.ch.lessons.every((x) => done[x.id]);
-    if (chDone && l.ch.lessons.length > 1) {
-      setTimeout(() => { L.toast(`Chapter complete: ${l.ch.title}`, 'xp big'); L.confetti(); L.sfx.good(); }, 500);
+    const idx = l.idx;
+    renderNav(l, ORDER[idx - 1], ORDER[idx + 1]);
+    renderSide();
+    if (!l.m.reference && modComplete(l.m)) {
+      setTimeout(() => {
+        L.toast(`Module ${num(l.m)} complete: ${l.m.title}`, 'xp big');
+        L.addXp(50, 'module complete');
+        L.confetti();
+        L.sfx.good();
+      }, 500);
     }
   }
 
   function renderQuiz(l) {
     const box = $('#ac-quiz');
     if (!l.quiz || !l.quiz.length) {
-      box.innerHTML = done[l.id] ? '' : '<div class="actions"><button class="btn" id="ac-done">Mark as read</button></div>';
+      box.innerHTML = done[l.id] || l.m.reference ? '' : '<div class="actions"><button class="btn primary" id="ac-done">Mark as read and continue</button></div>';
       const b = $('#ac-done');
       if (b) b.addEventListener('click', () => { complete(l, 10); renderQuiz(l); });
       return;
     }
     const answers = new Array(l.quiz.length).fill(null);
     box.innerHTML = `<div class="quiz">
-      <div class="card-title" style="margin-bottom:6px"><h3>Check your model</h3><span class="hint">${l.quiz.length} question${l.quiz.length > 1 ? 's' : ''}</span></div>
+      <div class="card-title" style="margin-bottom:6px"><h3>Check your model</h3><span class="hint">${done[l.id] ? 'completed · retake any time' : 'pass to unlock the next lesson'}</span></div>
       ${l.quiz.map((q, qi) => `<div class="qz" data-q="${qi}">
         <div class="qz-q">${qi + 1}. ${q.q}</div>
         <div class="qz-opts">${q.options.map((o, oi) => `<button class="qz-opt" data-o="${oi}">${o}</button>`).join('')}</div>
@@ -126,8 +274,8 @@
       const score = answers.filter((a, i) => a === l.quiz[i].answer).length;
       const perfect = score === l.quiz.length;
       $('#qz-result').innerHTML = `<div class="result-banner ${perfect ? 'good' : 'mid'}">${perfect
-        ? `${score}/${l.quiz.length} — lesson complete.`
-        : `${score}/${l.quiz.length}. Re-read the rule at the top and try again.`}</div>
+        ? `${score}/${l.quiz.length} — lesson complete.${ORDER[l.idx + 1] ? ' Next lesson unlocked.' : ''}`
+        : `${score}/${l.quiz.length}. Re-read the rule at the top, then retry — the next lesson builds on this one.`}</div>
         ${perfect ? '' : '<div class="actions"><button class="btn" id="qz-retry">Retry quiz</button></div>'}`;
       if (perfect) complete(l, 10 + 5 * l.quiz.length);
       else $('#qz-retry').addEventListener('click', () => renderQuiz(l));
@@ -367,11 +515,168 @@
       run();
     },
 
+    // Side-profile schematic of a precision bolt rifle with clickable parts
+    'rifle-anatomy'(el) {
+      const parts = {
+        scope: ['Optic (scope)', 'Magnifies the target and measures angles. Turrets on top/side adjust elevation and windage (module 08).'],
+        rings: ['Rings / mount', 'Clamp the scope to the rifle. Must be torqued correctly so the scope never moves.'],
+        barrel: ['Barrel', 'Rifled tube that spins and guides the bullet. The biggest single factor in precision (module 03).'],
+        muzzle: ['Muzzle device', 'A brake redirects gas to cut recoil; a suppressor reduces noise. Both help you see your own impact.'],
+        action: ['Action / receiver', 'The rigid core. Holds the bolt, locks the cartridge in the chamber; barrel and stock attach to it.'],
+        bolt: ['Bolt', 'Lift, pull back (eject), push forward (load), close (lock). The firing pin lives inside it.'],
+        trigger: ['Trigger', 'Releases the firing pin. Precision triggers break cleanly at ~1.5–3 lb.'],
+        mag: ['Magazine', 'Detachable box holding the cartridges.'],
+        stock: ['Stock / chassis', 'Holds the action rigidly and positions your eye behind the scope.'],
+        cheek: ['Cheek riser', 'Adjusts so your eye lines up with the scope without strain.'],
+        butt: ['Buttpad / length of pull', 'Where the rifle meets your shoulder; adjustable length fits the rifle to you.'],
+        bipod: ['Bipod', 'Front support for prone and bench shooting.'],
+        bag: ['Rear bag', 'Supports the back of the stock; squeeze it to fine-tune elevation.'],
+      };
+      const box = widgetShell(el, 'Click a part of the rifle', `
+        <svg class="anat" viewBox="0 0 800 230" role="img" aria-label="Rifle diagram">
+          <g class="part" data-p="bag"><path d="M40 170 q30 -22 70 0 v22 h-70 z"/></g>
+          <g class="part" data-p="butt"><rect x="28" y="96" width="16" height="70" rx="4"/></g>
+          <g class="part" data-p="stock"><path d="M44 102 h200 v26 h-40 l-20 40 h-30 l10 -30 h-120 z"/></g>
+          <g class="part" data-p="cheek"><rect x="70" y="84" width="90" height="16" rx="4"/></g>
+          <g class="part" data-p="trigger"><path d="M232 130 q6 16 -4 26" fill="none" stroke-width="5"/><path d="M212 130 h40 q4 30 -20 32 h-14" fill="none" stroke-width="3"/></g>
+          <g class="part" data-p="mag"><rect x="262" y="128" width="34" height="46" rx="3"/></g>
+          <g class="part" data-p="action"><rect x="244" y="96" width="120" height="32" rx="4"/></g>
+          <g class="part" data-p="bolt"><rect x="250" y="100" width="70" height="10" rx="3"/><circle cx="262" cy="134" r="8"/><line x1="262" y1="110" x2="262" y2="128" stroke-width="5"/></g>
+          <g class="part" data-p="stock"><rect x="364" y="112" width="150" height="20" rx="4"/></g>
+          <g class="part" data-p="barrel"><rect x="364" y="102" width="330" height="12" rx="3"/></g>
+          <g class="part" data-p="muzzle"><rect x="694" y="98" width="46" height="20" rx="3"/></g>
+          <g class="part" data-p="bipod"><line x1="480" y1="132" x2="452" y2="196" stroke-width="5"/><line x1="490" y1="132" x2="518" y2="196" stroke-width="5"/></g>
+          <g class="part" data-p="rings"><rect x="262" y="72" width="16" height="26" rx="2"/><rect x="336" y="72" width="16" height="26" rx="2"/></g>
+          <g class="part" data-p="scope"><path d="M200 60 h30 l14 6 h150 l14 -10 h40 v34 h-40 l-14 -10 h-150 l-14 6 h-30 z"/><rect x="300" y="44" width="20" height="16" rx="3"/></g>
+        </svg>
+        <div class="anat-info"><b>Tap a part</b><span>Each part has one job; precision comes from every part doing it identically.</span></div>`);
+      $$('.part', box).forEach((g) => g.addEventListener('click', () => {
+        $$('.part', box).forEach((x) => x.classList.toggle('on', x.dataset.p === g.dataset.p));
+        const [t, d] = parts[g.dataset.p];
+        $('.anat-info', box).innerHTML = `<b>${t}</b><span>${d}</span>`;
+        L.sfx.click();
+      }));
+    },
+
+    // Cutaway of a bottleneck rifle cartridge with clickable parts
+    'cartridge-anatomy'(el) {
+      const parts = {
+        head: ['Head & headstamp', 'The base of the case, stamped with the cartridge name and maker. Match it to your barrel marking.'],
+        rim: ['Rim / extractor groove', 'The extractor hooks this groove to pull the fired case out of the chamber.'],
+        primer: ['Primer', 'Struck by the firing pin; its flash ignites the powder.'],
+        powder: ['Powder', 'Burns rapidly (does not explode) to create ~60,000 psi of gas pressure.'],
+        body: ['Case body', 'Brass wall that holds the powder and expands to seal the chamber when fired.'],
+        shoulder: ['Shoulder', 'The angled step that positions the case in the chamber (headspace).'],
+        neck: ['Neck', 'Grips the bullet with consistent tension.'],
+        boattail: ['Boat tail', 'Tapered base of the bullet that reduces drag at long range.'],
+        bearing: ['Bearing surface', 'Straight section of the bullet that the rifling engraves.'],
+        ogive: ['Ogive', 'The curved nose. Its shape (tangent, secant, hybrid) drives the BC.'],
+        meplat: ['Meplat / tip', 'The very tip. Polymer tips make it uniform for consistent BC.'],
+      };
+      const box = widgetShell(el, 'Click a part of the cartridge (cutaway)', `
+        <svg class="anat" viewBox="0 0 800 180" role="img" aria-label="Cartridge diagram">
+          <g class="part" data-p="head"><rect x="40" y="52" width="26" height="76" rx="3"/></g>
+          <g class="part" data-p="rim"><rect x="66" y="58" width="10" height="64"/></g>
+          <g class="part" data-p="primer"><rect x="36" y="78" width="16" height="24" rx="3"/></g>
+          <g class="part" data-p="body"><path d="M76 50 L400 56 L400 124 L76 130 Z"/></g>
+          <g class="part" data-p="powder"><path d="M90 62 L390 66 L390 114 L90 118 Z" class="powder"/></g>
+          <g class="part" data-p="shoulder"><path d="M400 56 L450 72 L450 108 L400 124 Z"/></g>
+          <g class="part" data-p="neck"><rect x="450" y="72" width="70" height="36"/></g>
+          <g class="part" data-p="boattail"><path d="M440 80 L470 76 L470 104 L440 100 Z" class="bullet"/></g>
+          <g class="part" data-p="bearing"><rect x="470" y="76" width="110" height="28" class="bullet"/></g>
+          <g class="part" data-p="ogive"><path d="M580 76 Q680 78 738 88 L738 92 Q680 102 580 104 Z" class="bullet"/></g>
+          <g class="part" data-p="meplat"><rect x="738" y="86" width="14" height="8" rx="2"/></g>
+          <line x1="430" y1="150" x2="760" y2="150" class="dim"/><text x="595" y="168" text-anchor="middle" class="dimt">bullet</text>
+          <line x1="36" y1="150" x2="520" y2="150" class="dim"/><text x="278" y="168" text-anchor="middle" class="dimt">case</text>
+        </svg>
+        <div class="anat-info"><b>Tap a part</b><span>The bullet sits partly inside the case neck; only the bullet leaves the rifle.</span></div>`);
+      $$('.part', box).forEach((g) => g.addEventListener('click', () => {
+        $$('.part', box).forEach((x) => x.classList.toggle('on', x.dataset.p === g.dataset.p));
+        const [t, d] = parts[g.dataset.p];
+        $('.anat-info', box).innerHTML = `<b>${t}</b><span>${d}</span>`;
+        L.sfx.click();
+      }));
+    },
+
+    // Step through the firing sequence as a state machine
+    'fire-sequence'(el) {
+      const steps = [
+        ['Trigger press', 't = 0', 'You press the trigger; the sear releases the spring-loaded firing pin.'],
+        ['Firing pin strikes primer', '≈ 2–3 ms (lock time)', 'The pin dents the primer cup, crushing the impact-sensitive compound.'],
+        ['Primer ignites powder', '+ fractions of a ms', 'A jet of flame shoots through the flash hole into the powder.'],
+        ['Powder burns, pressure rises', 'peaks ≈ 60,000 psi', 'Burning powder makes hot gas. The case expands and seals the chamber.'],
+        ['Bullet engraves into the rifling', 'starts moving', 'Pressure pushes the bullet out of the neck into the lands, which grip it and start it spinning.'],
+        ['Bullet travels the barrel', '≈ 1 ms of barrel time', 'Gas keeps accelerating the spinning bullet down the bore.'],
+        ['Leaves the muzzle', 'muzzle velocity reached', 'The bullet exits at its muzzle velocity (e.g. 2,700 fps), spinning hundreds of thousands of RPM.'],
+        ['Flight', 'TOF ≈ 1–2 s to 1,000 yd', 'External ballistics takes over: gravity, drag and wind (module 07).'],
+        ['Cycle the bolt', 'you', 'Lift and pull the bolt: the extractor pulls the empty case, the ejector throws it clear; push forward to chamber the next round.'],
+      ];
+      let i = 0;
+      const box = widgetShell(el, 'The firing sequence — step through it', `
+        <div class="fs-track">${steps.map((s, k) => `<div class="fs-node" data-k="${k}"><span>${k + 1}</span></div>`).join('')}</div>
+        <div class="fs-card"></div>
+        <div class="actions"><button class="btn" data-d="-1">← Back</button><button class="btn primary" data-d="1">Next →</button></div>`);
+      const draw = () => {
+        $$('.fs-node', box).forEach((n, k) => { n.classList.toggle('done', k < i); n.classList.toggle('on', k === i); });
+        const [t, time, d] = steps[i];
+        $('.fs-card', box).innerHTML = `<div class="eyebrow" style="margin:0">Step ${i + 1} of ${steps.length} · ${time}</div><b>${t}</b><p>${d}</p>`;
+      };
+      $$('[data-d]', box).forEach((b) => b.addEventListener('click', () => { i = Math.max(0, Math.min(steps.length - 1, i + +b.dataset.d)); L.sfx.click(); draw(); }));
+      $$('.fs-node', box).forEach((n) => n.addEventListener('click', () => { i = +n.dataset.k; draw(); }));
+      draw();
+    },
+
+    // Flip-card vocabulary drill; "Again" cards go back in the queue
+    flashcards(el) {
+      const deck = (window.LRPS_DECKS || {})[el.dataset.deck] || [];
+      let queue = deck.map((c, k) => k).sort(() => Math.random() - 0.5);
+      let known = 0;
+      let flipped = false;
+      const box = widgetShell(el, `Flashcards · ${deck.length} cards`, `
+        <div class="fc-card" tabindex="0"><div class="fc-front"></div><div class="fc-back"></div></div>
+        <div class="fc-bar"><span></span></div>
+        <div class="actions fc-actions"><button class="btn" data-a="again">Again</button><button class="btn primary" data-a="got">Got it</button></div>
+        <p class="hint fc-hint">Click the card to flip it.</p>`);
+      const card = $('.fc-card', box);
+      const draw = () => {
+        $('.fc-bar span', box).style.width = (known / deck.length * 100) + '%';
+        if (!queue.length) {
+          card.classList.remove('flip');
+          $('.fc-front', box).innerHTML = `<b>Deck complete</b><span>${deck.length} / ${deck.length}</span>`;
+          $('.fc-back', box).innerHTML = '';
+          $('.fc-actions', box).innerHTML = '<button class="btn" data-a="restart">Shuffle again</button>';
+          $('[data-a="restart"]', box).addEventListener('click', () => { queue = deck.map((c, k) => k).sort(() => Math.random() - 0.5); known = 0; restoreButtons(); draw(); });
+          return;
+        }
+        const [t, d] = deck[queue[0]];
+        flipped = false;
+        card.classList.remove('flip');
+        $('.fc-front', box).innerHTML = `<b>${t}</b><span>What does it mean?</span>`;
+        $('.fc-back', box).innerHTML = `<span>${d}</span>`;
+      };
+      const act = (a) => {
+        if (!queue.length) return;
+        if (!flipped) { flipped = true; card.classList.add('flip'); return; }
+        const c = queue.shift();
+        if (a === 'got') { known++; L.sfx.click(); } else queue.push(c);
+        if (!queue.length) { L.sfx.good(); L.addXp(5, 'flashcards complete'); }
+        draw();
+      };
+      function restoreButtons() {
+        $('.fc-actions', box).innerHTML = '<button class="btn" data-a="again">Again</button><button class="btn primary" data-a="got">Got it</button>';
+        $$('.fc-actions [data-a]', box).forEach((b) => b.addEventListener('click', () => act(b.dataset.a)));
+      }
+      card.addEventListener('click', () => { flipped = !flipped; card.classList.toggle('flip', flipped); });
+      restoreButtons();
+      draw();
+    },
+
     glossary(el) {
       const box = widgetShell(el, 'Search the glossary', `<div class="field"><input type="text" id="w-gl-q" placeholder="Type to filter…"></div><dl class="w-gloss"></dl>`);
       const run = () => {
         const q = $('#w-gl-q').value.toLowerCase();
-        $('.w-gloss', box).innerHTML = window.LRPS_GLOSSARY.filter(([t, d]) => !q || (t + d).toLowerCase().includes(q))
+        const all = window.LRPS_GLOSSARY.concat(window.LRPS_GLOSSARY_EXTRA || []).sort((a, b) => a[0].localeCompare(b[0]));
+        $('.w-gloss', box).innerHTML = all.filter(([t, d]) => !q || (t + d).toLowerCase().includes(q))
           .map(([t, d]) => `<dt>${t}</dt><dd>${d}</dd>`).join('') || '<p class="hint">No matches.</p>';
       };
       $('#w-gl-q').addEventListener('input', run);
@@ -383,8 +688,9 @@
     return `<div class="tile"><div class="label">${label}</div><div class="value">${value}<small>${unitLabel || ''}</small></div></div>`;
   }
 
-  renderSide();
-  open(current, true);
-  L.onTab('academy', () => { renderSide(); });
-  L.onProfile(() => { if (L.currentTab === 'academy') open(current, true); });
+
+  const last = L.store.get('academy.last', 'map');
+  if (last !== 'map' && byId[last] && isUnlocked(byId[last])) open(last, true); else showMap(true);
+  L.onTab('academy', () => renderSide());
+  L.onProfile(() => { if (L.currentTab === 'academy' && view !== 'map') open(view, true); });
 })();
