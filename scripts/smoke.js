@@ -474,7 +474,6 @@ function measureOverflow(page, vw) {
       let s = el.tagName.toLowerCase();
       if (el.id) s += '#' + el.id;
       if (el.classList.length) s += '.' + [...el.classList].slice(0, 3).join('.');
-      const panel = el.closest('.panel');
       return s;
     };
     const bad = [];
