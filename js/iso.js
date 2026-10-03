@@ -278,7 +278,7 @@
         const x0 = Math.max(6, Math.min(o.w - tw - 6, left ? b[0] - tw : b[0]));
         b[1] = Math.max(fs + 6, Math.min(o.h - fs - 6, b[1]));
         if (b[0] < x0) b[0] = x0; else if (b[0] > x0 + tw) b[0] = x0 + tw;
-        let svg = `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${C.ink}" stroke-width="1.2" opacity="0.55"/>`;
+        let svg = `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--illus-ink)" stroke-width="1.2" opacity="0.6"/>`;
         svg += `<circle cx="${a[0]}" cy="${a[1]}" r="3.2" fill="#fff" stroke="${C.ink}" stroke-width="1.4"/>`;
         svg += `<rect x="${x0}" y="${b[1] - fs * 0.95}" width="${tw}" height="${fs * 1.9}" rx="${fs * 0.95}" fill="#fff" stroke="rgba(31,39,51,.12)" filter="url(#${id}-lift)"/>`;
         let tx = x0 + 10;

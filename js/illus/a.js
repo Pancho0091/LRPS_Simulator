@@ -368,7 +368,7 @@
       bars.forEach(([n, v, c], i) => put(i, v, c, n));
       s.text3([st * 4.8 + 2.5, -st * 4.8 + 2.5, 3], '=', { size: 30, weight: 800, anchor: 'middle', color: C.slate });
       const ti = 5.6;
-      put(ti, tot, C.ink, 'Total miss');
+      put(ti, tot, C.slate, 'Total miss');
       const x = st * ti, y = -st * ti;
       s.poly([[x, y + 5.05, fixed * kz], [x + 5, y + 5.05, fixed * kz], [x + 5, y + 5.05, 0], [x, y + 5.05, 0]], { stroke: C.mint, width: 2.5, dash: '5 4' });
       s.label([st + 2.5, -st + 2.5, 9 * kz], 'Biggest error: fix it first', { dx: -40, dy: -30, n: '!', color: C.coral });
@@ -645,11 +645,11 @@
       [1, -1].forEach((sg) => s.line([along(o2, H, 6.1, sg * 1.1), along(o2, H, 6.1, sg * 2.6)], { color: C.coral, width: 2.2, arrow: true, arrowSize: 7 }));
       s.text3(along(o1, H, 0, Ro + 1.0), 'Loading', { size: 15, weight: 800, color: C.blue });
       s.text3(along(o2, H, 0, Ro + 1.0), 'Firing', { size: 15, weight: 800, color: C.coral });
-      s.label(along(o1, H, 11, -2.1), 'Smaller than the bore: slides in', { dx: -40, dy: 74, n: 1, color: C.blue });
+      s.label(along(o1, H, 11, -2.1), 'Smaller than the bore: slides in', { dx: -60, dy: 74, n: 1, color: C.blue });
       s.label(along(o1, H, 8.4, 0.6), 'Hollow base', { dx: 30, dy: -104, n: 2, color: C.slate });
-      s.label(along(o2, H, 2.5, 1.1), 'Gas pressure', { dx: -30, dy: -82, n: 3, color: C.coral });
-      s.label(along(o2, H, 5.6, -Rg + 0.15), 'Skirt flares into the grooves', { dx: -30, dy: 76, n: 4, color: C.coral });
-      s.label(along(o2, H, 15.4, Rl), 'Lands & grooves (rifling)', { dx: -20, dy: -76, n: 5, color: C.slate });
+      s.label(along(o2, H, 2.5, 1.1), 'Gas pressure', { dx: 60, dy: -100, n: 3, color: C.coral });
+      s.label(along(o2, H, 5.6, -Rg + 0.15), 'Skirt flares into the grooves', { dx: 20, dy: 76, n: 4, color: C.coral });
+      s.label(along(o2, H, 15.4, Rl), 'Lands & grooves (rifling)', { dx: 30, dy: -40, n: 5, color: C.slate });
       return s.svg();
     },
   });
@@ -916,11 +916,11 @@
   ISO.lesson('cartridge-anatomy', {
     caption: '<b>Four parts, one sealed pressure vessel.</b> The primer ignites the powder, the powder burns into gas, the brass case contains it and seals the chamber, and the bullet is the only part that leaves. The headstamp on the base names the cartridge — it must match the marking on your barrel.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 340, origin: [44, 128], scale: 10 });
-      const k = 1.45, R = 2.35 * k, o = [0, 0, 5.2];
+      const s = ISO.scene({ w: 720, h: 340, origin: [40, 168], scale: 9.6 });
+      const k = 1.45, R = 2.35 * k, o = [0, 0, 4.4];
       s.line([along(o, H, -0.5), along(o, H, 47)], { color: C.steel, width: 1.4, dash: '3 5' });
       // primer cup
-      lathe3(s, along(o, H, 0), H, [[0, 0.62 * k], [0.5 * k, 0.62 * k], [0.55 * k, 0.5 * k]], { color: C.silver, segments: 16 });
+      lathe3(s, along(o, H, 0), H, [[0, 0.75 * k], [0.7 * k, 0.75 * k], [0.75 * k, 0.6 * k]], { color: C.silver, segments: 16 });
       // case
       lathe3(s, along(o, H, 3.2), H, caseProf(k), { color: C.brass, capColor: ISO.shade(C.brass, -0.2), segments: 22 });
       // bullet
@@ -931,19 +931,19 @@
       powder(s, pc[0], pc[1], 3.2, 2.4);
       s.line([add3(along(o, H, 15), Z, -R - 0.4), add3(pc, Z, 2.8)], { color: C.steel, width: 1.4, dash: '3 4', arrow: true, arrowSize: 7 });
       // headstamp: the case base seen end-on
-      const hx = 52, hy = -2, hz = 4.6, hr = 3.6;
+      const hc = add3(along([0, 0, 0], H, 49), F, 8), hx = hc[0], hy = hc[1], hz = 4.2, hr = 3.9;
       s.shadow(hx - 1, hy - hr, 2.5, hr * 2);
       s.lathe(hx - 1.4, hy, hz, [[0, hr], [1.4, hr]], { axis: 'x', color: C.brass, segments: 28 });
       s.disc(hx, hy, hz, hr * 0.8, { plane: 'yz', stroke: ISO.shade(C.brass, -0.35), width: 1.2 });
       s.disc(hx, hy, hz, hr * 0.26, { plane: 'yz', fill: C.silver, stroke: ISO.shade(C.brass, -0.4), width: 1.2 });
-      faceText(s, [hx, hy, hz + hr * 0.52], 'MAKER', 'x', { size: 10, color: ISO.shade(C.brass, -0.55) });
-      faceText(s, [hx, hy, hz - hr * 0.52], '6.5 CM', 'x', { size: 10, color: ISO.shade(C.brass, -0.55) });
-      s.label(along(o, H, 0.4, 0.62 * k), 'Primer', { dx: 0, dy: -64, n: 1, color: C.coral });
-      s.label(along(o, H, 12, R), 'Case (brass)', { dx: -10, dy: -60, n: 2, color: '#c9861c' });
-      s.label(add3(pc, Z, 1.2), 'Powder', { dx: -70, dy: 50, n: 3, color: C.slate });
-      s.label(along(o, H, 3.2 + 18.9 * k + 4.6 + bp.len * 0.5, R * 0.56), 'Bullet', { dx: 10, dy: -60, n: 4, color: C.copper });
-      s.label(along(o, H, 3.6, -R * 0.8), 'Rim / extractor groove', { dx: -20, dy: 80, n: 5, color: C.slate });
-      s.label([hx, hy + hr * 0.6, hz - hr * 0.6], 'Headstamp: must match the barrel', { dx: -150, dy: 72, n: 6, color: C.ink });
+      faceText(s, [hx, hy, hz + hr * 0.52], 'MAKER', 'x', { size: 11.5, color: ISO.shade(C.brass, -0.55) });
+      faceText(s, [hx, hy, hz - hr * 0.52], '6.5 CM', 'x', { size: 11.5, color: ISO.shade(C.brass, -0.55) });
+      s.label(along(o, H, 0.5, 0.75 * k), 'Primer', { dx: 4, dy: -70, n: 1, color: C.coral });
+      s.label(along(o, H, 14, R), 'Case (brass)', { dx: 10, dy: -56, n: 2, color: '#c9861c' });
+      s.label(add3(pc, Z, 1.2), 'Powder', { dx: -50, dy: 50, n: 3, color: C.slate });
+      s.label(along(o, H, 3.2 + 18.9 * k + 4.6 + bp.len * 0.5, R * 0.56), 'Bullet', { dx: 10, dy: -56, n: 4, color: C.copper });
+      s.label(along(o, H, 3.6, -R * 0.8), 'Rim / extractor groove', { dx: -10, dy: 86, n: 5, color: C.slate });
+      s.label([hx, hy + hr * 0.5, hz + hr * 0.55], 'Headstamp: must match the barrel', { dx: -40, dy: 78, n: 6, color: C.ink });
       return s.svg();
     },
   });
@@ -952,9 +952,10 @@
     at: 'after:table',
     caption: '<b>Every curve has a name.</b> The case steps down at the shoulder into the neck, which grips the bullet. On the bullet, the bearing surface is the part that touches the rifling, the ogive is the curved nose, the meplat is the tip, and the boat tail tapers the base to cut drag.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 320, origin: [40, 160], scale: 15.5 });
+      const s = ISO.scene({ w: 720, h: 320, origin: [36, 160], scale: 13.2 });
       const k = 1.3, R = 2.35 * k, o = [0, 0, 0];
-      const seat = 17.2 * k;
+      const seat = 17.2 * k + 6;
+      s.line([along(o, H, 18.9 * k + 0.3), along(o, H, seat - 0.3)], { color: C.steel, width: 1.4, dash: '3 4' });
       const bp = bulletProf(R * 0.56, 'otm');
       lathe3(s, along(o, H, seat), H, bp.prof, { color: C.copper, segments: 24 });
       lathe3(s, o, H, caseProf(k), { color: C.brass, capColor: ISO.shade(C.brass, -0.2), segments: 24 });
@@ -962,14 +963,15 @@
       const pt = (t, rr) => along(o, H, t, rr);
       // case labels (above)
       s.label(pt(0.3 * k, R), 'Head', { dx: -10, dy: -56, n: 1, color: '#c9861c' });
-      s.label(pt(8 * k, R * 0.96), 'Body', { dx: 0, dy: -66, n: 2, color: '#c9861c' });
-      s.label(pt(15 * k, R * 0.8), 'Shoulder', { dx: -10, dy: -78, n: 3, color: '#c9861c' });
-      s.label(pt(17.6 * k, R * 0.63), 'Neck', { dx: 20, dy: -66, n: 4, color: '#c9861c' });
+      s.label(pt(8 * k, R * 0.96), 'Body', { dx: -30, dy: -62, n: 2, color: '#c9861c' });
+      s.label(pt(15 * k, R * 0.8), 'Shoulder', { dx: 0, dy: -76, n: 3, color: '#c9861c' });
+      s.label(pt(17.6 * k, R * 0.63), 'Neck', { dx: 10, dy: -60, n: 4, color: '#c9861c' });
       // bullet labels (below)
-      s.label(pt(seat + b0 * 0.4 + (18.9 * k - seat), -r * 0.86), 'Boat tail (inside the neck)', { dx: -90, dy: 64, n: 5, color: C.copper });
-      s.label(pt(seat + (b0 + b1) / 2 + 1.2, -r), 'Bearing surface', { dx: 30, dy: 64, n: 6, color: C.copper });
-      s.label(pt(seat + b1 + (L - b1) * 0.4, r * 0.82), 'Ogive', { dx: 20, dy: -56, n: 7, color: C.copper });
-      s.label(pt(seat + L, 0), 'Meplat (tip)', { dx: -30, dy: 60, n: 8, color: C.copper });
+      s.label(pt(seat + b0 * 0.5, -r * 0.86), 'Boat tail', { dx: -50, dy: 66, n: 5, color: C.copper });
+      s.label(pt(seat + (b0 + b1) / 2, -r), 'Bearing surface', { dx: -20, dy: 92, n: 6, color: C.copper });
+      s.label(pt(seat + b1 + (L - b1) * 0.35, r * 0.85), 'Ogive', { dx: -10, dy: -62, n: 7, color: C.copper });
+      s.label(pt(seat + L, 0), 'Meplat (tip)', { dx: 6, dy: 56, n: 8, color: C.copper });
+      s.text3(pt((18.9 * k + seat) / 2, R * 0.63), 'pulled out', { size: 11.5, weight: 700, anchor: 'middle', dy: -8, color: C.slate });
       return s.svg();
     },
   });
@@ -977,7 +979,7 @@
   ISO.lesson('powder-primers', {
     caption: '<b>Velocity is the area under the pressure curve.</b> Pressure spikes to roughly 60,000 psi within the first inches of travel, then falls as the gas expands behind the bullet. The push keeps adding speed all the way to the muzzle — the right burn rate keeps the peak safe and the push long.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 380, origin: [60, 190], scale: 11 });
+      const s = ISO.scene({ w: 720, h: 360, origin: [96, 218], scale: 9.6 });
       const L = 44, ch = 12, base = [0, 0, 0];
       // chart card standing behind the barrel
       const cardO = add3(base, F, -5);
@@ -1019,20 +1021,20 @@
     at: 'after:table',
     caption: '<b>Warm powder burns faster.</b> The same cartridge shot on a cold morning and a hot afternoon can differ by tens of fps (roughly 0.5–2 fps per °F, depending on the powder). That changes your drop at long range — note the temperature with your dope.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 300, origin: [56, 100], scale: 9.4 });
+      const s = ISO.scene({ w: 720, h: 300, origin: [56, 104], scale: 9 });
       const ax3 = { U: T, W: perp(T) };
       const rows = [['30 °F', 0.25, C.blue, 2660, 'cold morning'], ['100 °F', 0.9, C.coral, 2730, 'hot afternoon']];
       rows.forEach(([t, fill, col, v, sub], i) => {
         const o = rowOff(14 * i);
         const A = (u, z) => along(o, T, u, z);
-        tile(s, o, T, 62, 4, 4);
+        tile(s, o, T, 54, 4, 4);
         const th = A(3, 0);
         thermo(s, th[0], th[1], 7, fill, col);
         s.text3(A(5.5, 6), t, { size: 16, weight: 800, color: col });
         s.text3(A(5.5, 6), sub, { size: 11.5, weight: 500, dy: 15 });
-        lathe3(s, A(14, 1.6), T, caseProf(0.66), { color: C.brass, segments: 16 });
-        lathe3(s, A(14 + 17.2 * 0.66, 1.6), T, bulletProf(2.35 * 0.66 * 0.56, 'otm').prof, { color: C.copper, segments: 16 });
-        const bl = (v - 2550) / 6;
+        lathe3(s, A(12, 1.6), T, caseProf(0.66), { color: C.brass, segments: 14 });
+        lathe3(s, A(12 + 17.2 * 0.66, 1.6), T, bulletProf(2.35 * 0.66 * 0.56, 'otm').prof, { color: C.copper, segments: 14 });
+        const bl = (v - 2500) / 12;
         obox(s, A(30, 0), bl, 2.4, 1.6, col, ax3);
         s.text3(A(30 + bl + 1, 0.8), v.toLocaleString('en-US') + ' fps', { size: 15, weight: 800, dy: 6 });
       });
@@ -1043,11 +1045,8 @@
   ISO.lesson('reading-the-box', {
     caption: '<b>An ammo box is a spec sheet.</b> Check the cartridge name against your barrel, note the bullet weight and type, use the G7 BC for long boat-tail bullets, and treat the advertised MV as a starting point: it was measured in their test barrel, not yours. Buy one lot and re-check when it changes.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 380, origin: [300, 70], scale: 9.6 });
-      s.floor(-6, -6, 34, 42, { grid: 4 });
-      // loose cartridges in front
-      cart(s, 4, 30, 1.25, 0.5, 'otm', 14);
-      cart(s, 7, 33, 1.25, 0.5, 'otm', 14);
+      const s = ISO.scene({ w: 720, h: 380, origin: [258, 66], scale: 9.6 });
+      s.floor(-6, -6, 46, 42, { grid: 4 });
       const bx = 0, by = 0, w = 18, d = 28, h = 6;
       s.shadow(bx - 0.5, by - 0.5, w + 1, d + 1);
       s.box(bx, by, 0, w, d, h, { color: C.navy, top: C.white });
@@ -1061,12 +1060,14 @@
       line(15.6, 'LOT  A1234', 13, C.slate, 700);
       faceText(s, [bx + w / 2, by + d, h / 2], '20 CARTRIDGES', 'y', { size: 15, color: '#fff' });
       faceText(s, [bx + w, by + d / 2, h / 2], 'PRECISION MATCH', 'x', { size: 15, color: '#fff' });
+      cart(s, 21, 10, 1.45, 0.62, 'otm', 14);
+      cart(s, 22.5, 14, 1.45, 0.62, 'otm', 14);
       const at = (x) => [bx + x, by + 3, h];
-      s.label(at(2.4), 'Cartridge: must match your barrel', { dx: 150, dy: -24, n: 1, color: C.coral });
-      s.label(at(6.6), 'Bullet weight + type', { dx: 170, dy: 0, n: 2, color: C.copper });
-      s.label(at(9.6), 'Drag rating: use the G7', { dx: 170, dy: 22, n: 3, color: C.purple });
-      s.label(at(12.4), 'MV in THEIR barrel: chronograph yours', { dx: 160, dy: 44, n: 4, color: C.blue });
-      s.label(at(15.6), 'Lot: one batch — buy in bulk', { dx: 140, dy: 66, n: 5, color: C.slate });
+      s.label(at(2.4), 'Cartridge: must match your barrel', { dx: 190, dy: -30, n: 1, color: C.coral });
+      s.label(at(6.6), 'Bullet weight + type', { dx: 200, dy: -10, n: 2, color: C.copper });
+      s.label(at(9.6), 'Drag rating: use the G7', { dx: 190, dy: 12, n: 3, color: C.purple });
+      s.label(at(12.4), 'MV in THEIR barrel: chronograph yours', { dx: 170, dy: 34, n: 4, color: C.blue });
+      s.label(at(15.6), 'Lot: one batch — buy in bulk', { dx: 150, dy: 56, n: 5, color: C.slate });
       return s.svg();
     },
   });
