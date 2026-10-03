@@ -575,14 +575,16 @@
       // caliper: beam behind, jaws reaching over/under the bullet bearing
       const xb = cp.bearAt + 0.05;
       const beamY = -0.75;
-      s.box(xb - 0.1, beamY - 0.06, -0.5, 0.36, 0.12, 2.0, { color: C.silver });
-      s.box(xb + 0.26, beamY - 0.08, 0.45, 0.62, 0.16, 0.42, { color: C.ink });
-      s.poly([[xb + 0.3, beamY + 0.081, 0.52], [xb + 0.84, beamY + 0.081, 0.52], [xb + 0.84, beamY + 0.081, 0.8], [xb + 0.3, beamY + 0.081, 0.8]], { fill: '#bdf5d8' });
-      s.text3([xb + 0.57, beamY + 0.09, 0.62], '0.308 in', { size: 15, weight: 800, anchor: 'middle', mono: true, color: C.ink, dy: 2 });
-      s.box(xb - 0.07, beamY, -r - 0.08, 0.14, 0.95, 0.08, { color: C.steel });
+      s.box(xb - 0.1, beamY - 0.05, -0.75, 0.3, 0.1, 2.15, { color: C.silver });
+      for (let i = 0; i < 18; i++) { const z = -0.7 + i * 0.11; s.line([[xb - 0.1, beamY + 0.051, z], [xb + (i % 5 ? 0.0 : 0.06), beamY + 0.051, z]], { color: C.slate, width: 1 }); }
+      s.box(xb - 0.07, beamY, -r - 0.07, 0.14, 0.92, 0.07, { color: C.steel });
+      // read-out on the sliding jaw
+      s.box(xb + 0.2, beamY - 0.07, 0.42, 0.78, 0.14, 0.5, { color: C.ink });
+      s.poly([[xb + 0.27, beamY + 0.071, 0.5], [xb + 0.91, beamY + 0.071, 0.5], [xb + 0.91, beamY + 0.071, 0.84], [xb + 0.27, beamY + 0.071, 0.84]], { fill: '#bdf5d8' });
+      s.text3([xb + 0.59, beamY + 0.072, 0.67], '0.308"', { size: 16, weight: 800, anchor: 'middle', mono: true, color: C.ink, dy: 6 });
       // cartridge
       s.lathe(0, 0, 0, cp.prof, { axis: 'x', colors: cp.cols, color: C.brass, capColor: sh(C.brass, -0.1), segments: 24 });
-      s.box(xb - 0.07, beamY, r, 0.14, 0.95, 0.08, { color: C.steel });
+      s.box(xb - 0.07, beamY, r, 0.14, 0.92, 0.07, { color: C.steel });
       // case-length dimension (51 mm) and OAL
       const zd = -0.55, yd = 0.4;
       s.line([[0, yd, zd], [d.len, yd, zd]], { color: C.blue, width: 2.5 });
@@ -590,10 +592,10 @@
       s.line([[0, yd, 0], [0, yd, zd]], { color: C.blue, width: 1, dash: '3 3' });
       s.line([[d.len, yd, 0], [d.len, yd, zd]], { color: C.blue, width: 1, dash: '3 3' });
       s.label([d.len * 0.5, yd, zd], 'Case length 51 mm (2.015") → "×51"', { dx: -60, dy: 50, n: 2, color: C.blue });
-      s.label([xb + 0.02, 0.1, r + 0.08], 'Caliber = bullet diameter .308"', { dx: 40, dy: -48, n: 1, color: C.coral });
+      s.label([xb, 0.12, r + 0.07], 'Caliber = bullet diameter .308"', { dx: 50, dy: 70, n: 1, color: C.coral });
       s.label([d.s0 * 0.45, 0.2, 0.22], 'Cartridge = the whole round design', { dx: -40, dy: -110, n: 3, color: C.purple });
-      s.text(704, 330, '.308 Winchester', { size: 17, weight: 800, anchor: 'end' });
-      s.text(704, 352, '≈ 7.62×51 NATO (similar, not identical)', { size: 12, weight: 600, anchor: 'end' });
+      s.text(704, 36, '.308 Winchester', { size: 17, weight: 800, anchor: 'end' });
+      s.text(704, 56, '≈ 7.62×51 NATO (similar, not identical)', { size: 12, weight: 600, anchor: 'end' });
       return s.svg();
     },
   });
