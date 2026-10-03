@@ -64,7 +64,7 @@
   function uprightBullet(s, x, y, z, r, type, o) {
     o = o || {};
     const b = bulletProfile(type, r, o);
-    s.lathe(x, y, z, b.prof, { axis: 'z', colors: b.cols, color: b.cols[0], segments: o.segments || 22 });
+    s.lathe(x, y, z, b.prof, { axis: 'z', colors: b.cols, color: b.cols[0], segments: Math.min(o.segments || 16, 18) });
     return { tip: [x, y, z + b.len], mid: [x, y, z + (b.b0 + b.b1) / 2], ogive: [x, y, z + b.b1 + (b.len - b.b1) * 0.4], len: b.len };
   }
 
@@ -134,7 +134,7 @@
   function uprightCart(s, x, y, z, name, k, o) {
     o = o || {};
     const c = cartProfile(name, k, o), d = c.d;
-    s.lathe(x, y, z, c.prof, { axis: 'z', colors: c.cols, color: C.brass, capColor: sh(C.brass, -0.1), segments: o.segments || 18 });
+    s.lathe(x, y, z, c.prof, { axis: 'z', colors: c.cols, color: C.brass, capColor: sh(C.brass, -0.1), segments: Math.min(o.segments || 14, 16) });
     return { tip: [x, y, z + d.oal * k], neck: [x, y, z + (d.s1 + 0.1) * k], body: [x, y, z + d.s0 * 0.5 * k], head: [x, y, z], bullet: [x, y, z + c.bearAt], d };
   }
 
