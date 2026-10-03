@@ -24,13 +24,17 @@ The app computes it with a **point-mass ballistic solver** (`js/ballistics.js`):
 
 ## Modes
 
-1. **Learn** – rules first: the variables, conversion formulas, and where the simple rules break (transonic flight, MOA vs IPHY, DA changes, truing).
-2. **Build Card** – enter a rifle, load and conditions; get a printable card (elevation, clicks, wind brackets, velocity, TOF) with transonic rows flagged. Export to CSV. Saved in the browser.
-3. **Drills** – graded to the click:
+1. **Learn – Ballistics Lab**: sliders for MV, BC, altitude, temperature, wind and zero drive live charts of the bullet path and the corrections. Pin a baseline to compare. "Predict, then reveal" challenges test your mental model of each variable. Reference rules (conversions, exceptions) below.
+2. **Build Card** – recomputes as you type; printable card (elevation, clicks, wind brackets, velocity, TOF) with transonic rows flagged, stat tiles and an elevation chart. Export to CSV. Saved in the browser.
+3. **Drills** – graded to the click, with streaks, a timer and XP:
    - *Convert*: raw solver output in inches → card cells in MIL/MOA and clicks.
    - *Interpolate*: read between 100 yd rows (and see why the straight-line estimate runs high).
    - *Wind call*: apply speed and clock direction to the card's 10 mph value.
-4. **Range** – a target at a random distance with a wind call. Dial and hold from **your** card, fire, read the impact through a reticle, and correct. Includes velocity spread, rifle dispersion, gusts, and an optional **hidden MV error** for practising card truing.
+4. **Range** – a scope view of a steel plate at a random distance. Read the wind from gusting flags and drifting mirage, dial the clickable turrets from **your** card, and send it. Real time of flight, a ding delayed by the sound's return trip, velocity spread, rifle dispersion, and an optional **hidden MV error** for truing practice.
+
+Progress (XP and rank) and preferences (theme, sound) are stored in your browser.
+
+**Range keys:** `↑/↓` elevation · `←/→` wind · `Shift` ×5 · `Space` fire · `N` new target · `0` reset dials.
 
 ## Limitations
 

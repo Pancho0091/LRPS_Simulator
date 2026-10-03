@@ -4,31 +4,79 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LRPS Dope Simulator</title>
+  <meta name="description" content="Learn to build and use dope cards for long-range precision shooting: ballistics lab, card builder, graded drills and a range simulator.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%23f59e0b' stroke-width='3'/%3E%3Cpath d='M16 1v10M16 21v10M1 16h10M21 16h10' stroke='%23f59e0b' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <header class="app-header no-print">
-    <h1>LRPS Dope Simulator</h1>
+  <header class="app-header">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+        <circle cx="16" cy="16" r="12"/><circle cx="16" cy="16" r="1.6" fill="currentColor" stroke="none"/>
+        <path d="M16 2v8M16 22v8M2 16h8M22 16h8"/>
+      </svg>
+      <div>LRPS Dope Sim<small>Long-range precision</small></div>
+    </div>
     <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="learn">1 · Learn</button>
-      <button class="tab" data-tab="build">2 · Build Card</button>
-      <button class="tab" data-tab="drill">3 · Drills</button>
-      <button class="tab" data-tab="range">4 · Range</button>
+      <button class="tab active" data-tab="learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>Learn</button>
+      <button class="tab" data-tab="build"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Build Card</button>
+      <button class="tab" data-tab="drill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Drills</button>
+      <button class="tab" data-tab="range"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Range</button>
     </nav>
+    <div class="header-right">
+      <div class="xp-chip" title="Experience: earn XP in challenges, drills and on the range">
+        <div class="xp-badge" id="xp-level">1</div>
+        <div class="xp-meta"><b id="xp-rank">Recruit</b><div class="xp-bar"><span id="xp-bar"></span></div></div>
+      </div>
+      <button class="icon-btn" id="sound-toggle" title="Sound on/off" aria-label="Toggle sound"></button>
+      <button class="icon-btn" id="theme-toggle" title="Theme" aria-label="Toggle theme"></button>
+    </div>
   </header>
 
   <main>
-    <!-- ============================== LEARN ============================== -->
+    <!-- ================================================== LEARN -->
     <section id="tab-learn" class="panel active">
-      <h2>The governing rule</h2>
-      <p class="rule">A dope card is a <b>precomputed lookup table</b>:
-        <code>f(range, conditions) → (elevation correction, wind correction)</code>.
-        You compute it at home with a ballistic solver so that under time pressure you only do a
-        lookup + a small adjustment.</p>
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Step 1 · Understand the engine</div>
+          <h2>Ballistics Lab</h2>
+          <p>A dope card is a precomputed lookup table: <code>f(range, conditions) → (elevation, wind)</code>.
+            Move the sliders and watch how each input reshapes the trajectory.</p>
+        </div>
+        <div class="seg" id="lab-unit"><button data-v="MIL" class="on">MIL</button><button data-v="MOA">MOA</button></div>
+      </div>
 
-      <h3>System diagram</h3>
-      <pre class="diagram">
-INPUTS (fixed per rifle/load)      INPUTS (vary per shot)        OUTPUTS (on the card)
+      <div class="grid-2">
+        <div class="card" id="lab-controls"></div>
+        <div class="stack">
+          <div class="tiles" id="lab-tiles"></div>
+          <div class="card">
+            <div class="charts">
+              <div><h3>Bullet path vs line of sight</h3><div id="chart-path"></div></div>
+              <div><h3>Corrections you dial / hold</h3><div id="chart-corr"></div></div>
+            </div>
+            <div class="actions">
+              <button class="btn" id="lab-pin">Pin as baseline</button>
+              <button class="btn" id="lab-clear">Clear baseline</button>
+              <span class="hint" style="align-self:center">Pin a baseline, change one slider, compare the dashed line.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="challenge" id="challenge"></div>
+
+      <div style="margin-top:28px">
+        <div class="eyebrow">Reference</div>
+        <h2 style="margin-bottom:8px">Rules of the dope card</h2>
+
+        <details class="ref" open>
+          <summary><span class="num">01</span>The system: inputs → solver → card</summary>
+          <div class="body">
+            <pre class="code">FIXED PER RIFLE/LOAD               VARY PER SHOT                 ON THE CARD
 ───────────────────────────────    ──────────────────────────    ─────────────────────────
 muzzle velocity (MV)               range to target               elevation  (MIL or MOA)
 ballistic coefficient (BC, G1/G7)  wind speed + direction        turret clicks
@@ -37,23 +85,30 @@ turret unit + click size           shot angle                    time of flight 
         │                                   │                              ▲
         └──────────► point-mass solver ◄────┘──────────────────────────────┘
                      (drag × gravity × wind integrated over time)</pre>
+          </div>
+        </details>
 
-      <h3>The variables and what each one does</h3>
-      <table class="grid">
-        <thead><tr><th>Variable</th><th>Effect on dope</th><th>Sensitivity</th></tr></thead>
-        <tbody>
-          <tr><td>Range</td><td>Drop grows faster than linearly: the bullet slows down, so it spends more time falling each yard.</td><td>Dominant</td></tr>
-          <tr><td>Muzzle velocity</td><td>Faster = less time of flight = less drop and less drift.</td><td>High. ±25 fps ≈ ±0.1–0.2 mil at 800+ yd</td></tr>
-          <tr><td>BC</td><td>Higher BC = retains velocity = flatter at long range. Barely matters inside 300 yd.</td><td>Grows with range</td></tr>
-          <tr><td>Density altitude</td><td>Thinner air (hot, high, low pressure) = less drag = less drop.</td><td>Medium. ~0.15 mil per 1000 ft DA at 1000 yd</td></tr>
-          <tr><td>Wind</td><td>Drift is roughly linear in crosswind speed: 5 mph is half of 10 mph.</td><td>Largest source of misses</td></tr>
-          <tr><td>Shot angle</td><td>Gravity only acts across the line of sight with factor cos(angle), so you need <i>less</i> elevation going up OR down.</td><td>Small below ~15°</td></tr>
-        </tbody>
-      </table>
+        <details class="ref">
+          <summary><span class="num">02</span>Variables and their sensitivity</summary>
+          <div class="body table-wrap">
+            <table class="tbl text">
+              <thead><tr><th>Variable</th><th>Effect on dope</th><th>Sensitivity</th></tr></thead>
+              <tbody>
+                <tr><td>Range</td><td>Drop grows faster than linearly: the bullet slows down, so it spends more time falling each yard.</td><td>Dominant</td></tr>
+                <tr><td>Muzzle velocity</td><td>Faster = less time of flight = less drop and less drift.</td><td>High. ±25 fps ≈ ±0.1–0.2 mil at 800+ yd</td></tr>
+                <tr><td>BC</td><td>Higher BC = retains velocity = flatter at long range. Barely matters inside 300 yd.</td><td>Grows with range</td></tr>
+                <tr><td>Density altitude</td><td>Thinner air (hot, high, low pressure) = less drag = less drop.</td><td>Medium. ~0.15 mil per 1000 ft DA at 1000 yd</td></tr>
+                <tr><td>Wind</td><td>Drift is roughly linear in crosswind speed: 5 mph is half of 10 mph.</td><td>Largest source of misses</td></tr>
+                <tr><td>Shot angle</td><td>Gravity only acts across the line of sight with factor cos(angle), so you need <i>less</i> elevation going up OR down.</td><td>Small below ~15°</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
 
-      <h3>Conversion rules (the arithmetic you do on the card)</h3>
-      <pre class="code">
-1 MIL  at Y yards = 3.6   × (Y / 100) inches
+        <details class="ref">
+          <summary><span class="num">03</span>Conversion rules (the arithmetic on the card)</summary>
+          <div class="body">
+            <pre class="code">1 MIL  at Y yards = 3.6   × (Y / 100) inches
 1 MOA  at Y yards = 1.047 × (Y / 100) inches
 
 correction_in_MIL = inches / (3.6   × Y/100)
@@ -64,151 +119,235 @@ clicks = round(correction / click_size)        // 0.1 MIL or 0.25 MOA typical
 wind_for_speed S = wind_value_10mph × (S / 10)  // linear scaling
 wind_for_clock C = full_value × sin(C × 30°)    // 3 & 9 = full, 12 & 6 = zero
   1:30 / 4:30 ≈ 0.7 value     1 / 2 o'clock ≈ 0.5 / 0.87 value</pre>
+          </div>
+        </details>
 
-      <h3>Exceptions (where the simple rules break)</h3>
-      <table class="grid">
-        <thead><tr><th>Exception</th><th>Cause</th><th>What to do</th></tr></thead>
-        <tbody>
-          <tr><td>MOA vs "shooter's MOA" (IPHY)</td><td>True MOA is 1.047 in/100 yd; some scopes use 1.000.</td><td>Know which your turret is. At 1000 yd the difference is ~1.4 in per MOA dialed.</td></tr>
-          <tr><td>Transonic zone</td><td>Near Mach 1 (~1125 fps) the drag curve spikes and the bullet can destabilise. Solver accuracy degrades.</td><td>Mark the range where velocity &lt; ~1340 fps (Mach 1.2) on the card. Trust field data past it.</td></tr>
-          <tr><td>Solver ≠ reality</td><td>Chronograph error, BC that differs from the box, scope tracking error.</td><td>"True" the card: shoot at long range, adjust MV (or BC) until predictions match impacts.</td></tr>
-          <tr><td>Wind is not one number</td><td>Wind at the muzzle, midrange and target differ; gusts.</td><td>The card gives you <i>brackets</i> (5/10/15 mph). Your wind call picks the bracket.</td></tr>
-          <tr><td>Spin drift</td><td>Gyroscopic effect pushes right-twist bullets right, growing with time of flight.</td><td>Small (&lt;0.2 mil inside 800 yd). Some shooters fold it into the card's wind zero.</td></tr>
-          <tr><td>Card made for one DA</td><td>Drop changes with air density.</td><td>Make one card per typical DA band (e.g. 0 / 3000 / 6000 ft), or recompute on the day.</td></tr>
-        </tbody>
-      </table>
+        <details class="ref">
+          <summary><span class="num">04</span>Exceptions: where the simple rules break</summary>
+          <div class="body table-wrap">
+            <table class="tbl text">
+              <thead><tr><th>Exception</th><th>Cause</th><th>What to do</th></tr></thead>
+              <tbody>
+                <tr><td>MOA vs "shooter's MOA" (IPHY)</td><td>True MOA is 1.047 in/100 yd; some scopes use 1.000.</td><td>Know which your turret is. At 1000 yd the difference is ~1.4 in per MOA dialed.</td></tr>
+                <tr><td>Transonic zone</td><td>Near Mach 1 (~1125 fps) the drag curve spikes and the bullet can destabilise. Solver accuracy degrades.</td><td>Mark the range where velocity &lt; ~1340 fps (Mach 1.2) on the card. Trust field data past it.</td></tr>
+                <tr><td>Solver ≠ reality</td><td>Chronograph error, BC that differs from the box, scope tracking error.</td><td>"True" the card: shoot at long range, adjust MV (or BC) until predictions match impacts.</td></tr>
+                <tr><td>Wind is not one number</td><td>Wind at the muzzle, midrange and target differ; gusts.</td><td>The card gives you <i>brackets</i> (5/10/15 mph). Your wind call picks the bracket.</td></tr>
+                <tr><td>Spin drift</td><td>Gyroscopic effect pushes right-twist bullets right, growing with time of flight.</td><td>Small (&lt;0.2 mil inside 800 yd). Some shooters fold it into the card's wind zero.</td></tr>
+                <tr><td>Card made for one DA</td><td>Drop changes with air density.</td><td>Make one card per typical DA band (e.g. 0 / 3000 / 6000 ft), or recompute on the day.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
 
-      <h3>Technical analog</h3>
-      <pre class="code">
-// The card is a memoised function with a coarse key and interpolation.
+        <details class="ref">
+          <summary><span class="num">05</span>Code analog</summary>
+          <div class="body">
+            <pre class="code">// The card is a memoised function with a coarse key and interpolation.
 const card = precompute(solver, ranges = [100, 150, ... 1000], conditions = today);
 function dope(range, windMph, clock) {
   const elev = interpolate(card.elev, range);                 // between rows
   const wind = interpolate(card.wind10, range) * windMph/10 * sin(clock*30°);
   return { elev: roundToClick(elev), wind: roundToClick(wind) };
 }</pre>
-
-      <h3>Verification loop (how to use this app)</h3>
-      <ol>
-        <li><b>Build Card</b>: enter a rifle and load. Change one variable at a time (MV, DA, BC) and predict
-          the direction of change before you hit Compute. If your prediction is wrong, your model is wrong.</li>
-        <li><b>Drills</b>: you are given raw solver output (inches) and must write card cells yourself. Graded to the click.</li>
-        <li><b>Range</b>: a target at a random distance and a wind call. Use <i>your</i> card to dial and hold, then
-          read the impact and correct. Turn on "hidden MV error" to practise truing.</li>
-      </ol>
-    </section>
-
-    <!-- ============================== BUILD ============================== -->
-    <section id="tab-build" class="panel">
-      <div class="build-layout">
-        <form id="profile-form" class="no-print" autocomplete="off">
-          <fieldset>
-            <legend>Rifle & load</legend>
-            <label>Preset
-              <select id="preset"></select>
-            </label>
-            <label>Profile name <input name="name" type="text"></label>
-            <label>Muzzle velocity (fps) <input name="muzzleVelocityFps" type="number" step="1"></label>
-            <label>Ballistic coefficient <input name="bc" type="number" step="0.001"></label>
-            <label>Drag model
-              <select name="dragModel"><option>G7</option><option>G1</option></select>
-            </label>
-            <label>Bullet weight (gr) <input name="bulletWeightGr" type="number" step="1"></label>
-            <label>Sight height (in) <input name="sightHeightIn" type="number" step="0.05"></label>
-            <label>Zero range (yd) <input name="zeroYards" type="number" step="25"></label>
-          </fieldset>
-          <fieldset>
-            <legend>Scope</legend>
-            <label>Turret unit
-              <select name="unit"><option value="MIL">MIL</option><option value="MOA">MOA</option></select>
-            </label>
-            <label>Click size <input name="clickSize" type="number" step="0.05"></label>
-          </fieldset>
-          <fieldset>
-            <legend>Conditions</legend>
-            <label>Altitude (ft) <input name="altitudeFt" type="number" step="100"></label>
-            <label>Temperature (°F) <input name="tempF" type="number" step="1"></label>
-            <label>Humidity (%) <input name="humidityPct" type="number" step="5"></label>
-            <label>Shot angle (°) <input name="shotAngleDeg" type="number" step="1"></label>
-            <label class="inline"><input name="spinDrift" type="checkbox"> Include spin drift (right twist, Sg 1.5)</label>
-          </fieldset>
-          <fieldset>
-            <legend>Card layout</legend>
-            <label>From (yd) <input name="rangeStart" type="number" step="25"></label>
-            <label>To (yd) <input name="rangeEnd" type="number" step="25"></label>
-            <label>Step (yd) <input name="rangeStep" type="number" step="25"></label>
-            <label>Wind brackets (mph, full value) <input name="windBrackets" type="text"></label>
-          </fieldset>
-          <div class="actions">
-            <button type="submit" class="primary">Compute card</button>
-            <button type="button" id="print-card">Print</button>
-            <button type="button" id="export-csv">CSV</button>
           </div>
-          <p class="hint">Profile is saved in this browser and used by the Range tab.</p>
-        </form>
-
-        <div id="card-output"></div>
+        </details>
       </div>
     </section>
 
-    <!-- ============================== DRILLS ============================== -->
+    <!-- ================================================== BUILD -->
+    <section id="tab-build" class="panel">
+      <div class="page-head no-print">
+        <div>
+          <div class="eyebrow">Step 2 · Make your data</div>
+          <h2>Build your dope card</h2>
+          <p>Every change recomputes instantly. Your card is saved in this browser and is the card you'll shoot with on the Range.</p>
+        </div>
+        <div class="actions" style="margin:0">
+          <button type="button" class="btn" id="export-csv">CSV</button>
+          <button type="button" class="btn primary" id="print-card">Print card</button>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <form id="profile-form" class="no-print stack" autocomplete="off" onsubmit="return false">
+          <div class="card">
+            <div class="card-title"><h3>Rifle &amp; load</h3></div>
+            <div class="field"><label for="preset">Preset</label><select id="preset"></select></div>
+            <div class="field"><label>Profile name</label><input name="name" type="text"></div>
+            <div class="field-row">
+              <div class="field"><label>Muzzle vel. (fps)</label><input name="muzzleVelocityFps" type="number" step="5"></div>
+              <div class="field"><label>Bullet (gr)</label><input name="bulletWeightGr" type="number" step="1"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>BC</label><input name="bc" type="number" step="0.001"></div>
+              <div class="field"><label>Drag model</label><select name="dragModel"><option>G7</option><option>G1</option></select></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Sight height (in)</label><input name="sightHeightIn" type="number" step="0.05"></div>
+              <div class="field"><label>Zero (yd)</label><input name="zeroYards" type="number" step="25"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3>Scope</h3></div>
+            <div class="field-row">
+              <div class="field"><label>Turret unit</label><select name="unit"><option value="MIL">MIL</option><option value="MOA">MOA</option></select></div>
+              <div class="field"><label>Click size</label><input name="clickSize" type="number" step="0.05"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3>Conditions</h3></div>
+            <div class="field-row">
+              <div class="field"><label>Altitude (ft)</label><input name="altitudeFt" type="number" step="100"></div>
+              <div class="field"><label>Temp (°F)</label><input name="tempF" type="number" step="1"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Humidity (%)</label><input name="humidityPct" type="number" step="5"></div>
+              <div class="field"><label>Shot angle (°)</label><input name="shotAngleDeg" type="number" step="1"></div>
+            </div>
+            <label class="check"><input name="spinDrift" type="checkbox"> Spin drift column (right twist)</label>
+          </div>
+          <div class="card">
+            <div class="card-title"><h3>Card layout</h3></div>
+            <div class="field-row">
+              <div class="field"><label>From (yd)</label><input name="rangeStart" type="number" step="25"></div>
+              <div class="field"><label>To (yd)</label><input name="rangeEnd" type="number" step="25"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Step (yd)</label><input name="rangeStep" type="number" step="25"></div>
+              <div class="field"><label>Wind (mph)</label><input name="windBrackets" type="text"></div>
+            </div>
+          </div>
+        </form>
+
+        <div class="stack">
+          <div class="tiles no-print" id="build-tiles"></div>
+          <div id="card-output"></div>
+          <div class="card no-print"><h3>Elevation curve</h3><div id="chart-build"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================== DRILLS -->
     <section id="tab-drill" class="panel">
-      <div class="drill-head">
-        <label>Drill
-          <select id="drill-type">
-            <option value="convert">Convert solver output → card cells</option>
-            <option value="interp">Interpolate between card rows</option>
-            <option value="wind">Wind call: speed + clock → hold</option>
-          </select>
-        </label>
-        <label>Unit
-          <select id="drill-unit"><option value="MIL">MIL (0.1)</option><option value="MOA">MOA (0.25)</option></select>
-        </label>
-        <button id="drill-new" class="primary">New problem</button>
-        <span id="drill-score" class="score"></span>
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Step 3 · Do it yourself</div>
+          <h2>Card drills</h2>
+          <p>Write card cells by hand and get graded to the click. <kbd>Enter</kbd> checks, <kbd>Enter</kbd> again for the next problem.</p>
+        </div>
+      </div>
+      <div class="drill-bar">
+        <div class="left">
+          <div class="seg" id="drill-type">
+            <button data-v="convert" class="on">Convert</button>
+            <button data-v="interp">Interpolate</button>
+            <button data-v="wind">Wind call</button>
+          </div>
+          <div class="seg" id="drill-unit"><button data-v="MIL" class="on">MIL</button><button data-v="MOA">MOA</button></div>
+        </div>
+        <div class="right">
+          <span class="pill-stat fire" title="Perfect problems in a row"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2s5 4.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 1-3.5s.5 2.5 2.5 2.5C10.5 7 12 2 12 2z"/></svg><span id="drill-streak">0</span></span>
+          <span class="pill-stat acc" title="Cells correct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg><span id="drill-acc">–</span></span>
+          <span class="pill-stat time" title="Time on this problem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg><span id="drill-timer">0:00</span></span>
+          <button id="drill-new" class="btn primary">New problem</button>
+        </div>
       </div>
       <div id="drill-body"></div>
     </section>
 
-    <!-- ============================== RANGE ============================== -->
+    <!-- ================================================== RANGE -->
     <section id="tab-range" class="panel">
-      <div class="range-layout">
-        <div class="range-controls">
-          <div class="range-settings">
-            <label class="inline"><input type="checkbox" id="opt-truing"> Hidden MV error (truing practice)</label>
-            <label class="inline"><input type="checkbox" id="opt-gusts" checked> Variable wind</label>
-            <label>Rifle precision (MOA) <input type="number" id="opt-precision" value="0.75" step="0.25"></label>
-            <label>Plate size (in) <input type="number" id="opt-plate" value="12" step="1"></label>
-            <button id="range-new" class="primary">New target</button>
-          </div>
-          <div id="range-brief" class="brief"></div>
-          <form id="fire-form" autocomplete="off">
-            <label>Elevation dialed (<span class="u">MIL</span>, + = up)
-              <input type="number" id="dial-elev" step="0.05" value="0">
-            </label>
-            <label>Wind (<span class="u">MIL</span>, + = right, − = left)
-              <input type="number" id="dial-wind" step="0.05" value="0">
-            </label>
-            <div class="actions">
-              <button type="submit" class="primary">Fire</button>
-              <button type="button" id="range-reveal">Reveal solution</button>
-            </div>
-          </form>
-          <div id="range-feedback" class="feedback"></div>
-          <div id="your-card-mini"></div>
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Step 4 · Put it to work</div>
+          <h2>Range</h2>
+          <p>Range the target, read the flags and mirage, dial from your card, send it. The ding arrives late because sound travels back at ~1125 fps.</p>
         </div>
-        <div class="range-view">
-          <canvas id="scope" width="520" height="520"></canvas>
-          <table class="grid small" id="shot-log">
-            <thead><tr><th>#</th><th>Range</th><th>Dial E</th><th>Wind</th><th>Impact (up / right)</th><th>Result</th></tr></thead>
-            <tbody></tbody>
-          </table>
+        <p class="hint" style="max-width:340px"><kbd>↑</kbd><kbd>↓</kbd> elevation · <kbd>←</kbd><kbd>→</kbd> wind · <kbd>Shift</kbd> ×5 · <kbd>Space</kbd> fire · <kbd>N</kbd> new target · <kbd>0</kbd> reset dials</p>
+      </div>
+
+      <div class="grid-range">
+        <div>
+          <div class="scope-wrap">
+            <canvas id="scope" aria-label="Rifle scope view"></canvas>
+            <div class="scope-hud" id="scope-hud"></div>
+          </div>
+          <div class="flight-bar"><span id="flight-bar"></span></div>
+          <div class="hud" id="range-hud"></div>
+          <div class="card" style="margin-top:16px">
+            <details class="plain" open>
+              <summary>Your dope card</summary>
+              <div id="your-card-mini"></div>
+            </details>
+          </div>
+          <div class="card" style="margin-top:16px">
+            <details class="plain">
+              <summary>Shot log</summary>
+              <div class="table-wrap">
+                <table class="tbl" id="shot-log">
+                  <thead><tr><th>#</th><th>Yds</th><th>Elev</th><th>Wind</th><th>Impact ↑/→</th><th></th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="card">
+            <div class="brief" id="range-brief"></div>
+            <div class="flags-wrap"><canvas id="flags"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="turrets">
+              <div class="turret" data-axis="elev">
+                <div class="t-label">Elevation</div>
+                <div class="dial"><svg viewBox="-50 -50 100 100"></svg><div class="dial-value"></div></div>
+                <div class="turret-btns"><button type="button" data-step="-1" aria-label="Elevation down">−</button><input type="number" id="dial-elev" value="0"><button type="button" data-step="1" aria-label="Elevation up">+</button></div>
+                <div class="dir">+ = up</div>
+              </div>
+              <div class="turret" data-axis="wind">
+                <div class="t-label">Windage</div>
+                <div class="dial"><svg viewBox="-50 -50 100 100"></svg><div class="dial-value"></div></div>
+                <div class="turret-btns"><button type="button" data-step="-1" aria-label="Wind left">L</button><input type="number" id="dial-wind" value="0"><button type="button" data-step="1" aria-label="Wind right">R</button></div>
+                <div class="dir">+ = right · − = left</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button type="button" class="btn primary big" id="fire-btn" style="flex:1">Send it</button>
+              <button type="button" class="btn" id="range-new">New target</button>
+            </div>
+            <div class="actions" style="margin-top:8px">
+              <button type="button" class="btn" id="range-reveal">Reveal solution</button>
+              <button type="button" class="btn" id="range-reset">Reset dials</button>
+            </div>
+            <div class="feedback" id="range-feedback" style="margin-top:12px"></div>
+          </div>
+          <div class="card">
+            <details class="plain">
+              <summary>Range settings</summary>
+              <label class="check"><input type="checkbox" id="opt-truing"> Hidden MV error (truing practice)</label>
+              <label class="check"><input type="checkbox" id="opt-gusts" checked> Gusting wind</label>
+              <label class="check"><input type="checkbox" id="opt-delay" checked> Realistic sound delay</label>
+              <div class="field-row" style="margin-top:8px">
+                <div class="field"><label>Precision (MOA)</label><input type="number" id="opt-precision" value="0.75" step="0.25" min="0"></div>
+                <div class="field"><label>Plate (in)</label><input type="number" id="opt-plate" value="12" step="1" min="2"></div>
+              </div>
+            </details>
+          </div>
         </div>
       </div>
     </section>
   </main>
 
+  <div id="toasts" aria-live="polite"></div>
+  <canvas id="confetti"></canvas>
+
   <script src="js/ballistics.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/lab.js"></script>
+  <script src="js/build.js"></script>
+  <script src="js/drills.js"></script>
+  <script src="js/range.js"></script>
 </body>
 </html>
