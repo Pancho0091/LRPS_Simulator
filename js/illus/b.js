@@ -185,7 +185,7 @@
     g += `<g${rot}><line x1="${cx - r}" y1="${cy}" x2="${cx + r}" y2="${cy}" stroke="${col}" stroke-width="1.2"/><line x1="${cx}" y1="${cy - r}" x2="${cx}" y2="${cy + r}" stroke="${col}" stroke-width="1.2"/>`;
     for (let i = -n; i <= n; i++) {
       if (!i) continue;
-      const L = i % 5 === 0 ? 5 : 3;
+      const L = i % (o.major || 5) === 0 ? 5 : 3;
       g += `<line x1="${cx + i * m}" y1="${cy - L}" x2="${cx + i * m}" y2="${cy + L}" stroke="${col}" stroke-width="1.2"/>`;
       g += `<line x1="${cx - L}" y1="${cy + i * m}" x2="${cx + L}" y2="${cy + i * m}" stroke="${col}" stroke-width="1.2"/>`;
     }
@@ -825,7 +825,7 @@
       // sight pictures: columns 10x, 25x; rows FFP, SFP
       const cols = [[490, '10×', 8], [638, '25×', 20]];
       const rowsY = [104, 262];
-      cols.forEach(([cx, mag]) => s.text(cx + 72, 26, mag, { size: 14, weight: 800, anchor: 'end' }));
+      cols.forEach(([cx, mag]) => s.text(cx, 30, mag, { size: 14, weight: 800, anchor: 'middle' }));
       rowsY.forEach((cy, ri) => cols.forEach(([cx, mag, tw], ci) => {
         const mil = ri === 0 ? tw : 20; // FFP reticle scales with the image; SFP stays fixed
         const plate = `<line x1="${cx + tw / 2}" y1="${cy + tw * 0.7}" x2="${cx + tw / 2}" y2="${cy + tw * 1.6}" stroke="${C.wood}" stroke-width="${Math.max(1.2, tw / 8)}"/><rect x="${cx}" y="${cy - tw * 0.7}" width="${tw}" height="${tw * 1.4}" fill="${C.white}" stroke="${C.coral}" stroke-width="2"/>`;
@@ -834,6 +834,166 @@
         const read = ok ? '✓ reads 1.0 mil' : '✗ reads 0.4 mil';
         pill(s, cx, cy + 82, read, { size: 12, anchor: 'middle', fill: ok ? C.green : C.coral });
       }));
+      return s.svg();
+    },
+  });
+  ISO.lesson('turrets', {
+    caption: '<b>Read the turret like a clock with two hands.</b> Each click is 0.1 mil, ten numbered mils make one revolution, and the revolution indicator tells you which lap you are on — here 12.0 mil = second revolution, "2" on the index. The zero stop lets you spin back to zero without looking.',
+    draw: () => {
+      const sc = 25;
+      const s = ISO.scene({ w: 720, h: 380, origin: [330, 212], scale: sc });
+      s.shadow(-8, -2.2, 16, 4.4);
+      s.lathe(-9, 0, 0, [[0, 1.5], [18, 1.5]], { axis: 'x', color: C.ink, segments: 26 });
+      const zb = 1.2, zr = 2.3, zd = 3.0, zt = 5.9, R = 3.6;
+      s.lathe(0, 0, zb, [[0, 2.5], [zr - zb, 2.5]], { axis: 'z', color: C.gunmetal, segments: 30 });
+      // base ring with index line and revolution marks
+      s.lathe(0, 0, zr, [[0, 3.2], [zd - zr, 3.2]], { axis: 'z', color: C.black, segments: 34 });
+      // dial
+      s.lathe(0, 0, zd, [[0, R], [zt - zd, R], [zt - zd + 0.25, R - 0.3]], { axis: 'z', color: C.ink, capColor: C.gunmetal, segments: 40 });
+      const W = (th, r, z) => [r * Math.cos(th), r * Math.sin(th), z];
+      const deg = Math.PI / 180, vis = (th) => Math.cos(th - 45 * deg) > 0.08;
+      // knurling on the upper half of the dial
+      for (let a = -40; a <= 130; a += 6) { const th = a * deg; if (vis(th)) s.line([W(th, R + 0.01, 4.9), W(th, R + 0.01, zt - 0.05)], { color: C.gunmetal, width: 1.4 }); }
+      // ticks: 100 per revolution (0.1 mil), long every 1 mil, mid every 0.5
+      for (let i = -26; i <= 26; i++) {
+        const th = (45 - i * 3.6) * deg;
+        if (!vis(th)) continue;
+        const L = i % 10 === 0 ? 0.75 : i % 5 === 0 ? 0.5 : 0.3;
+        s.line([W(th, R + 0.01, zd + 0.05), W(th, R + 0.01, zd + 0.05 + L)], { color: i % 10 === 0 ? C.white : C.silver, width: i % 10 === 0 ? 2 : 1.1 });
+        if (i % 10 === 0) {
+          const n = 2 + i / 10;
+          s.text3(W(th, R + 0.01, zd + 1.45), String(n), { size: 15, weight: 800, anchor: 'middle', color: n === 2 ? C.amber : C.white, dy: 5 });
+        }
+      }
+      // index line on the base ring
+      const ti = 45 * deg;
+      s.line([W(ti, 3.21, zr + 0.05), W(ti, 3.21, zd - 0.05)], { color: C.amber, width: 3 });
+      // revolution indicator: second line exposed under the dial
+      [0, 1].forEach((k) => { const th = (75 + k * 0) * deg; s.line([W(th - 0.12, 3.21, zr + 0.15 + k * 0.28), W(th + 0.12, 3.21, zr + 0.15 + k * 0.28)], { color: C.mint, width: 3 }); });
+      // rotation arrow on the cap
+      s.curve((t) => [Math.cos(t) * 2.2, Math.sin(t) * 2.2, zt + 0.26], 200 * deg, 330 * deg, { color: C.amber, width: 3, arrow: true, samples: 18 });
+      s.text3([0, 0, zt + 0.26], 'UP', { size: 16, weight: 800, anchor: 'middle', color: C.amber, dy: 6 });
+      s.label(W(ti + 3.6 * deg * 3, R, zd + 0.3), '1 click = 0.1 mil', { dx: 70, dy: 80, n: 1, color: C.blue });
+      s.label(W(ti, 3.2, zr + 0.35), 'Index line: reads 2', { dx: 90, dy: 30, n: 2, color: C.amber });
+      s.label(W(75 * deg, 3.2, zr + 0.4), 'Rev indicator: 2nd revolution', { dx: -110, dy: 70, n: 3, color: C.teal });
+      s.label(W(-30 * deg, 2.5, zb + 0.6), 'Zero stop: dial back to 0 blind', { dx: 90, dy: -80, n: 4, color: C.coral });
+      s.label(W(110 * deg, R, 4.3), '10 mil per revolution', { dx: -100, dy: -60, n: 5, color: C.purple });
+      pill(s, 16, 34, 'Dialed: 12.0 mil = 1 full rev + 2.0', { size: 13, mono: true, fill: C.navy });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('mil-ranging', {
+    caption: '<b>Known size + measured mils = distance.</b> An 18" plate that spans 1.0 mil in the reticle is 18 × 27.78 ÷ 1.0 ≈ 500 yd away. A 0.1-mil misread on a small target swings the answer by 10% or more — measure the biggest dimension you can, braced, at max power.',
+    draw: () => {
+      const sc = 5;
+      const s = ISO.scene({ w: 720, h: 380, origin: [400, 330], scale: sc });
+      s.floor(-14, -62, 30, 70, { grid: 8 });
+      const D = 55, h0 = 3, w = 12, hc = 9;
+      // horizontal wedge to the plate's edges
+      s.poly([[0, 0, h0], [-w / 2, -D, hc], [w / 2, -D, hc]], { fill: C.blue, opacity: 0.16 });
+      s.line([[0, 0, h0], [-w / 2, -D, hc]], { color: C.blue, width: 1.8, dash: '6 5' });
+      s.line([[0, 0, h0], [w / 2, -D, hc]], { color: C.blue, width: 1.8, dash: '6 5' });
+      // plate on a stand
+      s.line([[0, -D, 0], [0, -D, hc - 4]], { color: C.wood, width: 3 });
+      s.poly([[-w / 2, -D, hc - 4], [w / 2, -D, hc - 4], [w / 2, -D, hc + 4], [-w / 2, -D, hc + 4]], { fill: C.white, stroke: C.coral, width: 2.5 });
+      // known size dimension
+      const zt = hc + 6;
+      s.line([[-w / 2, -D, zt], [w / 2, -D, zt]], { color: C.coral, width: 3 });
+      [-w / 2, w / 2].forEach((x) => s.line([[x, -D, zt - 0.8], [x, -D, zt + 0.8]], { color: C.coral, width: 2 }));
+      s.label([w / 4, -D, zt], 'Known size: 18 in', { dx: 30, dy: -24, n: 1, color: C.coral });
+      // distance on the ground
+      s.line([[9, -2, 0.05], [9, -D + 2, 0.05]], { color: C.ink, width: 2, arrow: true, opacity: 0.8 });
+      s.label([9, -D * 0.45, 0.05], 'Range = ? → 500 yd', { dx: 40, dy: 34, n: 3, color: C.ink });
+      // scope from behind
+      s.box(-1.2, 3, 0, 2.4, 8, h0 - 1.3, { color: C.gunmetal });
+      s.lathe(0, 0, h0, [[0, 1.5], [3.5, 1.45], [5.5, 0.85], [12, 0.85], [13.5, 1.3], [17, 1.3]], { axis: 'y', color: C.ink, segments: 22 });
+      // sight picture inset: 40 px per mil, hashes every 0.5 mil
+      const cx = 130, cy = 120, m = 40;
+      const plate = `<rect x="${cx}" y="${cy - 26}" width="${m}" height="${52}" fill="${C.white}" stroke="${C.coral}" stroke-width="2.5"/><line x1="${cx + m / 2}" y1="${cy + 26}" x2="${cx + m / 2}" y2="${cy + 60}" stroke="${C.wood}" stroke-width="4"/>`;
+      const over = `<line x1="${cx}" y1="${cy - 38}" x2="${cx + m}" y2="${cy - 38}" stroke="${C.blue}" stroke-width="3"/><line x1="${cx}" y1="${cy - 44}" x2="${cx}" y2="${cy - 32}" stroke="${C.blue}" stroke-width="2"/><line x1="${cx + m}" y1="${cy - 44}" x2="${cx + m}" y2="${cy - 32}" stroke="${C.blue}" stroke-width="2"/><text x="${cx + m / 2}" y="${cy - 50}" text-anchor="middle" font-size="13" font-weight="800" fill="${C.blue}">1.0 mil</text>`;
+      sightPicture(s, cx, cy, { r: 96, mil: m / 2, major: 2, scene: plate, overlay: over, horizon: 0.55 });
+      s.text(cx, 240, 'What you see: plate spans 1.0 mil', { size: 12, weight: 700, anchor: 'middle' });
+      s.label([0, -D * 0.6, (h0 + hc) / 2], 'Measured: 1.0 mil', { dx: -70, dy: -60, n: 2, color: C.blue });
+      pill(s, 16, 300, 'range (yd) = 18 in × 27.78 ÷ 1.0 mil ≈ 500 yd', { size: 12, mono: true, fill: C.navy });
+      s.text(20, 334, 'metric: range (m) = size (mm) ÷ mils', { size: 11.5, weight: 600 });
+      return s.svg();
+    },
+  });
+
+  // Short scope section with a cross-bore bubble level on top
+  function levelOnScope(s, x, y, z, bubble) {
+    s.shadow(x - 5, y - 1.3, 10, 2.6, { opacity: 0.1 });
+    s.lathe(x - 5, y, z, [[0, 1.2], [10, 1.2]], { axis: 'x', color: C.ink, segments: 22 });
+    s.box(x - 1.3, y - 2.1, z + 0.9, 2.6, 4.2, 0.9, { color: C.gunmetal });
+    s.lathe(x, y - 1.8, z + 2.3, [[0, 0.5], [3.6, 0.5]], { axis: 'y', color: '#bff3dd', segments: 18 });
+    s.line([[x, y - 0.5, z + 2.81], [x - 0.0, y - 0.5, z + 2.81]], { color: C.ink });
+    [-0.5, 0.5].forEach((d) => s.line([[x - 0.35, y + d, z + 2.82], [x + 0.35, y + d, z + 2.82]], { color: C.ink, width: 1.4 }));
+    s.sphere(x, y + bubble, z + 2.45, 0.42, { color: C.white, rings: 8 });
+  }
+
+  ISO.lesson('scope-setup', {
+    caption: '<b>Cant turns elevation into a sideways miss.</b> With the reticle square to gravity, dialed elevation moves the shot straight up. Tilt it and part of the elevation goes sideways: 2° of cant with 10 mil dialed ≈ 0.35 mil (≈12" at 1,000 yd). Check the bubble before every shot.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 380, origin: [0, 0], scale: 12 });
+      const panels = [{ cx: 190, cant: 0, ok: true }, { cx: 530, cant: 8, ok: false }];
+      panels.forEach((p) => {
+        const cy = 112;
+        const targ = `<circle cx="${p.cx}" cy="${cy}" r="30" fill="${C.white}" stroke="${C.slate}" stroke-width="2"/><circle cx="${p.cx}" cy="${cy}" r="12" fill="${sh(C.blue, 0.6)}" stroke="${C.slate}" stroke-width="1"/>`;
+        const off = p.ok ? 0 : 26;
+        const over = '';
+        sightPicture(s, p.cx, cy, { r: 84, mil: 14, cant: p.cant, scene: targ, horizon: 0.62 });
+        // plumb line and impact
+        s.raw(`<line x1="${p.cx}" y1="${cy - 84}" x2="${p.cx}" y2="${cy + 84}" stroke="${C.coral}" stroke-width="1.5" stroke-dasharray="5 4" opacity="${p.ok ? 0 : 0.9}"/>`, 6);
+        s.raw(`<circle cx="${p.cx + off}" cy="${cy + (p.ok ? 0 : 3)}" r="5.5" fill="${C.ink}" stroke="#fff" stroke-width="2"/>`, 6);
+        if (!p.ok) s.raw(`<line x1="${p.cx}" y1="${cy + 18}" x2="${p.cx + off}" y2="${cy + 18}" stroke="${C.coral}" stroke-width="3"/><line x1="${p.cx}" y1="${cy + 13}" x2="${p.cx}" y2="${cy + 23}" stroke="${C.coral}" stroke-width="2"/><line x1="${p.cx + off}" y1="${cy + 13}" x2="${p.cx + off}" y2="${cy + 23}" stroke="${C.coral}" stroke-width="2"/>`, 6);
+        // iso scope + level, positioned under the inset
+        const wx = (p.cx - 0) / (2 * 0.866 * 12), wz = 0;
+        const sy = 262; // screen y of the tube axis
+        const X = wx + sy / 12 - 0.5 * 0, Y = -wx + sy / 12;
+        levelOnScope(s, X / 1, Y / 1 - 0, 0, p.ok ? 0 : 1.15);
+        pill(s, p.cx, 356, p.ok ? '✓ Level: 10 mil dialed lands on the line' : '✗ Canted: same 10 mil lands sideways', { size: 12, anchor: 'middle', fill: p.ok ? C.green : C.coral });
+      });
+      s.text(190, 22, 'LEVEL', { size: 14, weight: 800, anchor: 'middle' });
+      s.text(530, 22, 'CANTED (exaggerated)', { size: 14, weight: 800, anchor: 'middle' });
+      s.text(360, 120, 'horizontal error ≈', { size: 11.5, weight: 600, anchor: 'middle' });
+      s.text(360, 137, 'dialed mils × sin(cant)', { size: 11.5, weight: 700, anchor: 'middle', mono: true });
+      s.text(360, 158, '10 × sin 2° ≈ 0.35 mil', { size: 11.5, weight: 600, anchor: 'middle', mono: true });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('scope-setup', {
+    at: 'end',
+    caption: '<b>Parallax check: move your head, watch the crosshair.</b> If the reticle slides across the target as your eye moves, the target image and reticle are not in the same focal plane — turn the parallax (side-focus) knob until the reticle stays put.',
+    draw: () => {
+      const sc = 16;
+      const s = ISO.scene({ w: 720, h: 380, origin: [118, 150], scale: sc });
+      s.shadow(1, -1.4, 13, 2.8);
+      s.box(3, -0.6, 0, 1.1, 1.2, 1.5, { color: C.black });
+      s.box(9.6, -0.6, 0, 1.1, 1.2, 1.5, { color: C.black });
+      scope(s, 0, 0, 2.1);
+      s.lathe(6.3, 0, 2.1 + 0.6, [[0, 0.8], [1.2, 0.8]], { axis: 'z', color: C.steel, segments: 18 });
+      // side-focus (parallax) knob on the left side of the saddle (toward -y, behind)… shown on the viewer side for clarity
+      s.lathe(6.8, 0.6, 2.1, [[0, 1.2], [0.9, 1.2], [1.0, 0.9]], { axis: 'y', color: C.amber, segments: 24 });
+      // eye positions behind the eyepiece
+      const ez = 2.1;
+      s.line([[-4, -1.6, ez], [-4, 1.6, ez]], { color: C.coral, width: 2.5, arrow: true });
+      s.line([[-4, 1.6, ez], [-4, -1.6, ez]], { color: C.coral, width: 2.5, arrow: true });
+      s.sphere(-4, 0, ez, 1.0, { color: C.white, rings: 8 });
+      s.sphere(-3.3, 0, ez, 0.42, { color: C.ink, rings: 6 });
+      s.label([7.2, 1.6, 2.1], 'Parallax / side-focus knob', { dx: 30, dy: 60, n: 1, color: C.amber });
+      s.label([-4, 1.6, ez], 'Move your head side to side', { dx: -30, dy: 70, n: 2, color: C.coral });
+      // sight pictures: rows = not set / set, columns = eye left / centered / right
+      const xs = [452, 548, 644], ys = [92, 262];
+      ['eye left', 'centered', 'eye right'].forEach((t, i) => s.text(xs[i], 24, t, { size: 11.5, weight: 700, anchor: 'middle' }));
+      ys.forEach((cy, r) => xs.forEach((cx, i) => {
+        const off = r === 0 ? (i - 1) * -9 : 0;
+        const plate = `<circle cx="${cx + off}" cy="${cy}" r="13" fill="${C.white}" stroke="${C.coral}" stroke-width="2"/><circle cx="${cx + off}" cy="${cy}" r="4" fill="${C.coral}"/>`;
+        sightPicture(s, cx, cy, { r: 40, mil: 10, scene: plate, horizon: 0.6 });
+      }));
+      pill(s, 548, 158, '✗ Parallax off: reticle floats on the target', { size: 12, anchor: 'middle', fill: C.coral });
+      pill(s, 548, 328, '✓ Parallax set: reticle stays on the target', { size: 12, anchor: 'middle', fill: C.green });
       return s.svg();
     },
   });
