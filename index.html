@@ -208,46 +208,101 @@
 
     <!-- ================================================== RANGE -->
     <section id="tab-range" class="panel">
-      <div class="page-head">
+      <div class="page-head no-print">
         <div>
           <div class="eyebrow">Step 4 · Put it to work</div>
           <h2>Range</h2>
-          <p>Shoot with <b>your</b> card in real conditions: today's weather, angles, wind that differs near and far, your position's wobble.
-            Training mode keeps it simple; Realistic mode takes the helpers away.</p>
+          <p>A range day, not a solver. Pick your rifle and ammo, chronograph it, zero it, then shoot steel in real wind and weather.
+            Write your dope on <b>your own paper</b>; the range only gives you what a real range gives you.</p>
         </div>
         <div class="range-modes">
-          <div class="seg" id="range-preset"><button data-v="training" class="on">Training</button><button data-v="realistic">Realistic</button></div>
-          <div class="seg" id="range-mode"><button data-v="free" class="on">Free fire</button><button data-v="stage">PRS stage</button></div>
+          <div class="seg" id="range-preset"><button type="button" data-v="training" class="on">Training</button><button type="button" data-v="realistic">Realistic</button></div>
+          <button type="button" class="btn" id="range-print">Print blank data book</button>
         </div>
       </div>
 
-      <div class="grid-range">
+      <ol class="r-steps no-print" id="r-steps" aria-label="Session steps">
+        <li><button type="button" data-step="setup" class="on"><span class="r-n">1</span>Setup</button></li>
+        <li><button type="button" data-step="chrono"><span class="r-n">2</span>Chronograph</button></li>
+        <li><button type="button" data-step="zero"><span class="r-n">3</span>Zero</button></li>
+        <li><button type="button" data-step="shoot"><span class="r-n">4</span>Shoot</button></li>
+        <li><button type="button" data-step="debrief"><span class="r-n">5</span>Debrief</button></li>
+      </ol>
+
+      <!-- ---------------------------------------------- 1. SETUP -->
+      <div class="r-step no-print" id="r-setup">
+        <div class="grid-2 r-setup-grid">
+          <form id="rig-form" class="stack" autocomplete="off" onsubmit="return false">
+            <div class="card">
+              <div class="card-title"><h3>Rifle &amp; ammunition</h3><span class="hint">approx. published data</span></div>
+              <div class="field"><label for="rig-cart">Cartridge</label><select id="rig-cart"></select></div>
+              <div class="field"><label for="rig-load">Factory ammunition</label><select id="rig-load"></select></div>
+              <div class="field-row">
+                <div class="field"><label for="rig-barrel">Barrel length</label><select id="rig-barrel"></select></div>
+                <div class="field"><label for="rig-twist">Twist (1:x in)</label><select id="rig-twist"></select></div>
+              </div>
+              <div class="field"><label for="rig-rifle">Rifle</label><select id="rig-rifle"></select></div>
+              <p class="hint" id="rig-rifle-desc" style="margin:0"></p>
+            </div>
+            <div class="card">
+              <div class="card-title"><h3>Optic</h3><span class="hint">MIL · 0.1 mil clicks · 10 mil/rev</span></div>
+              <div class="field"><label for="rig-optic">Scope</label><select id="rig-optic"></select></div>
+              <div class="field-row">
+                <div class="field"><label for="rig-sh">Sight height (in)</label><select id="rig-sh"></select></div>
+                <div class="field"><label for="rig-zero">Zero distance (yd)</label><select id="rig-zero"><option>50</option><option selected>100</option><option>200</option></select></div>
+              </div>
+              <p class="hint" id="rig-optic-desc" style="margin:0"></p>
+            </div>
+            <div class="card">
+              <div class="card-title"><h3>Range day</h3></div>
+              <div class="field-row">
+                <div class="field"><label for="rig-loc">Location</label><select id="rig-loc"></select></div>
+                <div class="field"><label for="rig-sky">Sky</label><select id="rig-sky"></select></div>
+              </div>
+              <div class="field"><label for="opt-position">Position</label><select id="opt-position"></select></div>
+              <p class="hint" id="rig-loc-desc" style="margin:0 0 8px"></p>
+              <details class="plain" id="range-settings">
+                <summary>Realism options <span class="hint" id="range-settings-sum"></span></summary>
+                <div id="range-toggles"></div>
+              </details>
+            </div>
+          </form>
+
+          <div class="stack">
+            <div class="card" id="rig-summary"></div>
+            <div class="card" id="setup-instruments-card">
+              <div id="instruments">
+                <div class="kestrel" id="kestrel"></div>
+                <div class="flags-wrap"><canvas id="flags" aria-label="Wind flags: near, mid and far"></canvas></div>
+              </div>
+            </div>
+            <div class="actions">
+              <button type="button" class="btn primary big" id="setup-go" style="flex:1">Start the session → Chronograph</button>
+            </div>
+            <p class="hint">Your rifle will not shoot the box velocity. Measure it, write it down, and build your dope from <em>your</em> numbers.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ------------------------------------ 2–4. ON THE LINE -->
+      <div class="r-step grid-range no-print" id="r-line" hidden>
         <div>
           <div class="scope-wrap">
             <canvas id="scope" aria-label="Rifle scope view"></canvas>
             <div class="scope-hud" id="scope-hud"></div>
             <div class="scope-stage" id="scope-stage"></div>
+            <div class="scope-zoom" id="scope-zoom" aria-label="Magnification"></div>
           </div>
           <div class="flight-bar"><span id="flight-bar"></span></div>
           <div class="hud" id="range-hud"></div>
           <p class="hint keys"><kbd>↑</kbd><kbd>↓</kbd> elevation · <kbd>←</kbd><kbd>→</kbd> wind · <kbd>Shift</kbd> ×5 · <kbd>Space</kbd> fire ·
-            <kbd>B</kbd> hold breath · <kbd>L</kbd> level · <kbd>N</kbd> new target · <kbd>0</kbd> reset dials</p>
-          <div class="card" style="margin-top:16px" id="whatchanged-card" hidden>
-            <h3>What changed vs your card</h3>
-            <div id="whatchanged"></div>
-          </div>
+            <kbd>B</kbd> hold breath · <kbd>L</kbd> level · <kbd>R</kbd> lase · <kbd>N</kbd> next target · <kbd>Z</kbd> zoom · <kbd>0</kbd> reset dials</p>
           <div class="card" style="margin-top:16px">
-            <details class="plain" open>
-              <summary>Your dope card</summary>
-              <div id="your-card-mini"></div>
-            </details>
-          </div>
-          <div class="card" style="margin-top:16px">
-            <details class="plain">
-              <summary>Shot log</summary>
+            <details class="plain" id="shot-log-card" open>
+              <summary>Shot log <span class="hint" id="shot-log-sum"></span></summary>
               <div class="table-wrap">
                 <table class="tbl" id="shot-log">
-                  <thead><tr><th>#</th><th>Yds</th><th>Elev</th><th>Wind</th><th>Impact ↑/→</th><th></th></tr></thead>
+                  <thead><tr><th>#</th><th>Station</th><th>Yds</th><th>Elev</th><th>Wind</th><th>Call</th><th></th></tr></thead>
                   <tbody></tbody>
                 </table>
               </div>
@@ -256,10 +311,9 @@
         </div>
 
         <div class="stack">
-          <div class="card">
-            <div class="brief" id="range-brief"></div>
-            <div class="flags-wrap"><canvas id="flags"></canvas></div>
-            <div class="kestrel" id="kestrel"></div>
+          <div class="card" id="station-card">
+            <div id="station"></div>
+            <div id="instruments-slot"></div>
             <div id="stage-list"></div>
           </div>
           <div class="card">
@@ -267,13 +321,13 @@
               <div class="turret" data-axis="elev">
                 <div class="t-label">Elevation</div>
                 <div class="dial"><svg viewBox="-50 -50 100 100"></svg><div class="dial-value"></div></div>
-                <div class="turret-btns"><button type="button" data-step="-1" aria-label="Elevation down">−</button><input type="number" id="dial-elev" value="0"><button type="button" data-step="1" aria-label="Elevation up">+</button></div>
+                <div class="turret-btns"><button type="button" data-step="-1" aria-label="Elevation down">−</button><input type="number" id="dial-elev" value="0" aria-label="Elevation (mil)"><button type="button" data-step="1" aria-label="Elevation up">+</button></div>
                 <div class="dir">+ = up</div>
               </div>
               <div class="turret" data-axis="wind">
                 <div class="t-label">Windage</div>
                 <div class="dial"><svg viewBox="-50 -50 100 100"></svg><div class="dial-value"></div></div>
-                <div class="turret-btns"><button type="button" data-step="-1" aria-label="Wind left">L</button><input type="number" id="dial-wind" value="0"><button type="button" data-step="1" aria-label="Wind right">R</button></div>
+                <div class="turret-btns"><button type="button" data-step="-1" aria-label="Wind left">L</button><input type="number" id="dial-wind" value="0" aria-label="Windage (mil)"><button type="button" data-step="1" aria-label="Wind right">R</button></div>
                 <div class="dir">+ = right · − = left</div>
               </div>
             </div>
@@ -283,45 +337,24 @@
             </div>
             <div class="actions" style="margin-top:8px">
               <button type="button" class="btn primary big" id="fire-btn" style="flex:1">Send it</button>
-              <button type="button" class="btn" id="range-new">New target</button>
+              <button type="button" class="btn" id="range-new">Next target</button>
             </div>
             <div class="actions" style="margin-top:8px">
-              <button type="button" class="btn" id="range-reveal">Reveal solution</button>
               <button type="button" class="btn" id="range-reset">Reset dials</button>
+              <button type="button" class="btn" id="station-next">Next station →</button>
             </div>
             <div class="feedback" id="range-feedback" style="margin-top:12px"></div>
           </div>
-          <div class="card">
-            <details class="plain" id="range-settings">
-              <summary>Range settings</summary>
-              <div class="field"><label for="opt-position">Position</label>
-                <select id="opt-position">
-                  <option value="bench">Bench / sandbags</option>
-                  <option value="prone-bag">Prone · bipod + rear bag</option>
-                  <option value="prone">Prone · bipod only</option>
-                  <option value="barricade">Barricade</option>
-                  <option value="kneeling">Kneeling · tripod</option>
-                  <option value="standing">Standing · tripod</option>
-                </select>
-              </div>
-              <label class="check"><input type="checkbox" id="opt-weather"> Range-day weather differs from card</label>
-              <label class="check"><input type="checkbox" id="opt-angle"> Uphill / downhill shots</label>
-              <label class="check"><input type="checkbox" id="opt-rf" checked> Laser rangefinder (off = mil the target)</label>
-              <label class="check"><input type="checkbox" id="opt-call" checked> Wind call given</label>
-              <label class="check"><input type="checkbox" id="opt-spotter" checked> Spotter calls impacts</label>
-              <label class="check"><input type="checkbox" id="opt-gusts" checked> Gusting wind, varies near/far</label>
-              <label class="check"><input type="checkbox" id="opt-cant"> Cant (use the bubble level)</label>
-              <label class="check"><input type="checkbox" id="opt-adv"> Spin drift, Coriolis, aerodynamic jump</label>
-              <label class="check"><input type="checkbox" id="opt-truing"> Hidden MV error (truing practice)</label>
-              <label class="check"><input type="checkbox" id="opt-delay" checked> Realistic sound delay</label>
-              <div class="field-row" style="margin-top:8px">
-                <div class="field"><label>Rifle precision (mil, 5-shot)</label><input type="number" id="opt-precision" value="0.2" step="0.05" min="0"></div>
-                <div class="field"><label>Plate</label><select id="opt-plate"><option value="random">Random</option><option>8</option><option>10</option><option selected>12</option><option>18</option></select></div>
-              </div>
-            </details>
-          </div>
         </div>
       </div>
+
+      <!-- ---------------------------------------------- 5. DEBRIEF -->
+      <div class="r-step no-print" id="r-debrief" hidden>
+        <div class="card" id="debrief"></div>
+      </div>
+
+      <!-- Printable blank data book (only visible when printing from the Range) -->
+      <div id="range-print-sheet" class="print-sheet" aria-hidden="true"></div>
     </section>
   </main>
 
@@ -343,5 +376,8 @@
   <script src="js/build.js"></script>
   <script src="js/drills.js"></script>
   <script src="js/range.js"></script>
+  <script src="js/range/data.js"></script>
+  <script src="js/range/world.js"></script>
+  <script src="js/range/scene.js"></script>
 </body>
 </html>
