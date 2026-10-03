@@ -36,3 +36,10 @@ The app computes it with a **point-mass ballistic solver** (`js/ballistics.js`):
 
 This is a training aid, not a firing solution. It omits Coriolis, aerodynamic jump, and
 scope tracking error, and its spin drift is an empirical approximation. Always confirm dope with live fire.
+
+## Hosting on GitHub Pages
+
+`.github/workflows/pages.yml` tests the solver and publishes `index.html`, `css/` and `js/`
+on every push. One-time setup: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+The site is then served at `https://pancho0091.github.io/LRPS_Simulator/`.
+(Pages on a private repo requires a paid GitHub plan; on a free plan make the repo public.)
