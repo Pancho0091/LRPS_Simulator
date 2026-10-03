@@ -477,7 +477,7 @@
     at: 'before:pre.code',
     caption: '<b>Compare the call with the impact.</b> If they agree, the data was right and you missed — do not touch the dial. If you called a clean, centred shot and it still landed 0.2 right, the data or wind was off — correct 0.2 left.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 310, origin: [62, 150], scale: 3.6 });
+      const s = ISO.scene({ w: 720, h: 290, origin: [62, 150], scale: 3.6 });
       const W = 26, H = 24, Z = 3, SP = 18.5;
       const MIL = 22; // local units per mil
       const pan = (slot, title, callDx, hitDx) => {
@@ -497,10 +497,314 @@
       const a1 = pan(0, 'CALL', 0.2, null), a2 = pan(1.25, 'IMPACT', null, 0.2);
       const b1 = pan(3.05, 'CALL', 0, null), b2 = pan(4.3, 'IMPACT', null, 0.2);
       [[a1, 'broke 0.2 right'], [a2, 'hit 0.2 right'], [b1, 'clean, centred'], [b2, 'hit 0.2 right']].forEach(([q, txt]) => s.text(q[0], q[1] + 22, txt, { anchor: 'middle', size: 12, weight: 600 }));
-      tag(s, (a1[0] + a2[0]) / 2, 278, '=', 'You missed → don\'t dial', C.coral, 'middle');
-      tag(s, (b1[0] + b2[0]) / 2, 278, '≠', 'Data missed → correct 0.2 L', C.green, 'middle');
+      tag(s, (a1[0] + a2[0]) / 2, 262, '=', 'You missed → don\'t dial', C.coral, 'middle');
+      tag(s, (b1[0] + b2[0]) / 2, 262, '≠', 'Data missed → correct 0.2 L', C.green, 'middle');
       return s.svg();
     },
+  });
+
+
+  // ------------------------------------------------------------- m-cards
+
+  // One consistent example card: 6.5 CM 140 gr, MV 2710, 100 yd zero, DA 3,000 ft
+  const DOPE = [[300, 0.9, 0.2, 0.4], [400, 1.7, 0.3, 0.6], [500, 2.6, 0.4, 0.8], [600, 3.7, 0.5, 1.0], [700, 4.8, 0.6, 1.2],
+    [800, 6.0, 0.7, 1.4], [900, 7.4, 0.8, 1.6], [1000, 8.9, 1.0, 1.9], [1100, 10.6, 1.1, 2.2], [1200, 12.5, 1.3, 2.5]];
+  const TRANS = 1200;
+
+  // Dope card face in local units (w × h); returns svg
+  function cardSvg(w, rows, o) {
+    o = o || {};
+    const rh = o.rh || 2.3, hh = o.hh || 6, fs = o.fs || 1.55;
+    const h = hh + 2.6 + rows.length * rh + 1;
+    const cx = [w * 0.05, w * 0.27, w * 0.46, w * 0.66, w * 0.85];
+    let g = `<rect x="0" y="0" width="${w}" height="${h}" rx="1.2" fill="${C.paper}"/>`;
+    g += `<rect x="0" y="0" width="${w}" height="${hh}" rx="1.2" fill="${C.ink}"/><rect x="0" y="${hh - 1.2}" width="${w}" height="1.2" fill="${C.ink}"/>`;
+    g += T(w * 0.04, hh * 0.42, o.title || '6.5 CM · 140 ELD-M · MV 2710', { size: fs * 1.05, color: '#fff' });
+    g += T(w * 0.04, hh * 0.82, o.sub || 'ZERO 100 YD · DA 3,000 FT · MIL', { size: fs * 0.9, color: C.amber });
+    const hy = hh + 2;
+    ['YD', 'MIL', 'CLK', '5 MPH', '10 MPH'].forEach((c, i) => { g += T(cx[i], hy, c, { size: fs * 0.78, color: C.slate }); });
+    g += `<rect x="${w * 0.63}" y="${hh + 0.3}" width="${w * 0.36}" height="${rows.length * rh + 2.5}" fill="${C.sky}" opacity=".18"/>`;
+    rows.forEach((r, i) => {
+      const y = hy + 0.6 + (i + 1) * rh;
+      if (r[0] === TRANS) g += `<rect x="0.3" y="${y - rh * 0.78}" width="${w - 0.6}" height="${rh}" fill="${C.coral}" opacity=".22"/>`;
+      else if (i % 2) g += `<rect x="0.3" y="${y - rh * 0.78}" width="${w - 0.6}" height="${rh}" fill="${C.ink}" opacity=".04"/>`;
+      g += T(cx[0], y, r[0], { size: fs, mono: true });
+      g += T(cx[1], y, r[1].toFixed(1), { size: fs * 1.08, mono: true, weight: 800, color: C.blue });
+      g += T(cx[2], y, Math.round(r[1] * 10), { size: fs * 0.95, mono: true, color: C.slate });
+      g += T(cx[3], y, r[2].toFixed(1), { size: fs, mono: true });
+      g += T(cx[4], y, r[3].toFixed(1), { size: fs, mono: true });
+      if (r[0] === TRANS) g += T(w * 0.985, y, 'TRANS', { size: fs * 0.7, color: C.red, anchor: 'end' });
+    });
+    return { svg: g, h, rowY: (i) => hy + 0.6 + (i + 1) * rh, cx };
+  }
+  // Card lying flat (reads along +x); returns local→world mapper
+  // Card lying flat, text rising up-right (columns along -y, rows along +x).
+  // (x, y) is the near-left corner of its footprint: x..x+h, y-w..y.
+  function flatCard(s, x, y, z, w, rows, o) {
+    const c = cardSvg(w, rows, o);
+    s.shadow(x, y - w, c.h, w, { opacity: 0.12 });
+    s.box(x, y - w, z, c.h, w, 0.5, { color: C.white, top: C.paper });
+    onTopY(s, [x, y, z + 0.5], c.svg);
+    return Object.assign(c, { at: (u, v) => [x + v, y - u, z + 0.5] });
+  }
+
+  ISO.lesson('workflow', {
+    caption: '<b>Measure → zero → solve → true → print → maintain.</b> Every station feeds the next with measured numbers, and the card is only trustworthy after step 5 has checked it against real impacts at distance.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 300, origin: [70, 184], scale: 3.4 });
+      const N = 6, SP = 20, B = 17, Z = 3;
+      const cols = [C.mint, C.sky, C.lilac, C.amber, C.pink, C.green];
+      const names = [['Chronograph', 'MV + SD, 10+ shots'], ['Inputs', 'BC · twist · sight'], ['Zero', '100 yd groups'], ['Solve', 'at expected DA'], ['True', 'at 600–1000 yd'], ['Print card', 'clicks · wind']];
+      // maintain loop (in front)
+      const st = [5 * SP + B * 0.3, -5 * SP + B + 2, 0.2], en = [B * 0.7, B + 2, 0.2];
+      for (let i = N - 1; i >= 0; i--) {
+        const x = i * SP, y = -i * SP, cx = x + B / 2, cy = y + B / 2;
+        s.shadow(x, y, B, B);
+        s.box(x, y, 0, B, B, Z, { color: cols[i], top: ISO.shade(cols[i], 0.6) });
+        if (i < N - 1) s.line([[x + B + 0.5, cy - 1, 0.2], [x + SP + 1.5, cy - 2, 0.2]], { color: C.slate, width: 2.5, arrow: true, arrowSize: 7 });
+        if (i === 0) {           // doppler chronograph + bullet path
+          s.box(cx - 4, cy - 3, Z, 6, 6, 5, { color: C.ink });
+          s.disc(cx + 2.05, cy, Z + 2.6, 2.1, { plane: 'yz', fill: C.sky, stroke: C.white, width: 1 });
+          onTop(s, [cx - 3.4, cy - 2.2, Z + 5], `<rect x="0" y="0" width="4.6" height="2.4" rx="0.3" fill="${C.green}"/>` + T(0.4, 1.75, '2710', { size: 1.5, mono: true, color: C.ink }));
+          s.line([[x - 2, cy + 5, Z + 4], [x + B + 2, cy + 5, Z + 4]], { color: C.copper, width: 2, dash: '3 3' });
+        } else if (i === 1) {    // stack of input chips
+          [[C.blue, 'BC'], [C.teal, 'TWIST'], [C.purple, 'SIGHT HT'], [C.amber, 'CLICK 0.1']].forEach(([c, n], k) => {
+            s.box(cx - 5, cy - 4 + k * 0.4, Z + k * 2, 10, 8, 1.8, { color: c });
+            onFront(s, [cx - 5, cy + 4 + k * 0.4, Z + k * 2 + 1.8], T(0.6, 1.4, n, { size: 1.25, color: '#fff' }));
+          });
+        } else if (i === 2) {    // zero: rifle + 100 yd target with tight group
+          slimRifle(s, [x + 1, cy + 3, Z + 0.8], [1, 0, 0], 0.22);
+          panel(s, x + 9, cy - 4, Z, 6, 9, `<rect x="0" y="0" width="6" height="9" fill="#fff"/><circle cx="3" cy="3.6" r="2.2" fill="none" stroke="${C.ink}" stroke-width="0.25"/>` + L(0.4, 3.6, 5.6, 3.6, C.ink, 0.15) + L(3, 1, 3, 6.2, C.ink, 0.15) + [[2.8, 3.4], [3.3, 3.7], [3, 3.9], [3.2, 3.3], [2.9, 3.8]].map(([a, b]) => `<circle cx="${a}" cy="${b}" r="0.28" fill="${C.coral}"/>`).join('') + T(3, 8.2, '100', { size: 1.6, anchor: 'middle', mono: true }), { legs: false });
+        } else if (i === 3) {    // laptop solver
+          s.box(cx - 6, cy - 3, Z, 12, 9, 0.8, { color: C.steel });
+          let sc = `<rect x="0" y="0" width="12" height="8" rx="0.5" fill="${C.ink}"/>`;
+          let d = 'M1 1.8'; for (let k = 1; k <= 20; k++) { const u = k / 20; d += ` L${(1 + u * 10).toFixed(2)} ${(1.8 + u * u * 4.8).toFixed(2)}`; }
+          sc += `<path d="${d}" fill="none" stroke="${C.mint}" stroke-width="0.4"/>` + T(1, 7.4, '800 → 6.0', { size: 1.3, mono: true, color: C.amber });
+          s.box(cx - 6, cy - 3.6, Z + 0.8, 12, 0.6, 8, { color: C.gunmetal });
+          onFront(s, [cx - 6, cy - 3, Z + 8.8], sc);
+        } else if (i === 4) {    // truing plate: predicted vs actual
+          s.line([[cx, cy - 4, Z], [cx, cy - 4, Z + 13]], { color: C.wood, width: 2.5 });
+          s.line([[cx, cy + 4, Z], [cx, cy + 4, Z + 13]], { color: C.wood, width: 2.5 });
+          s.disc(cx, cy, Z + 8.5, 3.6, { plane: 'yz', fill: C.white, stroke: C.slate, width: 1.4 });
+          s.disc(cx, cy, Z + 8.5, 1, { plane: 'yz', stroke: C.blue, width: 1.5, dash: '2 2' });
+          [[0.3, -1.6], [-0.5, -1.9], [0.1, -2.2]].forEach(([a, b]) => s.disc(cx, cy + a, Z + 8.5 + b, 0.4, { plane: 'yz', fill: C.coral }));
+        } else {                 // printed card + data book
+          s.box(cx - 6.5, cy + 1, Z, 7, 5.5, 1.4, { color: C.blue });
+          s.box(cx - 6.3, cy + 1.2, Z + 1.4, 6.6, 5.1, 0.2, { color: C.white });
+          flatCard(s, cx - 3, cy + 0.5, Z, 11, DOPE.slice(3, 8), { fs: 0.8, rh: 1.2, hh: 2.8, title: '6.5 CM · MV 2710', sub: 'DA 3,000 · MIL' });
+        }
+      }
+      s.curve((k) => { const p = lerp(st, en, k), b = Math.sin(Math.PI * k) * 16; return [p[0] + b, p[1] + b, 0.2]; }, 0, 1, { color: C.purple, width: 2.5, dash: '6 5', arrow: true, arrowSize: 9, samples: 50 });
+      const lp = s.P([2.5 * SP + B / 2 + 16, -2.5 * SP + B / 2 + 16, 0]);
+      tag(s, lp[0], lp[1] + 4, 7, 'Maintain: data book, re-chrono new lots', C.purple, 'middle');
+      for (let i = 0; i < N; i++) {
+        const q = s.P([i * SP + B / 2, -i * SP + B / 2, Z + 16]);
+        caption2(s, q[0], q[1] - 40, i + 1, names[i][0], names[i][1], ISO.shade(cols[i], -0.35));
+      }
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('anatomy', {
+    caption: '<b>A card is a UI for a stressed brain.</b> Header says when it is valid; one row per range; elevation in mil <i>and</i> 0.1-mil clicks; wind brackets you can scale; the transonic row flagged where the data stops being trustworthy.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 340, origin: [118, 186], scale: 7.0 });
+      s.floor(-4, -50, 42, 54, { round: 8 });
+      const c = flatCard(s, 0, 0, 0.6, 46, DOPE, { fs: 1.6, rh: 2.35, hh: 6 });
+      // grease pencil
+      s.lathe(36.5, -30, 0.9, [[0, 0.6], [12, 0.6], [13.6, 0.15]], { axis: 'y', color: C.amber, colors: [C.amber, C.ink] });
+      const w = 46;
+      s.label(c.at(w * 0.62, 1), 'Header: load, MV, zero, DA, unit', { dx: 40, dy: -40, n: 1 });
+      s.label(c.at(c.cx[0], c.rowY(5) - 0.6), 'Range steps', { dx: -110, dy: 10, n: 2 });
+      s.label(c.at(c.cx[1], c.rowY(8) - 0.6), 'Elevation (mil)', { dx: -150, dy: 46, n: 3 });
+      s.label(c.at(c.cx[2] + 0.5, c.rowY(9) - 0.6), 'Clicks (0.1 mil)', { dx: -40, dy: 74, n: 4 });
+      s.label(c.at(w * 0.9, c.rowY(1) - 0.6), 'Wind brackets 5 / 10 mph', { dx: 60, dy: -10, n: 5 });
+      s.label(c.at(w * 0.96, c.rowY(9) - 0.6), 'Transonic: data limit', { dx: 60, dy: 40, n: 6, color: C.coral });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('wind-formats', {
+    caption: '<b>Brackets scale linearly.</b> 15 mph is three times 5 mph at every range. Pick the column for your call, then scale by speed and clock value: 7 mph from 2 o\'clock at 800 yd → 1.4 × 0.7 × 0.87 ≈ 0.85 mil.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 360, origin: [70, 300], scale: 4.1 });
+      const G = DOPE.slice(1, 8), SP = 13.5, BW = 3, K = 15;
+      const cols = [C.mint, C.teal, C.blue];
+      s.floor(-4, -4 - SP * (G.length - 1), SP * (G.length - 1) + 16, SP * (G.length - 1) + 14, { grid: SP });
+      for (let i = G.length - 1; i >= 0; i--) {
+        const [rng, , w5, w10] = G[i];
+        const vals = [w5, w10, +(w10 * 1.5).toFixed(1)];
+        const x = i * SP, y = -i * SP;
+        const hi = rng === 800;
+        if (hi) s.floor(x - 1.5, y - 1.5, 12, 7.5, { color: C.yellow, z: 0.05 });
+        for (let j = 2; j >= 0; j--) {
+          const bx = x + j * 3.4, by = y;
+          s.box(bx, by, 0, BW, BW, vals[j] * K, { color: cols[j] });
+          if (hi || i === G.length - 1) s.text3([bx + BW / 2, by + BW / 2, vals[j] * K + 1.2], vals[j].toFixed(1), { anchor: 'middle', size: hi ? 12.5 : 11, weight: 800, mono: true, dy: -4 });
+        }
+        s.text3([x + 5, y + 7, 0], rng + ' yd', { anchor: 'middle', size: 12, weight: hi ? 800 : 600, dy: 18, dx: -12 });
+      }
+      // legend + formula
+      [['5 mph', cols[0]], ['10 mph', cols[1]], ['15 mph', cols[2]]].forEach(([n, c], i) => {
+        s.raw(`<rect x="${26 + i * 76}" y="30" width="14" height="14" rx="3" fill="${c}"/>`, 2);
+        s.text(46 + i * 76, 42, n, { size: 12, weight: 700 });
+      });
+      s.text(26, 70, 'Full-value hold (mil)', { size: 11.5, weight: 600 });
+      s.text(26, 104, 'hold = ref × speed/ref × clock', { size: 12.5, weight: 800, mono: true });
+      s.text(26, 124, '800 yd, 7 mph @ 2 o\'clock:', { size: 11.5, weight: 600 });
+      s.text(26, 142, '1.4 × 0.7 × 0.87 ≈ 0.85 mil', { size: 12.5, weight: 800, mono: true, color: C.blue });
+      // clock value chips
+      s.text(26, 176, 'Clock value: 3/9 = 1 · 2,4,8,10 ≈ 0.87', { size: 11, weight: 600 });
+      s.text(26, 192, '1,5,7,11 = 0.5 · 12/6 = 0', { size: 11, weight: 600 });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('truing', {
+    caption: '<b>True the velocity first.</b> At 800 yd (still supersonic) the group lands 0.3 mil below the card\'s prediction — the real MV is lower than entered. Lower MV in the solver until predicted = actual, then fine-tune BC/DSF near transonic.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 360, origin: [150, 120], scale: 2.4 });
+      s.floor(-10, -40, 170, 64, { grid: 10 });
+      P.mat(s, -6, -8, 40, 16, { color: C.teal });
+      const rf = P.rifle(s, -4, 0, 0.4, { bag: true });
+      // board in the y-z plane at x = 140 (1 mil = 12 units on the board)
+      const bx = 140, M = 12, bz = 30;
+      s.box(bx, -16, 0, 2, 2, bz + 16, { color: C.wood }); s.box(bx, 14, 0, 2, 2, bz + 16, { color: C.wood });
+      let g = `<rect x="0" y="0" width="34" height="34" fill="#fff"/>`;
+      for (let k = 1; k < 10; k++) g += L(k * 3.4, 0, k * 3.4, 34, C.sky, 0.15) + L(0, k * 3.4, 34, k * 3.4, C.sky, 0.15);
+      g += L(17, 0, 17, 34, C.ink, 0.3) + L(0, 17, 34, 17, C.ink, 0.3);
+      g += `<circle cx="17" cy="17" r="2.6" fill="none" stroke="${C.blue}" stroke-width="0.5" stroke-dasharray="1 0.7"/>`;
+      const gy = 17 + 0.3 * M * 0.95 * 3.4 / 3.4 * (34 / (M * 10 / 3.4)) ;
+      const low = 17 + 0.3 * 34; // board shows ±0.5 mil → 34 units per mil
+      [[-0.6, -0.4], [0.5, 0.3], [0.1, 0.9], [-0.2, -0.8]].forEach(([a, b]) => { g += `<circle cx="${17 + a}" cy="${low + b}" r="0.75" fill="${C.coral}"/>`; });
+      g += `<circle cx="17" cy="${low}" r="2.6" fill="none" stroke="${C.coral}" stroke-width="0.45"/>`;
+      g += `<path d="M20.5 17.5 L20.5 ${low - 0.8}" stroke="${C.ink}" stroke-width="0.35" marker-end=""/>` + T(21.3, (17 + low) / 2 + 0.6, '0.3', { size: 2.2, mono: true });
+      face(s, [bx + 2.1, 17, bz + 17], [0, -1, 0], [0, 0, -1], g);
+      // trajectories: predicted (dashed blue) vs actual (solid coral)
+      const m = rf.muzzle;
+      s.curve((k) => [m[0] + (bx - m[0]) * k, 0, m[2] + 34 * Math.sin(Math.PI * k * 0.92) + (bz - m[2]) * k], 0, 1, { color: C.blue, width: 2.5, dash: '6 5', samples: 50 });
+      s.curve((k) => [m[0] + (bx - m[0]) * k, 0, m[2] + 34 * Math.sin(Math.PI * k * 0.92) * (1 - 0.06 * k) + (bz - 10.2 - m[2]) * k], 0, 1, { color: C.coral, width: 2.5, samples: 50 });
+      // solver knob
+      const kx = 60, ky = 22;
+      s.shadow(kx - 6, ky - 6, 12, 12);
+      s.lathe(kx, ky, 0, [[0, 6], [3, 6], [3.6, 5.2]], { axis: 'z', color: C.ink, colors: [C.gunmetal, C.ink] });
+      s.lathe(kx, ky, 3.6, [[0, 5.2], [0.4, 0]], { axis: 'z', color: C.purple });
+      s.line([[kx, ky, 4.1], [kx - 3.6, ky - 2.4, 4.1]], { color: '#fff', width: 3 });
+      s.curve((k) => { const a = -0.2 - k * 1.3; return [kx + 8 * Math.cos(a), ky + 8 * Math.sin(a), 4]; }, 0, 1, { color: C.purple, width: 2.5, arrow: true, arrowSize: 8 });
+      s.label([kx, ky + 3, 3], 'MV 2710 → 2680 fps', { dx: -150, dy: 40, n: 4, color: C.purple });
+      s.label([bx, 0, bz + 18], 'Card predicts here', { dx: -140, dy: -50, n: 2, color: C.blue });
+      s.label([bx, 0, bz + 4], 'Group: 0.3 mil low', { dx: 40, dy: 70, n: 3, color: C.coral });
+      s.label(rf.scope, 'Zero + tracking confirmed', { dx: -40, dy: -70, n: 1 });
+      s.text(704, 30, '800 yd · supersonic', { size: 12.5, weight: 800, anchor: 'end' });
+      s.text(704, 48, 'then BC / DSF near transonic', { size: 11.5, weight: 600, anchor: 'end', color: C.slate });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('conditions', {
+    caption: '<b>A card is valid for the DA on its header.</b> Thinner air (higher density altitude) means less drag and less elevation. Keep a card per band and pick the closest one — today\'s 3,400 ft uses the 3,000 ft card.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 350, origin: [70, 236], scale: 4.0 });
+      const bands = [['DA 0 FT', [3.8, 6.2, 9.4], C.sky, 3], ['DA 3,000 FT', [3.7, 6.0, 8.9], C.green, 10], ['DA 6,000 FT', [3.6, 5.7, 8.4], C.purple, 17]];
+      const SP = 30, W = 26;
+      s.floor(-6, -6 - SP * 2, SP * 2 + 34, SP * 2 + 26, { grid: 7 });
+      for (let i = 2; i >= 0; i--) {
+        const [name, v, col, hz] = bands[i];
+        const x = i * SP, y = -i * SP;
+        s.shadow(x, y - 2, W, 10);
+        s.box(x, y - 2, 0, W, 10, hz, { color: col, top: ISO.shade(col, 0.6) });
+        let g = `<rect x="0" y="0" width="${W - 4}" height="17" rx="0.8" fill="${C.paper}"/><rect x="0" y="0" width="${W - 4}" height="4.6" rx="0.8" fill="${C.ink}"/>`;
+        g += T(1.2, 3.3, name, { size: 2.6, color: '#fff' });
+        ['600', '800', '1000'].forEach((r, k) => { g += T(1.4, 8.4 + k * 3.6, r, { size: 2.4, mono: true }) + T(W - 5.6, 8.4 + k * 3.6, v[k].toFixed(1), { size: 2.6, mono: true, anchor: 'end', color: C.blue }); });
+        panel(s, x + 2, y + 2, hz, W - 4, 17, g, { legs: false });
+        if (i === 1) {
+          s.label([x + W / 2, y + 2.9, hz + 17.5], 'Today DA 3,400 ft → use this card', { dx: -60, dy: -60, n: '✓', color: C.green });
+        }
+      }
+      s.text(26, 330, 'Higher DA → thinner air → less drag → less elevation (1,000 yd: 9.4 → 8.4 mil)', { size: 12, weight: 600 });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('conditions', {
+    at: 'before:pre.code',
+    caption: '<b>Uphill or downhill, dial for the horizontal distance.</b> Gravity only bends the path across the horizontal part of the flight: 600 yd line of sight at 30° → dial for 600 × cos 30° ≈ 520 yd. Angle always means <i>less</i> elevation.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 340, origin: [96, 262], scale: 4.0 });
+      const X = 90, ang = 30 * Math.PI / 180, H = X * Math.tan(ang);
+      const d = [Math.SQRT1_2, -Math.SQRT1_2, 0], n = [Math.SQRT1_2, Math.SQRT1_2, 0];
+      const at = (u, z, off) => [d[0] * u + n[0] * off, d[1] * u + n[1] * off, z];
+      track(s, [0, 0], [X * Math.SQRT1_2, -X * Math.SQRT1_2], 14, { ext: 14 });
+      // hill wedge: slope top + front triangle (in the plane facing the viewer)
+      const w = 9, h0 = 18;
+      s.poly([at(h0, 0, -w), at(X, H, -w), at(X, H, w), at(h0, 0, w)], { fill: ISO.shade(C.grass, 0.15), stroke: ISO.shade(C.grass, 0.15), width: 0.6 });
+      s.poly([at(X, H, -w), at(X + 10, H, -w), at(X + 10, H, w), at(X, H, w)], { fill: ISO.shade(C.grass, 0.25) });
+      s.poly([at(h0, 0, w), at(X, H, w), at(X + 10, H, w), at(X + 10, 0, w)], { fill: C.grassDark, stroke: C.grassDark, width: 0.6 });
+      const pl = at(X + 3, H, 0);
+      P.plate(s, pl[0], pl[1], H, 2.4);
+      // shooter
+      const m0 = at(-6, 0, 0);
+      P.mat(s, m0[0] - 6, m0[1] - 6, 16, 12, { color: C.teal });
+      slimRifle(s, at(-6, 1.2, 0), [d[0] * Math.cos(ang), d[1] * Math.cos(ang), Math.sin(ang)], 0.3);
+      // triangle on the hill's front face
+      const A = at(4, 4, w + 1), Bp = at(X, 4, w + 1), Cp = at(X, H + 4, w + 1);
+      s.line([A, Cp], { color: C.blue, width: 3.5 });
+      s.line([A, Bp], { color: C.coral, width: 3.5, dash: '8 6' });
+      s.line([Bp, Cp], { color: '#fff', width: 2, dash: '3 4' });
+      s.curve((k) => { const a = ang * k; return at(4 + 18 * Math.cos(a), 4 + 18 * Math.sin(a), w + 1); }, 0, 1, { color: C.ink, width: 1.8 });
+      s.text3(at(24, 6, w + 1), '30°', { size: 13, weight: 800, dx: 4, dy: 2 });
+      s.line([at(X - 14, H + 30, w + 1), at(X - 14, H + 14, w + 1)], { color: C.slate, width: 3, arrow: true });
+      s.label(lerp(A, Cp, 0.45), 'Line of sight: 600 yd', { dx: -150, dy: -70, n: 1, color: C.blue });
+      s.label(lerp(A, Bp, 0.5), 'Dial for 600 × cos 30° ≈ 520 yd', { dx: -60, dy: 50, n: 2, color: C.coral });
+      s.label(at(X - 14, H + 26, w + 1), 'Gravity: only the horizontal part', { dx: -270, dy: -10, n: 3 });
+      s.text(706, 300, 'cos 10° = 0.985 · 20° = 0.940 · 30° = 0.866', { size: 11.5, weight: 700, anchor: 'end', mono: true });
+      s.text(706, 320, 'same rule uphill and downhill', { size: 11.5, weight: 600, anchor: 'end' });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('card-formats', {
+    caption: '<b>Put the card where your eyes already are.</b> A scope-cap card needs no head movement but holds only elevation; a stock panel fits both columns; a wrist coach holds several DA cards; the data book records every string so you can true and learn.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 360, origin: [150, 150], scale: 6.0 });
+      s.floor(-6, -10, 66, 34, { grid: 4 });
+      s.shadow(0, -4, 56, 8);
+      const r = P.rifle(s, 0, 0, 0, { bag: false });
+      // 1 scope cap card: flip-up panel standing above the ocular
+      const ocx = 13.5, sz = r.scope[2] - 1.2;
+      const cap = cardSvg(7, DOPE.slice(4, 8).map((d) => [d[0], d[1], d[2], d[3]]), { fs: 0.5, rh: 0.95, hh: 1.8, title: 'ELEV', sub: 'MIL' });
+      s.box(ocx - 0.6, -1.8, sz + 0.9, 0.5, 3.6, 4.4, { color: C.ink });
+      face(s, [ocx - 0.08, 1.7, sz + 5.2], [0, -1, 0], [0, 0, -1], `<rect x="0" y="0" width="3.4" height="4.2" fill="${C.paper}"/>` + [0, 1, 2, 3].map((k) => T(0.3, 1.2 + k * 0.9, DOPE[4 + k][0] + ' ' + DOPE[4 + k][1].toFixed(1), { size: 0.62, mono: true })).join(''));
+      // 2 stock panel on the +y side of the buttstock
+      const zb = 3.4;
+      face(s, [3.2, 1.02, zb + 2.6], [1, 0, 0], [0, 0, -1], `<rect x="0" y="0" width="9" height="4.6" rx="0.3" fill="${C.paper}" stroke="${C.ink}" stroke-width="0.08"/>` + DOPE.slice(3, 9).map((d, k) => T(0.4 + (k % 2) * 4.5, 1.2 + Math.floor(k / 2) * 1.3, d[0] + ' ' + d[1].toFixed(1) + '|' + d[3].toFixed(1), { size: 0.62, mono: true })).join(''));
+      // 3 wrist coach (forearm + window)
+      pill(s, [30, 15, 2], [44, 18, 3.4], 1.9, SKIN);
+      s.box(35, 14.2, 2.1, 5.5, 4, 1.8, { color: C.navy });
+      onTop(s, [35.6, 14.6, 3.95], `<rect x="0" y="0" width="4.3" height="3.2" fill="${C.paper}"/>` + [0, 1, 2].map((k) => R(0.3, 0.5 + k * 0.9, 3.7, 0.5, [C.sky, C.green, C.lilac][k])).join(''));
+      // 4 data book + pencil
+      s.box(4, 12, 0, 13, 9, 1.2, { color: C.coral });
+      s.box(4.2, 12.2, 1.2, 12.6, 8.6, 0.2, { color: C.white });
+      onTop(s, [4.8, 12.6, 1.42], T(0, 1, 'DATE  LOT  DA  RANGE  DIAL  IMPACT', { size: 0.62, mono: true }) + [1, 2, 3, 4, 5].map((k) => L(0, 1.5 + k * 1.25, 11.4, 1.5 + k * 1.25, C.sky, 0.08) + (k < 4 ? T(0, 1.3 + k * 1.25, '6/12 B17 3.2k 800 6.0 -0.3', { size: 0.6, mono: true, color: C.slate }) : '')).join(''));
+      s.lathe(10, 22, 0.5, [[0, 0.35], [8, 0.35], [9, 0.05]], { axis: 'x', color: C.amber, colors: [C.amber, C.sand] });
+      // 5 phone app
+      s.box(48, -14, 0, 4.5, 8, 0.6, { color: C.ink });
+      onTop(s, [48.4, -13.6, 0.62], `<rect x="0" y="0" width="3.7" height="7.2" rx="0.4" fill="${C.navy}"/>` + T(0.4, 2, '6.0', { size: 1.2, mono: true, color: C.mint }) + T(0.4, 3.4, 'MIL', { size: 0.6, color: C.white }));
+      s.label([ocx - 0.3, 0, sz + 4.6], 'Scope cap: no head movement', { dx: -60, dy: -60, n: 1 });
+      s.label([7, 1.05, zb + 1.5], 'Stock panel: both columns', { dx: -110, dy: 40, n: 2 });
+      s.label([37.5, 16, 4], 'Wrist coach: DA bands, stage notes', { dx: 40, dy: 44, n: 3 });
+      s.label([10, 16, 1.5], 'Data book: every string', { dx: -90, dy: 84, n: 4, color: C.coral });
+      s.label([50, -10, 0.6], 'App / LRF: exact, needs batteries', { dx: 20, dy: -60, n: 5, color: C.slate });
+      return s.svg();
+    },
+  });
+
+  ISO.module('m-cards', () => {
+    const s = ISO.scene({ w: 520, h: 270, origin: [150, 152], scale: 5.0 });
+    s.floor(-4, -44, 42, 48, { round: 8 });
+    flatCard(s, 0, 0, 0.6, 40, DOPE.slice(2, 9), { fs: 2.1, rh: 3.2, hh: 7 });
+    s.lathe(33, -3, 0.9, [[0, 0.8], [16, 0.8], [18, 0.2]], { axis: 'y', color: C.amber, colors: [C.amber, C.ink] });
+    return s.svg();
   });
 
   ISO.module('m-positions', () => {

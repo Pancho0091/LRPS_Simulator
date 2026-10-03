@@ -215,6 +215,76 @@
     return { prof, len: b1 + sh.og * r };
   }
 
+  const F = nrm3([1, 1, 0]); // toward the viewer, perpendicular to H
+  const Z = [0, 0, 1];
+  // Draw shaded faces (each {pts, n, col}) with culling + depth sort, like ISO's mesh
+  function faces3(s, faces, opt) {
+    opt = opt || {};
+    const vis = faces.filter((f) => dot3(f.n, VIEW) > 1e-6).map((f) => {
+      const c = f.pts.reduce((a, p) => add3(a, p, 1 / f.pts.length), [0, 0, 0]);
+      return { pts: f.pts, fill: tone(f.col, f.n), depth: c[0] + c[1] + c[2] };
+    }).sort((a, b) => a.depth - b.depth);
+    const op = opt.opacity != null ? ` opacity="${opt.opacity}"` : '';
+    s.raw('<g>' + vis.map((f) => `<polygon points="${f.pts.map((p) => s.P(p).map((v) => v.toFixed(1)).join(',')).join(' ')}" fill="${f.fill}" stroke="${f.fill}" stroke-width="0.6" stroke-linejoin="round"${op}/>`).join('') + '</g>');
+  }
+  // Prism: 2D profile (u along U, v along V) extruded along W from w0..w1, at origin o
+  function oext(s, o, prof, w0, w1, color, opt) {
+    opt = opt || {};
+    const U = opt.U || H, V = opt.V || Z, W = opt.W || F;
+    let area = 0;
+    for (let i = 0; i < prof.length; i++) { const p = prof[i], q = prof[(i + 1) % prof.length]; area += p[0] * q[1] - q[0] * p[1]; }
+    const pr = area > 0 ? prof : prof.slice().reverse();
+    const at = (u, v, w) => add3(add3(add3(o, U, u), V, v), W, w);
+    const sgn = dot3(cross3(U, V), W) > 0 ? 1 : -1; // handedness of (U,V,W)
+    const faces = [
+      { pts: pr.map(([u, v]) => at(u, v, w1)), n: W, col: opt.face || color },
+      { pts: pr.map(([u, v]) => at(u, v, w0)), n: W.map((c) => -c), col: opt.face || color },
+    ];
+    for (let i = 0; i < pr.length; i++) {
+      const j = (i + 1) % pr.length, du = pr[j][0] - pr[i][0], dv = pr[j][1] - pr[i][1];
+      const n = nrm3(add3(U.map((c) => c * dv * sgn), V, -du * sgn));
+      faces.push({ pts: [at(pr[i][0], pr[i][1], w0), at(pr[j][0], pr[j][1], w0), at(pr[j][0], pr[j][1], w1), at(pr[i][0], pr[i][1], w1)], n, col: opt.side || color });
+    }
+    faces3(s, faces, opt);
+  }
+  // Box aligned with H (length), F (depth, centred) and Z (height); o = left-bottom-centre
+  function obox(s, o, L, D, Ht, color, opt) { oext(s, o, [[0, 0], [L, 0], [L, Ht], [0, Ht]], -D / 2, D / 2, color, opt); }
+  // Text on the viewer-facing side of an H-aligned object is plain screen text
+  // Horizontal precision rifle along H (butt at o, o[2] = ground). Returns anchors.
+  // o: { stock, metal, blen, br (barrel radius), sporter, scope (len), scopeR, bipod, brake, rest, bag }
+  function hRifle(s, o, opt) {
+    opt = Object.assign({ stock: C.slate, metal: C.gunmetal, blen: 24, br: 0.42, sporter: false, scope: 14, scopeR: 0.8, bipod: true, brake: true, rest: false, bag: false, mag: true }, opt || {});
+    const zb = o[2] + (opt.bipod || opt.rest ? 3.4 : 1.2), ax = zb + 3.5;
+    const A = (u, v) => along([o[0], o[1], 0], H, u, v);
+    const bipodAt = 31;
+    if (opt.bipod) s.line([A(bipodAt, zb), add3(A(bipodAt - 1.5, o[2]), F, -1.6)], { color: opt.metal, width: 3 });
+    if (opt.bag) obox(s, A(2.5, o[2]), 6, 3.6, zb - o[2] + 0.3, C.sand);
+    const prof = opt.sporter
+      ? [[0, 1.6], [7, 2.6], [13, 3.4], [16.5, 2.4], [18.5, 3.6], [33, 4.4], [34, 5.5], [17, 5.8], [12.5, 5.2], [0.4, 6.2]]
+      : [[0, 1.2], [12, 2.6], [14.5, 0.2], [17.5, 0.2], [18.5, 3.4], [36, 3.4], [36, 6], [19, 6.1], [15, 6.2], [0.4, 6]];
+    oext(s, A(0.9, zb - 3.4), prof, -0.9, 0.9, opt.stock);
+    obox(s, A(0, zb - 2.2), 1.1, 2.1, opt.sporter ? 5.8 : 5.6, C.black);
+    if (!opt.sporter) obox(s, A(5, zb + 2.6), 8, 1.5, 1.1, ISO.shade(opt.stock, -0.15));
+    if (opt.mag) obox(s, A(20, zb - 2.2), 2.6, 1.3, 2.4, C.black);
+    lathe3(s, A(15.5, ax), H, [[0, 0.8], [11, 0.8]], { color: opt.metal, segments: 14 });
+    lathe3(s, A(26.5, ax), H, [[0, opt.br * 1.45], [3, opt.br * 1.35], [opt.blen, opt.br]], { color: opt.metal, segments: 14 });
+    let muz = 26.5 + opt.blen;
+    if (opt.brake) { lathe3(s, A(muz, ax), H, [[0, opt.br * 1.5], [2.8, opt.br * 1.5]], { color: C.black, segments: 12 }); muz += 2.8; }
+    const sz = ax + 1.6 + opt.scopeR * 1.2;
+    let sc = null;
+    if (opt.scope) {
+      const L = opt.scope, sR = opt.scopeR, s0 = 13.5;
+      obox(s, A(17.2, ax + 0.5), 1, 1.1, sz - ax - 0.7, C.black);
+      obox(s, A(s0 + L * 0.72, ax + 0.5), 1, 1.1, sz - ax - 0.7, C.black);
+      lathe3(s, A(s0, sz), H, [[0, sR * 1.2], [3, sR * 1.2], [4.2, sR * 0.75], [L - 2.5, sR * 0.75], [L - 1, sR * 1.35], [L + 1.5, sR * 1.4]], { color: C.ink, segments: 14 });
+      s.lathe(...A(s0 + L * 0.5, sz + sR * 0.6), [[0, 0.55], [0.9, 0.55]], { axis: 'z', color: C.amber, segments: 12 });
+      sc = A(s0 + L * 0.5, sz + sR);
+    }
+    if (opt.bipod) s.line([A(bipodAt, zb), add3(A(bipodAt - 1.5, o[2]), F, 1.6)], { color: opt.metal, width: 3 });
+    if (opt.rest) { obox(s, A(30, o[2]), 4, 3.2, zb - o[2] - 0.4, C.slate); obox(s, A(30.5, zb - 0.6), 3, 2.4, 0.6, C.black); }
+    return { A, zb, ax, sz, muzzle: A(muz, ax), scope: sc, eye: A(13.5, sz), cheek: A(9, zb + 3.7), butt: A(0.5, zb + 0.5), trigger: A(17.9, zb - 1), grip: A(16, zb - 1.5), mag: A(21.3, zb - 1.6), action: A(21, ax + 0.8), barrel: A(26.5 + opt.blen * 0.6, ax), forend: A(28, zb), len: muz };
+  }
+
   // ------------------------------------------------------- module heroes
 
   ISO.module('m-terms', () => {
@@ -462,6 +532,171 @@
         });
         s.text3([x + 15, y + 11, 0], name, { size: 14, weight: 800, anchor: 'middle', color: col === C.amber ? '#c9861c' : col, dy: 20 });
       });
+      return s.svg();
+    },
+  });
+
+  // ------------------------------------------------------------ m-history
+
+  ISO.lesson('history-rifling', {
+    caption: '<b>Spin was the missing ingredient.</b> A smoothbore ball leaves with random wobble and tumbles off course (useful only to ~50–100 yd). Spiral rifling spins the bullet so it stays point-first like a gyroscope, and the Minié ball made rifles as fast to load as muskets.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 310, origin: [60, 128], scale: 8 });
+      const z = 5;
+      const lane = (o, rifled) => {
+        band(s, o[0] - 1.5, o[1] + 1.5, 45, 3, 3);
+        const b = [o[0], o[1], z];
+                if (rifled) helix3(s, b, H, 21, 0.95, 5, { color: C.slate, width: 1.4, opacity: 0.5 }, 'back');
+        if (!rifled) s.sphere(...along(b, H, 17.5), 0.85, { color: C.lead, rings: 6, segments: 12 });
+        else { const bp = bulletProf(0.85, 'minie'); lathe3(s, along(b, H, 15), H, bp.prof, { color: C.lead, segments: 12 }); }
+        lathe3(s, b, H, [[0, 1.5], [3, 1.5], [3.4, 1.25], [21, 1.15]], { color: rifled ? C.gunmetal : C.wood, opacity: 0.38, segments: 16 });
+        if (rifled) helix3(s, b, H, 21, 0.95, 5, { color: C.ink, width: 1.6, opacity: 0.8 }, 'front');
+      };
+      const A = [0, 0], B = [17, 17];
+      // lane A: smoothbore, tumbling ball
+      lane(A, false);
+      const bA = [A[0], A[1], z];
+      s.poly([along(bA, H, 21.5, 0.8), along(bA, H, 62, 4.4), along(bA, H, 62, -4.4), along(bA, H, 21.5, -0.8)], { fill: C.coral, opacity: 0.13 });
+      const wob = [[28, 0.6], [37, -1.5], [46, 1.9], [55, -3.3]];
+      s.curve((t) => { const u = 21.5 + t * 36; const v = 0.6 * Math.sin(t * 7.5) * (0.4 + t * 5) ; return along(bA, H, u, v * 0.62 + (t > 0.9 ? -0.4 : 0)); }, 0, 1, { color: C.coral, width: 2, dash: '3 5', samples: 60 });
+      wob.forEach(([u, v], i) => {
+        const c = along(bA, H, u, v);
+        s.sphere(...c, 0.95, { color: C.lead, rings: 6, segments: 12 });
+        const ph = i * 1.7;
+        s.curve((t) => add3(add3(c, H, 1.5 * Math.cos(t + ph)), [0, 0, 1], 1.5 * Math.sin(t + ph)), 0, 2.4, { color: C.coral, width: 1.6, arrow: true, arrowSize: 6, samples: 14 });
+      });
+      // lane B: rifled, spinning Minié
+      lane(B, true);
+      const bB = [B[0], B[1], z];
+      s.poly([along(bB, H, 21.5, 0.5), along(bB, H, 62, 1.1), along(bB, H, 62, -1.1), along(bB, H, 21.5, -0.5)], { fill: C.green, opacity: 0.16 });
+      s.line([along(bB, H, 21.5), along(bB, H, 62)], { color: C.green, width: 2, dash: '3 5' });
+      const bp = bulletProf(1, 'minie');
+      [30, 44, 58].forEach((u) => {
+        lathe3(s, along(bB, H, u - bp.len / 2), H, bp.prof, { color: C.lead, segments: 12 });
+        s.curve((t) => add3(add3(along(bB, H, u - 0.6), [-0.7071, -0.7071, 0], 1.7 * Math.cos(t)), [0, 0, 1], 1.7 * Math.sin(t)), -2.6, 1.6, { color: C.green, width: 1.8, arrow: true, arrowSize: 6, samples: 18 });
+      });
+      s.text3(along(bA, H, -0.5, 4.2), 'Smoothbore musket · 1500s–1800s', { size: 14, weight: 800, color: C.coral });
+      s.text3(along(bB, H, -0.5, 4.2), 'Rifled barrel + Minié ball · 1849', { size: 14, weight: 800, color: '#239e6f' });
+      s.label(along(bA, H, 46, 1.9 + 0.8), 'No spin → the ball tumbles', { dx: 30, dy: -30, n: 1, color: C.coral });
+      s.label(along(bA, H, 62, 4.4), 'Wide spread past ~100 yd', { dx: -20, dy: 66, n: 2, color: C.coral });
+      s.label(along(bB, H, 12, 1.1), 'Spiral grooves (rifling)', { dx: 10, dy: 56, n: 3, color: '#239e6f' });
+      s.label(along(bB, H, 44 - 0.6, 1.7), 'Spin keeps it point-first', { dx: 20, dy: 52, n: 4, color: '#239e6f' });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('history-rifling', {
+    at: 'after:.timeline',
+    caption: '<b>The Minié ball: loose going in, tight going out.</b> It is smaller than the bore, so it drops down the barrel as fast as a musket ball. On firing, gas pressure flares its hollow skirt outward into the grooves, so it still grips the rifling and spins.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 320, origin: [50, 160], scale: 13 });
+      const Rl = 2.5, Rg = 3, Ro = 4.1;
+      const sec = (o, pts, fill, stroke) => s.poly(pts.map(([t, v]) => along(o, H, t, v)), { fill, stroke: stroke || 'none', width: 1.2 });
+      const barrel = (o, L) => {
+                lathe3(s, o, H, [[0, Rg], [L, Rg]], { color: C.steel, from: -Math.PI / 2, to: Math.PI / 2, inner: true, segments: 14 });
+        for (let k = 0; k < 4; k++) helix3(s, o, H, L, Rg * 0.98, 16, { color: ISO.shade(C.steel, -0.35), width: 3, opacity: 0.55, phase: k * TAU / 4 }, 'back');
+        [1, -1].forEach((sg) => {
+          const pts = [[0, sg * Ro]];
+          for (let t = 0; t < L - 0.01; t += 1.6) pts.push([t, sg * (Math.floor(t / 1.6) % 2 ? Rl : Rg)], [Math.min(L, t + 1.6), sg * (Math.floor(t / 1.6) % 2 ? Rl : Rg)]);
+          pts.push([L, sg * Ro]);
+          sec(o, pts, ISO.shade(C.steel, sg > 0 ? -0.05 : -0.2), ISO.shade(C.steel, -0.4));
+        });
+      };
+      const minie = (o, b, base, rb) => {
+        const top = [[b, base], [b + 1.6, rb], [b + 3.6, rb], [b + 3.8, rb - 0.25], [b + 4.1, rb], [b + 4.4, rb], [b + 4.6, rb - 0.25], [b + 4.9, rb]];
+        for (let i = 1; i <= 8; i++) { const t = i / 8; top.push([b + 4.9 + t * 2.6, Math.max(0.4, rb * Math.pow(1 - t, 1 / 1.5))]); }
+        top.push([b + 7.6, 0]);
+        const pts = top.concat(top.slice(0, -1).reverse().map(([t, v]) => [t, -v]));
+        sec(o, pts, ISO.shade(C.lead, 0.25), ISO.shade(C.lead, -0.35));
+        sec(o, [[b, base * 0.62], [b + 2.4, 0.35], [b + 2.6, 0], [b + 2.4, -0.35], [b, -base * 0.62]], ISO.shade(C.lead, -0.45));
+        return { cav: [b + 1, 0], tip: b + 7.6 };
+      };
+      const o1 = [0, 0, 0], o2 = [14.8, -14.8, 0];
+      // stage 1: loading
+      barrel(o1, 18);
+      const m1 = minie(o1, 7.5, 2.1, 2.1);
+      s.line([along(o1, H, 17, Ro + 1.1), along(o1, H, 10, Ro + 1.1)], { color: C.blue, width: 2.6, arrow: true, arrowSize: 9 });
+      // stage 2: firing
+      barrel(o2, 18);
+      sec(o2, [[0.2, Rg], [4.8, Rg], [4.8, -Rg], [0.2, -Rg]], C.amber);
+      const m2 = minie(o2, 5, Rg, Rl + 0.05);
+      [[0.8, 1.1], [0.8, 0], [0.8, -1.1]].forEach(([t, v]) => s.line([along(o2, H, t, v), along(o2, H, t + 5.6 - Math.abs(v) * 1.6, v)], { color: C.coral, width: 2.4, arrow: true, arrowSize: 8 }));
+      [1, -1].forEach((sg) => s.line([along(o2, H, 6.1, sg * 1.1), along(o2, H, 6.1, sg * 2.6)], { color: C.coral, width: 2.2, arrow: true, arrowSize: 7 }));
+      s.text3(along(o1, H, 0, Ro + 1.0), 'Loading', { size: 15, weight: 800, color: C.blue });
+      s.text3(along(o2, H, 0, Ro + 1.0), 'Firing', { size: 15, weight: 800, color: C.coral });
+      s.label(along(o1, H, 11, -2.1), 'Smaller than the bore: slides in', { dx: -40, dy: 74, n: 1, color: C.blue });
+      s.label(along(o1, H, 8.4, 0.6), 'Hollow base', { dx: 30, dy: -104, n: 2, color: C.slate });
+      s.label(along(o2, H, 2.5, 1.1), 'Gas pressure', { dx: -30, dy: -82, n: 3, color: C.coral });
+      s.label(along(o2, H, 5.6, -Rg + 0.15), 'Skirt flares into the grooves', { dx: -30, dy: 76, n: 4, color: C.coral });
+      s.label(along(o2, H, 15.4, Rl), 'Lands & grooves (rifling)', { dx: -20, dy: -76, n: 5, color: C.slate });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('history-smokeless', {
+    caption: '<b>Bullets evolved toward lower drag.</b> Each step kept speed longer: a conical Minié replaced the ball, smokeless powder and jackets allowed high velocity, and the pointed spitzer nose and tapered boat tail cut air drag — the shape you shoot today.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 300, origin: [86, 150], scale: 9 });
+      const st = 8.1;
+      const items = [
+        ['round', 1.6, C.lead, 'Round ball', '1500s'],
+        ['minie', 1.6, C.lead, 'Minié ball', '1849'],
+        ['flat', 1.45, C.copper, 'Flat-nose', '1886'],
+        ['spitzer', 1.35, C.copper, 'Spitzer', '~1905'],
+        ['otm', 1.25, C.copper, 'Boat-tail', 'today'],
+      ];
+      const lens = { round: 3, minie: 3.12, flat: 3.12, spitzer: 4.32, otm: 5.3 };
+      items.forEach(([type, r, col, name, date], i) => {
+        const x = st * i, y = -st * i, h = 1.8 + i * 0.9;
+        s.floor(x - 1, y - 1, 9, 9, { grid: 3 });
+        block(s, x, y, 0, 7, 7, h, i === 4 ? C.blue : ISO.shade(C.blue, 0.45 - i * 0.08));
+        faceText(s, [x + 3.5, y + 7, h / 2], date, 'y', { size: 14, color: i >= 3 ? '#fff' : C.navy });
+        const L = lens[type] * r;
+        if (type === 'round') s.sphere(x + 3.5, y + 3.5, h + r, r, { color: col, rings: 8, segments: 16 });
+        else P.bullet(s, x + 3.5 - L / 2, y + 3.5, h + r, r, type, { color: col, segments: 16 });
+        s.text3([x + 7.6, y + 7.6, 0], name, { size: 13.5, weight: 800, anchor: 'middle', dy: 14 });
+      });
+      s.line([[3.5 + 11, 3.5 + 11, 0], [st * 4 + 3.5 + 11, -st * 4 + 3.5 + 11, 0]], { color: C.green, width: 3, arrow: true, arrowSize: 11 });
+      s.text3([st * 2 + 3.5 + 11, -st * 2 + 3.5 + 11, 0], 'less drag · keeps its speed longer', { size: 12.5, weight: 700, anchor: 'middle', dy: -7, color: '#239e6f' });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('history-modern', {
+    caption: '<b>Modern precision = measure, then compute.</b> The rangefinder measures distance, the weather meter measures the air, the Doppler chronograph measures muzzle velocity, and a solver turns those into a MIL correction for the reticle. The dope card is the paper backup of the same model.',
+    draw: () => {
+      const s = ISO.scene({ w: 720, h: 360, origin: [214, 92], scale: 7.4 });
+      s.floor(-6, -8, 64, 30, { grid: 4 });
+      P.mat(s, -2, -6, 58, 11, { color: C.teal });
+      // Doppler radar chronograph beside the muzzle, beam downrange
+      s.poly([[52, -6.5, 1.6], [62, -11, 0.5], [62, -2, 4.5]], { fill: C.mint, opacity: 0.35 });
+      block(s, 49.5, -8, 0, 2.6, 3, 3.2, C.green);
+      s.disc(52.12, -6.5, 1.8, 1, { plane: 'yz', fill: ISO.shade(C.green, 0.5), stroke: ISO.shade(C.green, -0.3) });
+      const r = P.rifle(s, 0, 0, 0.4, { bag: true });
+      // dope card
+      block(s, 2, 9.5, 0, 6, 4.4, 0.15, C.paper);
+      for (let i = 0; i < 4; i++) s.line([[2.6, 10.4 + i * 0.9, 0.16], [7.4, 10.4 + i * 0.9, 0.16]], { color: C.steel, width: 1.2 });
+      // phone with solver
+      block(s, 11, 9.5, 0, 7.2, 3.6, 0.4, C.ink);
+      s.poly([[11.4, 9.9, 0.42], [17.8, 9.9, 0.42], [17.8, 12.7, 0.42], [11.4, 12.7, 0.42]], { fill: '#1d3557' });
+      s.curve((t) => [11.8 + t * 5.6, 11.3 + 0.0, 0.43 + 0 * t], 0, 1, { color: C.sky, width: 1 });
+      s.curve((t) => [11.8 + t * 5.6, 12.4 - Math.sin(Math.PI * t * 0.9) * 2.0 + t * 0.6, 0.43], 0, 1, { color: C.amber, width: 2 });
+      // weather meter
+      block(s, 22, 10.2, 0, 2.2, 1.3, 4.2, C.amber);
+      s.poly([[22.3, 11.52, 1.2], [23.9, 11.52, 1.2], [23.9, 11.52, 2.8], [22.3, 11.52, 2.8]], { fill: C.ink });
+      s.lathe(23.1, 10.2, 5.3, [[0, 1], [1.3, 1]], { axis: 'y', color: C.ink, segments: 18 });
+      s.disc(23.1, 11.52, 5.3, 0.7, { plane: 'xz', fill: C.silver, stroke: C.slate });
+      // laser rangefinder
+      block(s, 28, 9.8, 0, 4.6, 2.4, 2.6, C.slate);
+      s.lathe(32.6, 10.4, 1.5, [[0, 0.5], [0.3, 0.5]], { axis: 'x', color: C.ink, segments: 14 });
+      s.lathe(32.6, 11.6, 1.5, [[0, 0.5], [0.3, 0.5]], { axis: 'x', color: C.ink, segments: 14 });
+      s.line([[33, 11.6, 1.5], [44, 11.6, 1.5]], { color: C.red, width: 2, dash: '5 4' });
+      s.label(r.scope, 'Mil reticle · 1970s', { dx: -60, dy: -46, n: 1 });
+      s.label([2.6, 13.9, 0.2], 'Dope card: paper backup', { dx: -90, dy: 30, n: 6, color: C.slate });
+      s.label([14, 12.8, 0.5], 'Ballistic solver · 2000s', { dx: -100, dy: 60, n: 4, color: C.purple });
+      s.label([23.1, 11.5, 1.2], 'Weather meter · 1990s', { dx: -60, dy: 74, n: 3, color: '#d9912a' });
+      s.label([30, 12.2, 2.6], 'Laser rangefinder · 1990s', { dx: 30, dy: 64, n: 2, color: C.coral });
+      s.label([51, -6.5, 3.2], 'Doppler chronograph · 2010s', { dx: 10, dy: -60, n: 5, color: C.green });
       return s.svg();
     },
   });

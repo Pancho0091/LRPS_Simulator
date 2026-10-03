@@ -138,6 +138,30 @@
     return { tip: [x, y, z + d.oal * k], neck: [x, y, z + (d.s1 + 0.1) * k], body: [x, y, z + d.s0 * 0.5 * k], head: [x, y, z], bullet: [x, y, z + c.bearAt], d };
   }
 
+  // Front half (y >= axis) of an x-axis lathe, for cutaways: the back half
+  // would otherwise paint over the cut face. Shaded like ISO meshes.
+  const LIGHT = (() => { const v = [-0.45, 0.55, 0.85], l = Math.hypot(...v); return v.map((c) => c / l); })();
+  function halfLatheX(s, x, y, z, prof, cols, N) {
+    N = N || 14;
+    const faces = [];
+    const at = (t, r, th) => [x + t, y + r * Math.cos(th), z + r * Math.sin(th)];
+    for (let k = 0; k < prof.length - 1; k++) {
+      for (let i = 0; i < N; i++) {
+        const a0 = -Math.PI / 2 + Math.PI * i / N, a1 = -Math.PI / 2 + Math.PI * (i + 1) / N, am = (a0 + a1) / 2;
+        const [t0, r0] = prof[k], [t1, r1] = prof[k + 1];
+        const f = [at(t0, r0, a0), at(t1, r1, a0), at(t1, r1, a1), at(t0, r0, a1)];
+        // outward normal of a surface of revolution
+        const dr = r1 - r0, dt = t1 - t0, l = Math.hypot(dr, dt) || 1;
+        const n = [-dr / l, dt / l * Math.cos(am), dt / l * Math.sin(am)];
+        const d = n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2];
+        const col = d > 0.45 ? sh(cols[k], (d - 0.45) * 0.55) : sh(cols[k], -(0.45 - d) * 0.55);
+        const depth = f.reduce((q, p) => q + p[0] + p[1] + p[2] * 0.5, 0) / 4;
+        faces.push({ f, col, depth });
+      }
+    }
+    faces.sort((a, b) => a.depth - b.depth).forEach(({ f, col }) => s.poly(f, { fill: col, stroke: col, width: 0.6 }));
+  }
+
   // Plinth with a coloured top
   function plinth(s, x, y, w, d, h, color, o) {
     o = o || {};
@@ -282,9 +306,9 @@
       s.label([bx + 0.7, by - 0.7, 0.7 + 0.5], 'Boat tail', { dx: -48, dy: 38, n: 'a', color: C.blue });
       s.label([bx + 0.55, by - 0.55, 0.7 + 4.6], 'Ogive (nose)', { dx: -40, dy: -60, n: 'b', color: C.blue });
       const [px, py] = row(0, 0, 4, st);
-      s.label([px, py, 0.7 + 6.1], 'Tip closes the meplat', { dx: 26, dy: -36, n: 'c', color: C.coral });
+      s.label([px, py, 0.7 + 6.1], 'Tip closes the meplat', { dx: -20, dy: -34, n: 'c', color: C.coral });
       const [mx, my] = row(0, 0, 5, st);
-      s.label([mx + 0.7, my - 0.7, 0.7 + 2.2], 'Relief grooves', { dx: 30, dy: -120, n: 'd', color: C.amber });
+      s.label([mx + 0.7, my - 0.7, 0.7 + 2.2], 'Relief grooves', { dx: 30, dy: -116, n: 'd', color: C.amber });
       return s.svg();
     },
   });
@@ -334,9 +358,9 @@
         if (kind === 'secant') {
           const h = 1.6;
           s.poly([J, sil(r, z0 + h), sil(f(h), z0 + h)], { fill: C.coral, opacity: 0.6 });
-          s.label(J, 'Kink at the junction', { dx: 26, dy: 40, n: '!', color: C.coral });
+          s.label(J, 'Kink at junction', { dx: 20, dy: 40, n: '!', color: C.coral });
         } else if (kind === 'tangent') {
-          s.label(J, 'Leaves the shank smoothly', { dx: 26, dy: 40, n: '✓', color: C.green });
+          s.label(J, 'Smooth junction', { dx: 20, dy: 40, n: '✓', color: C.green });
         } else {
           const qz = Lo * 0.36;
           s.label(J, 'Smooth here', { dx: 30, dy: 40, n: '✓', color: C.teal });
@@ -403,38 +427,35 @@
   ISO.lesson('consistency', {
     caption: '<b>Velocity spread becomes vertical spread.</b> Each line is one shot: a faster bullet drops less and hits high, a slower one hits low. Triple the SD and you roughly triple the vertical — the horizontal stays the same.',
     draw: () => {
-      const s = ISO.scene({ w: 720, h: 370, origin: [118, 262], scale: 5 });
-      s.floor(-14, -72, 52, 84, { grid: 6 });
-      const L = 62;
+      const s = ISO.scene({ w: 720, h: 380, origin: [130, 284], scale: 6.2 });
+      s.floor(-12, -60, 50, 70, { grid: 5 });
+      const L = 50;
       const lanes = [
-        { x: 0, spread: [0.2, -0.5, 0.6, -0.1, 0.3], col: C.green, sd: 'SD 5 fps', res: 'Tight vertical' },
-        { x: 26, spread: [1.4, -2.2, 2.6, -0.6, 0.8], col: C.coral, sd: 'SD 15 fps', res: 'Vertical stringing (3×)' },
+        { x: 0, spread: [0.3, -0.8, 0.9, -0.3, 0.5], col: C.green, sd: 'SD 5 fps', res: 'Tight vertical' },
+        { x: 22, spread: [1.0, -2.5, 2.6, -0.9, 1.6], col: C.coral, sd: 'SD 15 fps', res: '3× the vertical' },
       ];
       lanes.forEach((ln, k) => {
-        const x = ln.x, aim = 8.5;
-        // target board (faces the viewer: x-z plane at y = -L)
-        s.line([[x - 3.4, -L, 0], [x - 3.4, -L, 13]], { color: C.wood, width: 3 });
-        s.line([[x + 3.4, -L, 0], [x + 3.4, -L, 13]], { color: C.wood, width: 3 });
-        s.poly([[x - 4, -L, 3], [x + 4, -L, 3], [x + 4, -L, 14], [x - 4, -L, 14]], { fill: C.white, stroke: C.slate, width: 1.4 });
-        [3, 2, 1].forEach((r, i) => s.disc(x, -L, aim, r, { plane: 'xz', fill: i % 2 ? C.white : sh(ln.col, 0.55), stroke: C.slate, width: 1 }));
+        const x = ln.x, aim = 10;
+        s.line([[x - 3.8, -L, 0], [x - 3.8, -L, 4]], { color: C.wood, width: 3 });
+        s.line([[x + 3.8, -L, 0], [x + 3.8, -L, 4]], { color: C.wood, width: 3 });
+        s.poly([[x - 5, -L, 4], [x + 5, -L, 4], [x + 5, -L, 16], [x - 5, -L, 16]], { fill: C.white, stroke: C.slate, width: 1.4 });
+        [4, 3, 2, 1].forEach((r, i) => s.disc(x, -L, aim, r, { plane: 'xz', fill: i % 2 ? C.white : sh(ln.col, 0.6), stroke: C.slate, width: 1 }));
         // muzzle + chronograph
-        s.box(x - 1.2, -6, 0, 2.4, 3, 1.2, { color: C.gunmetal });
-        s.lathe(x, 0, 3, [[0, 0.5], [9, 0.55]], { axis: 'y', color: C.gunmetal, segments: 14 });
-        // shots
+        s.box(x - 1.2, -5.5, 0, 2.4, 3, 1.1, { color: C.gunmetal });
+        s.lathe(x, 0, 3, [[0, 0.45], [10, 0.5]], { axis: 'y', color: C.gunmetal, segments: 14 });
         ln.spread.forEach((dz, i) => {
-          const zi = aim + dz;
-          s.curve((t) => [x + (i - 2) * 0.12 * t, -L * t, 3 + (zi - 3) * t + 7 * Math.sin(Math.PI * t) * (1 - 0.15 * dz / 3)], 0, 1, { color: ln.col, width: 1.6, opacity: 0.8, samples: 30 });
+          const zi = aim + dz, dx = (i - 2) * 0.35;
+          s.curve((t) => [x + dx * t, -L * t, 3 + (zi - 3) * t + 6 * Math.sin(Math.PI * t)], 0, 1, { color: ln.col, width: 1.6, opacity: 0.85, samples: 28 });
         });
-        ln.spread.forEach((dz, i) => s.disc(x + (i - 2) * 0.12, -L + 0.05, aim + dz, 0.42, { plane: 'xz', fill: C.ink }));
-        // vertical-spread bracket
+        ln.spread.forEach((dz, i) => s.disc(x + (i - 2) * 0.35, -L + 0.05, aim + dz, 0.45, { plane: 'xz', fill: C.ink }));
         const lo = Math.min(...ln.spread) + aim, hi = Math.max(...ln.spread) + aim;
-        s.line([[x + 5, -L, lo], [x + 5, -L, hi]], { color: ln.col, width: 3 });
-        s.line([[x + 4.6, -L, lo], [x + 5.4, -L, lo]], { color: ln.col, width: 2 });
-        s.line([[x + 4.6, -L, hi], [x + 5.4, -L, hi]], { color: ln.col, width: 2 });
-        s.label([x, -3, 1.2], ln.sd, { dx: k ? 30 : -30, dy: 46, n: k + 1, color: ln.col });
-        s.label([x + 5, -L, (lo + hi) / 2], ln.res, { dx: 26, dy: 0, n: k + 1, color: ln.col });
+        s.line([[x + 6.2, -L, lo], [x + 6.2, -L, hi]], { color: ln.col, width: 3.5 });
+        s.line([[x + 5.7, -L, lo], [x + 6.7, -L, lo]], { color: ln.col, width: 2 });
+        s.line([[x + 5.7, -L, hi], [x + 6.7, -L, hi]], { color: ln.col, width: 2 });
+        s.label([x, -4, 1.1], ln.sd, { dx: k ? 60 : -40, dy: k ? 4 : 44, n: k + 1, color: ln.col });
+        s.label([x + 6.2, -L, (lo + hi) / 2], ln.res, { dx: 28, dy: 0, n: k + 1, color: ln.col });
       });
-      s.text(600, 350, 'vertical exaggerated · chronograph under the muzzle', { size: 10.5, weight: 500, anchor: 'middle' });
+      s.text(16, 24, 'vertical exaggerated · chronograph under each muzzle', { size: 10.5, weight: 500 });
       return s.svg();
     },
   });
@@ -450,10 +471,10 @@
         s.shadow(x - 3.4, y - 2, 7.6, 4.4, { opacity: 0.12 });
         s.box(x - 3.4, y - 2, 0, 7.4, 4, 0.6, { color: C.white, top: sh(col, 0.7) });
         // thermometer: bulb, fluid column, glass
-        const tx = x - 1.8, ty = y, lvl = 1.4 + (T + 10) / 120 * 9;
+        const tx = x - 2.3, ty = y + 0.4, lvl = 1.6 + (T + 10) / 120 * 5;
         s.sphere(tx, ty, 1.5, 0.85, { color: C.red, rings: 8 });
         s.lathe(tx, ty, 1.8, [[0, 0.32], [lvl - 1.8, 0.32]], { axis: 'z', color: C.red, segments: 14 });
-        s.lathe(tx, ty, lvl, [[0, 0.32], [11 - lvl, 0.32], [11.3 - lvl, 0]], { axis: 'z', color: C.white, segments: 14 });
+        s.lathe(tx, ty, lvl, [[0, 0.32], [7.6 - lvl, 0.32], [7.9 - lvl, 0]], { axis: 'z', color: C.white, segments: 14 });
         // MV bar (baseline 2,600 fps), cartridge in front
         const h = (mv - 2600) / 10;
         s.box(x + 0.4, y - 1.2, 0.6, 2.2, 2.2, h, { color: col });
@@ -474,55 +495,244 @@
 
   ISO.lesson('powder-barrel', {
     at: 'before:h4',
-    caption: '<b>Throat erosion moves the rifling away from the bullet.</b> Hot gas burns the start of the lands (the throat). On a worn barrel the bullet jumps farther before it engages, pressure and MV usually drop — re-chronograph and update the card.',
+    caption: '<b>Throat erosion moves the rifling away from the bullet.</b> Hot gas burns away the start of the lands (the throat). On a worn barrel the bullet jumps farther before it engages the rifling and MV usually drops — re-chronograph and update the card.',
     draw: () => {
-      const sc = 150;
-      const s = ISO.scene({ w: 720, h: 380, origin: [-30, 40], scale: sc });
-      const X0 = 1.35, X1 = 3.35, OUT = 0.5, T = 0.55;
+      const sc = 165;
+      const s = ISO.scene({ w: 720, h: 380, origin: [-190, 50], scale: sc });
+      const X0 = 1.62, X1 = 3.35, OUT = 0.36, T = 0.05;
       const rows = [
-        { y: -1.5, gap: 0.03, worn: false, name: 'NEW BARREL' },
-        { y: 0.0, gap: 0.17, worn: true, name: 'WORN (~2,500 rds, 6.5 CM)' },
+        { y: -1.15, gap: 0.03, worn: false, name: 'NEW BARREL' },
+        { y: 0.0, gap: 0.2, worn: true, name: 'WORN THROAT (~2,500 rds)' },
       ];
       const cp = cartProfile('6.5 CM', 1);
-      const d = cp.d, ch = 0.006;
-      // chamber/bore half-profile (groove radius in the bore)
-      const rG = 0.1325, rL = 0.1, ogX = cp.ogiveAt;
+      const d = cp.d, ch = 0.008;
+      const rG = 0.138, rL = 0.108, ogX = cp.ogiveAt;
       const inner = (x) => (x < d.s0 ? d.sh / 2 + ch : x < d.s1 ? d.sh / 2 + ch + (d.neck / 2 - d.sh / 2) * (x - d.s0) / (d.s1 - d.s0) : x < d.len ? d.neck / 2 + ch : rG);
+      const xs = [X0, d.s1, d.len, d.len + 0.0005, X1];
+      const pts = xs.map((x) => [x, inner(x)]);
+      const cut = (poly, y, fill) => s.poly(poly.map(([x, r]) => [x, y + 0.001, r]), { fill, stroke: C.ink, width: 1 });
       rows.forEach((rw, k) => {
-        const y = rw.y, landX = ogX + rw.gap;
-        const pts = [];
-        for (let i = 0; i <= 40; i++) { const x = X0 + (X1 - X0) * i / 40; pts.push([x, inner(x)]); }
-        [d.s0, d.s1, d.len, d.len + 0.0001].forEach((x) => { if (x > X0) pts.push([x, inner(x)]); });
-        pts.sort((a, b) => a[0] - b[0]);
-        // cavity backdrop (inside of the far chamber wall)
-        s.poly([...pts.map(([x, r]) => [x, y - T * 0.5, r]), ...pts.slice().reverse().map(([x, r]) => [x, y - T * 0.5, -r])], { fill: sh(C.gunmetal, -0.3) });
-        // lower half then upper half of the barrel, cut at y = 0
+        const y = rw.y, landX = ogX + rw.gap, col = rw.worn ? C.coral : C.green;
+        s.poly([...pts.map(([x, r]) => [x, y - T, r]), ...pts.slice().reverse().map(([x, r]) => [x, y - T, -r])], { fill: sh(C.gunmetal, -0.35) });
         const lower = [[X0, -OUT], [X1, -OUT], ...pts.slice().reverse().map(([x, r]) => [x, -r])];
-        const upper = [[X0, OUT], ...pts.map(([x, r]) => [x, r]), [X1, OUT]];
-        s.extrude(lower, -T, T, { plane: 'xz', at: [0, y, 0], color: C.steel });
-        // lands (rifling), eroded edge on the worn barrel
-        const edge = rw.worn ? [[landX, rG], [landX - 0.03, rG - 0.008], [landX + 0.02, rG - 0.016], [landX - 0.02, rG - 0.024], [landX + 0.025, rL]] : [[landX - 0.03, rG], [landX, rL]];
+        const upper = [[X0, OUT], ...pts, [X1, OUT]];
+        const edge = rw.worn ? [[landX - 0.05, rG], [landX - 0.01, rG - 0.008], [landX - 0.04, rG - 0.015], [landX, rG - 0.022], [landX + 0.02, rL]] : [[landX - 0.03, rG], [landX, rL]];
         const landU = [...edge, [X1, rL], [X1, rG]];
         const landD = landU.map(([x, r]) => [x, -r]);
-        s.extrude(landD, -T * 0.999, T * 0.999, { plane: 'xz', at: [0, y, 0], color: rw.worn ? C.copper : C.slate });
+        s.extrude(lower, -T, T, { plane: 'xz', at: [0, y, 0], color: C.steel });
+        s.extrude(landD, -T, T, { plane: 'xz', at: [0, y, 0], color: C.blue });
+        s.extrude(landU, -T, T, { plane: 'xz', at: [0, y, 0], color: C.blue });
         s.extrude(upper, -T, T, { plane: 'xz', at: [0, y, 0], color: C.steel });
-        s.extrude(landU, -T * 0.999, T * 0.999, { plane: 'xz', at: [0, y, 0], color: rw.worn ? C.copper : C.slate });
-        if (rw.worn) [[landX + 0.08, rG + 0.03], [landX + 0.18, rG + 0.06], [landX + 0.04, rG + 0.09], [landX + 0.26, rG + 0.02]].forEach(([x, z]) => s.line([[x - 0.02, y + 0.001, z], [x + 0.015, y + 0.001, z + 0.025], [x + 0.03, y + 0.001, z]], { color: sh(C.coral, -0.3), width: 1.4 }));
-        // cartridge (clipped to the cut-away region)
+        // section faces
+        cut(lower, y, '#cfd8e3'); cut(upper, y, '#cfd8e3');
+        cut(landU, y, C.blue); cut(landD, y, C.blue);
+        if (rw.worn) {
+          const burn = [[ogX - 0.02, rG], [landX - 0.02, rG], [landX + 0.06, rG + 0.06], [ogX + 0.02, rG + 0.035]];
+          s.poly(burn.map(([x, r]) => [x, y + 0.002, r]), { fill: C.coral, opacity: 0.6 });
+          s.poly(burn.map(([x, r]) => [x, y + 0.002, -r]), { fill: C.coral, opacity: 0.6 });
+          [[0.03, 0.012], [0.09, 0.03], [0.14, 0.01], [0.06, 0.05]].forEach(([dx, dz]) => s.line([[ogX + dx, y + 0.003, rG + dz], [ogX + dx + 0.015, y + 0.003, rG + dz + 0.015], [ogX + dx + 0.03, y + 0.003, rG + dz]], { color: sh(C.coral, -0.45), width: 1.2 }));
+        }
         const cl = clipProfile(cp.prof, cp.cols, X0);
-        s.lathe(X0, y, 0, cl.prof.map(([t, r]) => [t - X0, r]), { axis: 'x', colors: cl.cols, color: C.brass, segments: 22 });
-        // jump bracket
-        const zb = -0.2;
-        s.line([[ogX, y, zb], [landX, y, zb]], { color: rw.worn ? C.coral : C.green, width: 3 });
-        s.line([[ogX, y, zb + 0.04], [ogX, y, zb - 0.04]], { color: C.ink, width: 1.5 });
-        s.line([[landX, y, zb + 0.04], [landX, y, zb - 0.04]], { color: C.ink, width: 1.5 });
-        s.label([(ogX + landX) / 2, y, zb], rw.worn ? 'Long jump → MV drops' : 'Short jump to the lands', { dx: rw.worn ? -40 : -60, dy: 50, n: k ? 2 : 1, color: rw.worn ? C.coral : C.green });
-        const q = s.P([X0, y, OUT]);
-        s.text(q[0] + 4, q[1] - 14, rw.name, { size: 13, weight: 800 });
+        halfLatheX(s, 0, y, 0, cl.prof, cl.cols, 12);
+        // jump bracket on top of the barrel
+        const zt = OUT + 0.1;
+        s.line([[ogX, y, rG + 0.01], [ogX, y, zt]], { color: C.ink, width: 1, dash: '3 3' });
+        s.line([[landX, y, rL + 0.01], [landX, y, zt]], { color: C.ink, width: 1, dash: '3 3' });
+        s.line([[ogX, y, zt], [landX, y, zt]], { color: col, width: 4 });
+        s.label([(ogX + landX) / 2, y, zt], rw.worn ? 'Long jump → lower MV' : 'Short jump to the lands', { dx: 20, dy: -34, n: k + 1, color: col });
+        const q = s.P([X1, y, 0]);
+        s.text(q[0] + 12, q[1] + 5, rw.name, { size: 13, weight: 800 });
       });
-      s.label([ogX + 0.17 + 0.1, 0, rG + 0.06], 'Fire-cracked, eroded throat', { dx: 30, dy: -30, n: '!', color: C.coral });
-      s.label([2.9, -1.5, rL], 'Lands (rifling)', { dx: 40, dy: -30, n: 'i', color: C.slate });
+      s.label([ogX + 0.1, 0, -rG - 0.03], 'Eroded, fire-cracked throat', { dx: -80, dy: 80, n: '!', color: C.coral });
+      s.label([2.95, -1.15, -rL - 0.01], 'Lands (rifling)', { dx: 30, dy: 50, n: 'i', color: C.blue });
       return s.svg();
     },
   });
+
+  // =====================================================================
+  // m-calibers — Calibers & cartridges
+  // =====================================================================
+
+  ISO.module('m-calibers', () => {
+    const { s, st } = rowScene(3, 120, 56, 640, 300, 250);
+    [['.223 Rem', C.slate], ['6.5 CM', C.blue], ['.338 Lapua', C.purple]].forEach(([n, col], i) => {
+      const [x, y] = row(0, 0, i, st);
+      plinth(s, x - 0.45, y - 0.45, 0.9, 0.9, 0.18, col);
+      uprightCart(s, x, y, 0.18, n, 1, { segments: 20 });
+    });
+    return s.svg();
+  });
+
+  // Digital caliper standing behind a cartridge lying along x, jaws on the bullet
+  ISO.lesson('naming', {
+    caption: '<b>Caliber is one measurement; the cartridge is the whole design.</b> The caliper reads the bullet diameter (.308"); the metric name 7.62×51 adds the case length (51 mm). Same bullet, same case length — still check the barrel marking: .308 Win and 7.62×51 differ in chamber spec and pressure.',
+    draw: () => {
+      const sc = 120;
+      const s = ISO.scene({ w: 720, h: 380, origin: [170, 150], scale: sc });
+      const cp = cartProfile('.308 Win', 1);
+      const d = cp.d, r = d.bd / 2;
+      s.shadow(-0.1, -0.3, 3.0, 0.6);
+      // caliper: beam behind, jaws reaching over/under the bullet bearing
+      const xb = cp.bearAt + 0.05;
+      const beamY = -0.75;
+      s.box(xb - 0.1, beamY - 0.06, -0.5, 0.36, 0.12, 2.0, { color: C.silver });
+      s.box(xb + 0.26, beamY - 0.08, 0.45, 0.62, 0.16, 0.42, { color: C.ink });
+      s.poly([[xb + 0.3, beamY + 0.081, 0.52], [xb + 0.84, beamY + 0.081, 0.52], [xb + 0.84, beamY + 0.081, 0.8], [xb + 0.3, beamY + 0.081, 0.8]], { fill: '#bdf5d8' });
+      s.text3([xb + 0.57, beamY + 0.09, 0.62], '0.308 in', { size: 15, weight: 800, anchor: 'middle', mono: true, color: C.ink, dy: 2 });
+      s.box(xb - 0.07, beamY, -r - 0.08, 0.14, 0.95, 0.08, { color: C.steel });
+      // cartridge
+      s.lathe(0, 0, 0, cp.prof, { axis: 'x', colors: cp.cols, color: C.brass, capColor: sh(C.brass, -0.1), segments: 24 });
+      s.box(xb - 0.07, beamY, r, 0.14, 0.95, 0.08, { color: C.steel });
+      // case-length dimension (51 mm) and OAL
+      const zd = -0.55, yd = 0.4;
+      s.line([[0, yd, zd], [d.len, yd, zd]], { color: C.blue, width: 2.5 });
+      [0, d.len].forEach((x) => s.line([[x, yd, zd - 0.07], [x, yd, zd + 0.07]], { color: C.blue, width: 2 }));
+      s.line([[0, yd, 0], [0, yd, zd]], { color: C.blue, width: 1, dash: '3 3' });
+      s.line([[d.len, yd, 0], [d.len, yd, zd]], { color: C.blue, width: 1, dash: '3 3' });
+      s.label([d.len * 0.5, yd, zd], 'Case length 51 mm (2.015") → "×51"', { dx: -60, dy: 50, n: 2, color: C.blue });
+      s.label([xb + 0.02, 0.1, r + 0.08], 'Caliber = bullet diameter .308"', { dx: 40, dy: -48, n: 1, color: C.coral });
+      s.label([d.s0 * 0.45, 0.2, 0.22], 'Cartridge = the whole round design', { dx: -40, dy: -110, n: 3, color: C.purple });
+      s.text(704, 330, '.308 Winchester', { size: 17, weight: 800, anchor: 'end' });
+      s.text(704, 352, '≈ 7.62×51 NATO (similar, not identical)', { size: 12, weight: 600, anchor: 'end' });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('naming', {
+    at: 'after:table',
+    caption: '<b>One .308" bullet, many cartridges.</b> All four share the same caliber, but case size, length and pressure differ — none of them will chamber in another\'s rifle. Caliber is the interface; the cartridge is the implementation.',
+    draw: () => {
+      const { s, st } = rowScene(4, 150, 68, 720, 360, 282);
+      const list = [['.308 Win', '.308 Winchester', '= 7.62×51 (≈)'], ['.30-06', '.30-06 Springfield', 'adopted 1906'], ['.300 Win Mag', '.300 Win Mag', 'belted magnum'], ['.300 PRC', '.300 PRC', 'long magnum']];
+      const tips = [];
+      list.forEach(([key, name, note], i) => {
+        const [x, y] = row(0, 0, i, st);
+        plinth(s, x - 0.42, y - 0.42, 0.84, 0.84, 0.16, i ? C.slate : C.blue);
+        const c = uprightCart(s, x, y, 0.16, key, 1, { segments: 20 });
+        tips.push(c.bullet);
+        const q = s.P([x + 0.42, y + 0.42, 0]);
+        s.text(q[0], q[1] + 22, name, { size: 13, weight: 800, anchor: 'middle' });
+        s.text(q[0], q[1] + 38, note, { size: 11, weight: 500, anchor: 'middle' });
+      });
+      // the shared bullet diameter: bracket across each bullet
+      tips.forEach((p, i) => {
+        const [x, y, z] = p, r = 0.154;
+        const a = [x - r / Math.SQRT2, y + r / Math.SQRT2, z], b = [x + r / Math.SQRT2, y - r / Math.SQRT2, z];
+        s.line([a, b], { color: C.coral, width: 3 });
+        s.text3([x, y, z], '.308"', { size: 12.5, weight: 800, anchor: 'end', dx: -18, dy: 4, color: C.coral, mono: true });
+      });
+      s.line(tips.map(([x, y, z]) => [x, y, z]), { color: C.coral, width: 1.4, dash: '4 5', opacity: 0.7 });
+      pill(s, 360, 26, 'Same caliber (.308")  ≠  same cartridge', { size: 13, anchor: 'middle', fill: C.navy });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('families', {
+    caption: '<b>Neck a parent case down (or up) and you get a new cartridge.</b> The .308 Winchester case, re-necked, becomes the .243 Win, .260 Rem and 7mm-08: same body and powder capacity, different bullet diameter — so different velocity, recoil and barrel life.',
+    draw: () => {
+      const sc = 62;
+      const { s, st } = rowScene(4, 165, sc, 720, 360, 262);
+      const kids = [['.243 Win', '6 mm · .243"', C.teal], ['.260 Rem', '6.5 mm · .264"', C.purple], ['7mm-08', '7 mm · .284"', C.amber]];
+      // parent
+      const [px, py] = row(0, 0, 0, st);
+      plinth(s, px - 0.6, py - 0.6, 1.2, 1.2, 0.35, C.blue);
+      const par = uprightCart(s, px, py, 0.35, '.308 Win', 1, { segments: 20 });
+      kids.forEach(([key, dia, col], i) => {
+        const [x, y] = row(0, 0, i + 1, st);
+        plinth(s, x - 0.45, y - 0.45, 0.9, 0.9, 0.2, col);
+        uprightCart(s, x, y, 0.2, key, 1, { segments: 20 });
+        const q = s.P([x + 0.45, y + 0.45, 0]);
+        s.text(q[0] + 14, q[1] + 26, key, { size: 13.5, weight: 800, anchor: 'middle' });
+        s.text(q[0] + 14, q[1] + 42, dia, { size: 11, weight: 500, anchor: 'middle' });
+      });
+      // re-necking arcs from the parent's neck to each child's neck
+      kids.forEach(([key, dia, col], i) => {
+        const [x, y] = row(0, 0, i + 1, st);
+        const a = [px + 0.1, py - 0.1, 0.35 + 2.0], b = [x - 0.1, y + 0.1, 0.2 + 2.05];
+        const hgt = 0.8 + i * 0.45;
+        s.curve((t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t + hgt * Math.sin(Math.PI * t)], 0, 1, { color: col, width: 2.5, arrow: true, samples: 24 });
+      });
+      const qp = s.P([px + 0.6, py + 0.6, 0]);
+      s.text(qp[0] + 22, qp[1] + 30, '.308 Win', { size: 13.5, weight: 800, anchor: 'middle' });
+      s.text(qp[0] + 22, qp[1] + 46, 'parent case · .308"', { size: 11, weight: 500, anchor: 'middle' });
+      s.label([px + 0.12, py + 0.12, 0.35 + 1.0], 'Same body & powder capacity', { dx: -30, dy: -150, n: 1, color: C.blue });
+      const [cx, cy] = row(0, 0, 2, st);
+      s.label([cx + 0.08, cy + 0.08, 0.2 + 1.8], 'Only the neck changes', { dx: 30, dy: -100, n: 2, color: C.purple });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('cartridges', {
+    caption: '<b>The eight app cartridges, to scale.</b> Bigger cases burn more powder behind heavier, higher-BC bullets: less wind drift and more reach — paid for in recoil, cost and barrel life. Compare them live on Build Card.',
+    draw: () => {
+      const sc = 64;
+      const w = 720, n = 8, px = 78;
+      const st = px / (2 * 0.866 * sc), ox = 70 + (w - 70) / 2 - (n - 1) * px / 2;
+      const s = ISO.scene({ w, h: 380, origin: [ox, 290], scale: sc });
+      const list = [
+        ['.223 Rem', '.224"', C.slate], ['6mm CM', '.243"', C.blue], ['6.5 CM', '.264"', C.blue], ['6.5 PRC', '.264"', C.coral],
+        ['.308 Win', '.308"', C.slate], ['.300 Win Mag', '.308"', C.coral], ['.300 PRC', '.308"', C.coral], ['.338 Lapua', '.338"', C.purple],
+      ];
+      // inch ruler standing at the left, in the screen plane
+      const rx = -0.85 * st, ry = 0.85 * st, u = 1 / Math.SQRT2;
+      s.poly([[rx - 0.12 * u, ry + 0.12 * u, 0], [rx + 0.12 * u, ry - 0.12 * u, 0], [rx + 0.12 * u, ry - 0.12 * u, 4.1], [rx - 0.12 * u, ry + 0.12 * u, 4.1]], { fill: C.amber, stroke: sh(C.amber, -0.3), width: 1 });
+      for (let i = 0; i <= 16; i++) {
+        const z = i * 0.25, L = i % 4 === 0 ? 0.12 : 0.06;
+        s.line([[rx + 0.12 * u - L * u * 2, ry - 0.12 * u + L * u * 2, z], [rx + 0.12 * u, ry - 0.12 * u, z]], { color: C.ink, width: i % 4 ? 1 : 1.6 });
+        if (i % 4 === 0) s.text3([rx - 0.12 * u, ry + 0.12 * u, z], (i / 4) + '"', { size: 11, weight: 700, anchor: 'end', dx: -5, dy: 4 });
+      }
+      list.forEach(([key, dia, col], i) => {
+        const [x, y] = row(0, 0, i, st);
+        s.shadow(x - 0.35, y - 0.35, 0.7, 0.7, { opacity: 0.1 });
+        s.disc(x, y, 0, 0.36, { fill: sh(col, 0.55), stroke: col, width: 1.5 });
+        const c = uprightCart(s, x, y, 0, key, 1, { segments: 18 });
+        const q = s.P([x, y, 0]);
+        s.text(q[0], q[1] + 32, key, { size: 11.5, weight: 800, anchor: 'middle' });
+        s.text(q[0], q[1] + 47, dia, { size: 10.5, weight: 600, anchor: 'middle', mono: true, color: C.coral });
+        s.text(q[0], q[1] + 61, c.d.oal.toFixed(2) + '" OAL', { size: 10, weight: 500, anchor: 'middle', mono: true });
+      });
+      // category legend
+      [['Trainer', C.slate, 150], ['PRS / target', C.blue, 250], ['Long range / hunting', C.coral, 372], ['Extreme range', C.purple, 540]].forEach(([t, col, x]) => {
+        s.raw(`<circle cx="${x}" cy="24" r="6" fill="${col}"/>`, 6);
+        s.text(x + 11, 28, t, { size: 11.5, weight: 700 });
+      });
+      return s.svg();
+    },
+  });
+
+  ISO.lesson('first-cartridge', {
+    caption: '<b>Pick the path that lets you shoot the most.</b> A cheap trainer builds fundamentals, a mild target cartridge (6.5 CM, 6mm CM, .308) is the classic first precision rifle, and magnums add reach at the cost of recoil, ammo price and barrel life.',
+    draw: () => {
+      const sc = 3.05, st = 42;
+      const s = ISO.scene({ w: 720, h: 380, origin: [40, 196], scale: sc });
+      s.floor(-10, -110, 150, 150, { grid: 10 });
+      const opts = [
+        { name: 'TRAINER', what: '.22 LR · .223 Rem', col: C.green, stock: C.wood, brake: false, recoil: 1, cost: '$', life: '5,000+ rds' },
+        { name: 'TARGET ★ best first pick', what: '6.5 CM · 6mm CM · .308', col: C.blue, stock: C.slate, brake: true, recoil: 2, cost: '$$', life: '2,500+ rds' },
+        { name: 'MAGNUM', what: '6.5 PRC · .300 Win Mag', col: C.coral, stock: C.gunmetal, brake: true, recoil: 3, cost: '$$$', life: '~1,500 rds' },
+      ];
+      const you = [64, 36];
+      opts.forEach((o, i) => {
+        const x = i * st, y = -i * st;
+        s.line([[you[0], you[1], 0.05], [you[0], you[1] - 8, 0.05], [x + 30, y + 15, 0.05], [x + 30, y + 7.5, 0.05]], { color: o.col, width: 3, dash: '7 6', arrow: true });
+      });
+      opts.forEach((o, i) => {
+        const x = i * st, y = -i * st;
+        s.shadow(x - 1, y - 6, 60, 13);
+        s.box(x - 1, y - 6, 0, 58, 12, 2.4, { color: C.white, top: sh(o.col, 0.65) });
+        s.box(x - 1, y + 5.4, 0, 58, 0.6, 2.4, { color: o.col });
+        P.rifle(s, x + 2, y, 2.4, { stock: o.stock, brake: o.brake, bag: false });
+        const q = s.P([x - 1, y - 6, 2.4]);
+        const bx = q[0] - 6, by = q[1] - 72;
+        s.text(bx, by, o.name, { size: 14, weight: 800 });
+        s.text(bx, by + 16, o.what, { size: 11, weight: 600 });
+        s.text(bx, by + 31, 'recoil ' + '●'.repeat(o.recoil) + '○'.repeat(3 - o.recoil) + ' · ' + o.cost + ' · ' + o.life, { size: 10.5, weight: 500 });
+      });
+      s.lathe(you[0], you[1], 0, [[0, 2.6], [1, 2.6]], { axis: 'z', color: C.amber, segments: 20 });
+      s.sphere(you[0], you[1], 4.4, 2.2, { color: C.amber });
+      s.label([you[0], you[1], 6.8], 'You: what is your goal?', { dx: 30, dy: 8, n: '?', color: C.amber });
+      return s.svg();
+    },
+  });
+
 })();
