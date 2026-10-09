@@ -16,6 +16,9 @@ concurrency:
 
 jobs:
   deploy:
+    # Pages only accepts deploys from the repository's default branch; any other branch skips
+    # (a skipped run sends no failure e-mail). Follows the default automatically if it changes.
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
