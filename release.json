@@ -1,0 +1,11 @@
+{
+  "version": "2.6.0",
+  "date": "2026-10-09",
+  "title": "Works offline",
+  "notes": [
+    "Installable app: add it to your home screen and it opens with no signal.",
+    "Every tab and your Data Book work offline once the page has loaded.",
+    "An update bar tells you when a new version is ready, with what changed.",
+    "The version is shown in the header — tap it to see what's new."
+  ]
+}

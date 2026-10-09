@@ -225,14 +225,34 @@
 
   // ------------------------------------------------------------ toasts
 
-  L.toast = (msg, kind) => {
-    const dup = $$('#toasts .toast').find((t) => t.textContent === msg);
+  // action: { label, onClick, sticky } adds a button; sticky toasts stay until acted on or closed
+  L.toast = (msg, kind, action) => {
+    const dup = $$('#toasts .toast').find((t) => t.dataset.msg === msg);
     if (dup) { dup.remove(); }
     const el = document.createElement('div');
-    el.className = 'toast ' + (kind || '');
+    el.className = 'toast ' + (kind || '') + (action && action.sticky ? ' sticky' : '');
+    el.dataset.msg = msg;
     el.textContent = msg;
+    if (action && action.label) {
+      el.classList.add('has-action');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'toast-action';
+      b.textContent = action.label;
+      b.addEventListener('click', () => { el.remove(); if (action.onClick) action.onClick(); });
+      el.appendChild(b);
+      if (action.sticky) {
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'toast-close';
+        x.setAttribute('aria-label', 'Dismiss');
+        x.textContent = '×';
+        x.addEventListener('click', () => el.remove());
+        el.appendChild(x);
+      }
+    }
     $('#toasts').appendChild(el);
-    setTimeout(() => el.remove(), 3000);
+    if (!(action && action.sticky)) setTimeout(() => el.remove(), 3000);
   };
 
   // ------------------------------------------------------------ sound

@@ -4,12 +4,12 @@
 
 **Long-range precision shooting academy · ballistic solver · dope card builder · realistic range simulator**
 
-[![Version](https://img.shields.io/badge/version-v2.5.0-f59e0b?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
+[![Version](https://img.shields.io/badge/version-v2.6.0-f59e0b?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
 [![Updated](https://img.shields.io/badge/last%20updated-2026--10--03-6b7280?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
 [![Live](https://img.shields.io/badge/live-pancho0091.github.io%2FLRPS__Simulator-4ade80?style=for-the-badge&labelColor=0a0e0c)](https://pancho0091.github.io/LRPS_Simulator/)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-auto--deploy-222222?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Pancho0091/LRPS_Simulator/actions/workflows/pages.yml)
 [![JavaScript](https://img.shields.io/badge/JavaScript-vanilla%2C%20no%20build-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/docs/Web/JavaScript)
-[![Tests](https://img.shields.io/badge/node%3Atest-83%20passing-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](./test)
+[![Tests](https://img.shields.io/badge/node%3Atest-89%20passing-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](./test)
 [![License](https://img.shields.io/badge/License-MIT-3b82f6?style=for-the-badge&labelColor=0a0e0c)](./LICENSE)
 
 ### ▶ [Open the simulator](https://pancho0091.github.io/LRPS_Simulator/)
@@ -56,8 +56,9 @@ republishes to GitHub Pages. Course progress, XP and rank, your card, Range setu
 | **Range view** | Canvas 2D | Scope scene, FFP mil reticle, bubble level, mirage, wind flags, paper and steel |
 | **Audio** | Web Audio API | Synthesized shot, steel ding, turret clicks — no audio files |
 | **Styling** | CSS custom properties | Light / dark themes, Inter + JetBrains Mono |
-| **Hosting** | GitHub Pages via Actions | `.github/workflows/pages.yml`, Node 22, deploys only if tests pass, cache-busted asset URLs |
-| **Testing** | `node:test` + Playwright | 83 tests (`test/ballistics.test.js`, `test/physics-audit.test.js`, `test/book.test.js`): zero, wind linearity, DA, angle, stability, Coriolis direction, aero jump sign, temp sensitivity, Range rifle truth, Data Book records / validation / merge / chrono stats · 34-scenario browser smoke test (`npm run smoke`: every tab, the full Academy course, every Range mode, the Data Book flows, storage robustness, mobile, a11y, perf; Playwright installed globally or as a devDependency — it is not in `package.json`) |
+| **Hosting** | GitHub Pages via Actions | `.github/workflows/pages.yml`, Node 22, deploys only if tests pass; `scripts/stage.mjs` cache-busts asset URLs by commit and writes the service worker's precache list |
+| **Offline** | Service worker + Web App Manifest | `sw.js` precaches every file (~1 MB); network-first page with a 3 s budget, cache-first versioned assets; installable on Android, desktop and iOS (Add to Home Screen); update bar on new releases |
+| **Testing** | `node:test` + Playwright | 89 tests (`test/ballistics.test.js`, `test/physics-audit.test.js`, `test/book.test.js`, `test/pwa.test.js`): zero, wind linearity, DA, angle, stability, Coriolis direction, aero jump sign, temp sensitivity, Range rifle truth, Data Book records / validation / merge / chrono stats · 34-scenario browser smoke test (`npm run smoke`: every tab, the full Academy course, every Range mode, the Data Book flows, storage robustness, mobile, a11y, perf; Playwright installed globally or as a devDependency — it is not in `package.json`) |
 
 ---
 
@@ -149,10 +150,21 @@ Governing rule: **identity on the rifle profile, measurements on the ammo lot, e
 
 ---
 
+### Offline, install and updates
+
+- **Works with no signal**: once the page has loaded, every tab — including the Data Book and a Range session — runs offline. An **Offline** pill in the header says when you have no connection.
+- **Install it**: the download button in the header (Chrome, Edge, Android) or **Share → Add to Home Screen** (iPhone) puts it on your home screen as its own app, with shortcuts straight to the Data Book, Range and Academy.
+- **Update bar**: when a new version is published while the app is open, a bar slides up with the version, the build and **What's new** — tap **Reload** when it suits you; sessions and the Data Book are kept.
+- **Version pill**: the header always shows the running version; tap it for the build and this release's notes.
+
 ## Architecture
 
 ```
-index.html                shell, tabs, static content
+index.html                shell, tabs, static content; app-version meta + version pill
+release.json              this release: version, date, title, notes (feeds the update bar)
+manifest.webmanifest      install metadata: name, icons, standalone, shortcuts (Data Book, Range, Academy)
+sw.js                     service worker: precache, offline page, versioned asset cache, old-release cleanup
+icons/                    app icon (SVG source + 192/512/maskable/apple-touch PNGs)
 fonts/                    Inter + JetBrains Mono (woff2, self-hosted)
 css/style.css             design tokens, light/dark themes, components
 css/range.css             Range tab: session stepper, stations, instruments, print sheet
@@ -174,10 +186,14 @@ js/range/world.js         Range day, wind field, rifle truth, per-shot ballistic
 js/range/scene.js         Canvas rendering: scope view, reticle, level, mirage, wind flags
 js/book.js                Data Book tab: rifle/lot pickers, conditions + DA, zero/chrono/field flows, export/import, print
 js/book/model.js          Data Book model (UMD): record shapes, validation, merge, DA snapshot, chrono stats
+js/pwa.js                 offline + install + updates: worker registration, update bar, version pill, Offline pill
 test/ballistics.test.js   node:test suite for the solver
 test/physics-audit.test.js physics audit: sign conventions, limits, degenerate inputs, Range rifle truth
 test/book.test.js         Data Book model: DA from conditions, chrono stats, validation, merge, record shapes
-scripts/smoke.js          Playwright browser smoke test
+test/pwa.test.js          manifest, icons, worker, staging, and the version-agreement check
+scripts/smoke.js          Playwright browser smoke test (file://)
+scripts/stage.mjs         stage the deployable site (used by the deploy and the offline test)
+scripts/offline-check.mjs end-to-end offline test over HTTP: server down, weak signal, release mid-session
 dev/                      illustration gallery + screenshot helper (not deployed)
 ```
 
@@ -203,6 +219,7 @@ Validated against published numbers: 6.5 Creedmoor 140 gr ELD-M at 2710 fps, sea
 
 | Version | Date | Notes |
 |---|---|---|
+| **v2.6.0** | 2026-10-09 | **Works offline + update bar**: installable app (manifest, icons, iOS home-screen support); a service worker precaches every file so all tabs and the Data Book open with no signal (network-first page with a 3 s budget for weak signal, cache-first versioned assets, old releases' caches removed); "Offline" pill in the header; storage marked persistent. A new release deployed while the app is open raises an **update bar** (version, build, what's new, Reload) — checked when the app returns to the foreground and every 15 min. **Version control**: `release.json` holds each release's version and notes; `package.json`, the `index.html` version meta and pill, the README badge and this table must agree or the tests fail; deploy stamps the commit as the build id. One staging script (`scripts/stage.mjs`) used by both the deploy and `npm run offline`, an end-to-end test that kills the server, hangs it, and ships a release mid-session. |
 | **v2.5.0** | 2026-10-03 | **Data Book tab (Phase 1 — record only)**: rifle profiles and ammo lots for your real rifle, a conditions panel with live density altitude from the solver (GPS altitude optional), three recording flows — zero, chronograph string, field dope — with thumb-sized steppers, result buttons and a conditions snapshot stamped on every row; sessions list, Field mode for sunlight, JSON export / import with validation and newest-wins merge, printable session sheet. 15 model tests, 2 new smoke checks |
 | **v2.4.0** | 2026-10-03 | **Offline-clean**: the Range session survives a reload (day, hidden rifle truth, chronograph string, zero, dials, log, stage clock — restored to the step you were on). Fonts self-hosted; Content-Security-Policy header; no external request after load. Repository default branch is `main`. |
 | **v2.3.0** | 2026-10-03 | **QA release**: six-agent audit — physics, content, code review, browser QA, Range deep test, security. Fixed the aerodynamic-jump sign in the solver, lesson, figure and test. Range no longer resets on a tab switch or regenerates the day when a toggle changes; in-flight rounds are scored against the target they were fired at; stage one-shot enforcement. Build Card no longer crashes on out-of-range inputs; solver returns null-safe rows, accepts unsorted ranges and degenerate inputs; stored data is type-checked on load. Memoised illustrations, LRF realism (re-lase, beam divergence), flag calibration, example dope regenerated from the solver. Browser QA round two: focused buttons keep Space, zoom buttons follow the chosen optic, `−` zooms out, Review mode reachable on mobile, light-theme eyebrow contrast, toast de-dupe, preset clears when edited, tighter Build bounds. README, attribution and LICENSE; cache-busted deploys |
@@ -219,11 +236,16 @@ Validated against published numbers: 6.5 Creedmoor 140 gr ELD-M at 2710 fps, sea
 
 ```sh
 npm start          # python3 -m http.server 8000 → http://localhost:8000
-npm test           # 83 solver / physics / data-book tests (node:test, Node 18+; CI runs Node 22)
+npm test           # 89 solver / physics / data-book / offline / version tests (node:test, Node 18+; CI runs Node 22)
 npm run smoke      # Playwright browser smoke test (scripts/smoke.js) — needs Playwright installed globally or as a devDependency
+npm run offline    # end-to-end offline test: stages two releases, serves them over HTTP, kills/hangs the server, ships an update mid-session
 ```
 
-**Deploying** — push to the deploy branch; `.github/workflows/pages.yml` runs `npm test` on Node 22, stages `index.html`, `css/` and `js/` with every stylesheet and script URL cache-busted by commit (`?v=<sha>`), and publishes to GitHub Pages. A failing test blocks the deploy.
+**Deploying** — push to the deploy branch; `.github/workflows/pages.yml` runs `npm test` on Node 22, then `node scripts/stage.mjs _site <sha>`: copies the shipped files, cache-busts every stylesheet and script URL by commit (`?v=<sha>`), writes `version.json` (version, build, notes) and stamps the service worker with the build and its precache list. A failing test blocks the deploy.
+
+**Releasing (version control)** — a release has one version, kept in five places that `test/pwa.test.js` checks agree: `package.json`, `release.json` (date, title and the notes the update bar shows), the `app-version` meta and the version pill in `index.html`, the README version badge, and the newest row of the changelog below. Bump all five in the same commit; the commit becomes the build id. Users with the app open see the update bar within 15 minutes, or as soon as they return to it.
+
+**Offline** — the first visit precaches every file; after that every tab and the Data Book open with no signal. The page is fetched network-first with a 3 s budget (a weak signal falls back to the cached copy), versioned assets cache-first, and each release deletes the previous release's cache. The app asks the browser to keep its storage (`navigator.storage.persist()`); exporting the Data Book is still the backup.
 
 **Dev tools** — `dev/illus-gallery.html` renders every registered illustration (with `?only=id,id` filtering and an engine self-test); `dev/shot.js` screenshots it with Playwright. Neither is deployed.
 

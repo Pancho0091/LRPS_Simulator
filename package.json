@@ -1,12 +1,13 @@
 {
   "name": "lrps-simulator",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Long-range precision shooting dope card trainer and simulator",
   "private": true,
   "scripts": {
     "test": "node --test",
     "smoke": "node scripts/smoke.js",
-    "start": "python3 -m http.server 8000"
+    "start": "python3 -m http.server 8000",
+    "offline": "node scripts/offline-check.mjs"
   },
   "license": "MIT"
 }
