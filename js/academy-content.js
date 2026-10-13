@@ -225,14 +225,25 @@ m = weight (gr)   d = diameter (in)   l = length (calibers)   t = twist (caliber
 <div class="callout rule"><b>Rule:</b> Scopes adjust in <b>angles</b>, not inches. An angle covers more inches the farther you look, so one
 number works at every range. This app — like most precision shooters, PRS competitors and military snipers — uses the
 <b>milliradian (MIL)</b> for reticle, turrets, card and spotter calls.</div>
-<table class="tbl text">
-<thead><tr><th>Distance</th><th>1 MIL covers (its subtension)</th><th>0.1 MIL (one click) covers</th></tr></thead>
+<table class="tbl text subt">
+<thead><tr><th>Distance</th><th>1 MIL covers <small>inches</small></th><th>1 click (0.1 MIL) <small>inches</small></th><th>Click change <small>in per +100 yd</small></th></tr></thead>
 <tbody>
-<tr><td>100 yd</td><td>3.6 in</td><td>0.36 in</td></tr>
-<tr><td>500 yd</td><td>18 in</td><td>1.8 in</td></tr>
-<tr><td>1000 yd</td><td>36 in</td><td>3.6 in</td></tr>
-<tr><td>100 m</td><td>10 cm</td><td>1 cm</td></tr>
+<tr><td>100 yd</td><td>3.6</td><td>0.36</td><td>+0.36</td></tr>
+<tr><td>200 yd</td><td>7.2</td><td>0.72</td><td>+0.36</td></tr>
+<tr><td>300 yd</td><td>10.8</td><td>1.08</td><td>+0.36</td></tr>
+<tr><td>400 yd</td><td>14.4</td><td>1.44</td><td>+0.36</td></tr>
+<tr><td>500 yd</td><td>18</td><td>1.80</td><td>+0.36</td></tr>
+<tr><td>600 yd</td><td>21.6</td><td>2.16</td><td>+0.36</td></tr>
+<tr><td>700 yd</td><td>25.2</td><td>2.52</td><td>+0.36</td></tr>
+<tr><td>800 yd</td><td>28.8</td><td>2.88</td><td>+0.36</td></tr>
+<tr><td>900 yd</td><td>32.4</td><td>3.24</td><td>+0.36</td></tr>
+<tr><td>1000 yd</td><td>36</td><td>3.60</td><td>+0.36</td></tr>
 </tbody></table>
+<div class="callout try"><b>The pattern:</b> the last column never changes — every extra 100 yd adds exactly <b>0.36 in</b> to what one click moves
+(3.6 in per full mil). Subtension is <b>linear</b>: double the distance, double the inches. So you only need one number, 0.36,
+and the hundreds of yards: a click at 700 yd is 7 × 0.36 = 2.52 in. Bullet drop is the opposite — it grows <i>faster</i> than
+distance (Module 07), which is exactly why the card is written in mils, not inches.</div>
+<p class="hint">Metric: 1 MIL = 10 cm at 100 m and one click = 1 cm, adding 1 cm per click for every extra 100 m.</p>
 <pre class="code">inches = mils × 3.6 × (yards / 100)
 mils   = inches / (3.6 × yards / 100)
 clicks = mils / 0.1</pre>

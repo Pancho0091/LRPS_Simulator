@@ -630,6 +630,12 @@ pre.code {
 .ac-body > p, .ac-body > ul, .ac-body > ol { text-wrap: pretty; }
 .ac-body code { overflow-wrap: anywhere; }
 .ac-body pre.code { overflow-wrap: normal; }
+/* number tables: numbers and units never break mid-value; headers wrap only between words */
+.ac-body .tbl.subt th, .ac-body .tbl.subt td { overflow-wrap: normal; }
+.ac-body .tbl.subt td { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ac-body .tbl.subt th small { display: block; font-weight: 600; text-transform: none; letter-spacing: 0; opacity: 0.75; }
+.ac-body .tbl.subt td:last-child { color: var(--accent-ink); font-weight: 700; }
+@media (max-width: 480px) { .ac-body .tbl.subt th, .ac-body .tbl.subt td { padding-left: 6px; padding-right: 6px; font-size: 14px; } }
 .ac-body h4 { font-size: 15px; margin: 22px 0 8px; }
 .ac-body ul, .ac-body ol { padding-left: 22px; margin: 8px 0 14px; }
 .ac-body li { margin: 4px 0; }
