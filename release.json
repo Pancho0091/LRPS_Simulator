@@ -1,10 +1,10 @@
 {
-  "version": "2.6.1",
+  "version": "2.6.2",
   "date": "2026-10-13",
-  "title": "Subtension table",
+  "title": "Where 27.78 comes from",
   "notes": [
-    "Academy 08.1: the MIL subtension table now runs 100 to 1000 yd in 100 yd steps.",
-    "New column: how much one 0.1 mil click changes for every 100 yd \u2014 always +0.36 in, because subtension is linear.",
-    "A note on the pattern, and the metric equivalent."
+    "Academy 08.4: the 27.78 in the mil relation is now explained \u2014 1000 \u00f7 36, a thousandth of the range and 36 inches in a yard.",
+    "A step-by-step derivation from lesson 08.1's 3.6 in, and the constant for other units (in \u2192 m 25.4, ft \u2192 yd 333.3, mm \u2192 m 1).",
+    "Mental-math method, the small-angle and 1/6400 mil exceptions, and two new quiz questions."
   ]
 }

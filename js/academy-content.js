@@ -318,6 +318,34 @@ revolution you're on. Verify both before trusting a card.</div>
         html: `
 <div class="callout rule"><b>Rule (mil relation):</b> <code>range (yd) = size (in) × 27.78 / size (mil)</code>.
 Metric: <code>range (m) = size (mm) / mils</code>.</div>
+<h4>Where 27.78 comes from</h4>
+<p>It is not a fudge factor. It is the 3.6 from lesson 08.1 turned around. A mil is one thousandth of the distance, so at any
+range one mil covers 0.036 in for every yard: 3.6 in at 100 yd, 36 in at 1,000 yd. Ranging runs that the other way: you know the
+inches and the mils, and you solve for the yards.</p>
+<pre class="code">1 mil = 1/1000 of the range
+size  = mils × range × 36 ÷ 1000
+      = mils × range × 0.036
+range = size ÷ (0.036 × mils)
+      = size × 27.78 ÷ mils</pre>
+<p class="hint">Size in inches, range in yards; 36 is the inches in a yard, and 1 ÷ 0.036 = 1000 ÷ 36 = 27.78.</p>
+<p><b>27.78 = 1000 ÷ 36:</b> the "milli" in milliradian divided by the inches in a yard. Change the units and only that
+ratio changes. The formula is always <code>range = size × constant ÷ mils</code>:</p>
+<table class="tbl text subt">
+<thead><tr><th>Size → range</th><th>Why <small>1000 ÷ size units in one range unit</small></th><th>Constant</th></tr></thead>
+<tbody>
+<tr><td>in → yd</td><td>1000 ÷ 36</td><td>27.78</td></tr>
+<tr><td>in → m</td><td>1000 × 0.0254</td><td>25.4</td></tr>
+<tr><td>ft → yd</td><td>1000 ÷ 3</td><td>333.3</td></tr>
+<tr><td>yd → yd</td><td>1000 ÷ 1</td><td>1000</td></tr>
+<tr><td>cm → m</td><td>1000 ÷ 100</td><td>10</td></tr>
+<tr><td>mm → m</td><td>1000 ÷ 1000</td><td>1</td></tr>
+</tbody></table>
+<div class="callout try"><b>Do it in your head:</b> 27.78 is 100 ÷ 3.6. Divide the inches by the mils first, then multiply by 100 and divide by 3.6.
+An 18" plate at 0.8 mil: 18 ÷ 0.8 = 22.5, × 100 = 2,250, ÷ 3.6 = <b>625 yd</b>. Rough check: ×28 gives 630 yd, close enough to
+pick the right line on your card.</div>
+<div class="callout warn"><b>Exceptions:</b> the formula uses the small-angle shortcut (an angle in radians equals size ÷ distance).
+Anything that fits in a reticle is under 10 mil, where the shortcut is off by less than 0.01%. Some old military material uses a
+"mil" of 1/6400 of a circle (about 0.98 milliradian). Scope reticles and turrets use the true milliradian, which is what 27.78 assumes.</div>
 <div data-widget="mil-ranging"></div>
 <table class="tbl text">
 <thead><tr><th>Error source</th><th>Effect</th></tr></thead>
@@ -330,6 +358,8 @@ Metric: <code>range (m) = size (mm) / mils</code>.</div>
 <div class="callout try"><b>Verify:</b> on the <a data-goto="range">Range</a>, open Setup → Realism options, turn the laser rangefinder off, and mil the plates yourself.</div>`,
         quiz: [
           { q: 'An 18" target measures 0.8 mil. Range?', options: ['400 yd', '625 yd', '900 yd'], answer: 1, why: '18 × 27.78 / 0.8 = 625 yd.' },
+          { q: 'Where does the 27.78 in the mil relation come from?', options: ['A correction for bullet drop', '1000 ÷ 36: a thousandth of the distance, 36 inches in a yard', 'It is measured, and changes with the scope'], answer: 1, why: 'One mil is 1/1000 of the distance; with size in inches and range in yards, 1000 ÷ 36 = 27.78. It is pure unit conversion: no ballistics, and the same for every scope.' },
+          { q: 'A 6 ft (72") door measures 2.4 mil. Range?', options: ['about 300 yd', 'about 1,200 yd', 'about 830 yd'], answer: 2, why: '72 × 27.78 / 2.4 = 833 yd. Or in feet: 6 × 333.3 / 2.4 = 833 yd. Same answer, different constant.' },
         ],
       },
       {

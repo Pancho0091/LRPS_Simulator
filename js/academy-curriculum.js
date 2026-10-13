@@ -696,7 +696,7 @@ not the one with the most energy. Skill grows with rounds fired.</div>
       { ref: 'mil-moa', terms: ['Milliradian (MIL)', 'Click', 'Subtension'], recap: ['1 mil = 3.6" at 100 yd; one click = 0.1 mil.', 'Never mix units.'] },
       { ref: 'reticles', terms: ['FFP', 'SFP', 'Reticle'], recap: ['FFP holds are valid at any magnification.', 'Dial elevation, hold wind.'] },
       { ref: 'turrets', terms: ['Turret', 'Revolution', 'Zero stop', 'Tracking'], recap: ['Know which revolution you are on.', 'Verify tracking with a tall target test.'] },
-      { ref: 'mil-ranging', terms: ['Mil relation', 'Ranging'], recap: ['Range (yd) = size (in) × 27.78 ÷ mils.'] },
+      { ref: 'mil-ranging', terms: ['Mil relation', 'Ranging', 'Small-angle shortcut'], recap: ['Range (yd) = size (in) × 27.78 ÷ mils.', '27.78 = 1000 ÷ 36: a mil is a thousandth of the distance, and a yard is 36 inches.', 'Other units only change the constant: in → m 25.4, ft → yd 333.3, mm → m 1.'] },
       { ref: 'scope-setup', terms: ['Cant', 'Parallax', 'Eye relief'], recap: ['Level the reticle, remove parallax, check your bubble.'] },
     ],
   },

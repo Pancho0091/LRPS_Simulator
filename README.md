@@ -4,7 +4,7 @@
 
 **Long-range precision shooting academy · ballistic solver · dope card builder · realistic range simulator**
 
-[![Version](https://img.shields.io/badge/version-v2.6.1-f59e0b?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
+[![Version](https://img.shields.io/badge/version-v2.6.2-f59e0b?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
 [![Updated](https://img.shields.io/badge/last%20updated-2026--10--03-6b7280?style=for-the-badge&labelColor=0a0e0c)](https://github.com/Pancho0091/LRPS_Simulator/commits)
 [![Live](https://img.shields.io/badge/live-pancho0091.github.io%2FLRPS__Simulator-4ade80?style=for-the-badge&labelColor=0a0e0c)](https://pancho0091.github.io/LRPS_Simulator/)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-auto--deploy-222222?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Pancho0091/LRPS_Simulator/actions/workflows/pages.yml)
@@ -219,6 +219,7 @@ Validated against published numbers: 6.5 Creedmoor 140 gr ELD-M at 2710 fps, sea
 
 | Version | Date | Notes |
 |---|---|---|
+| **v2.6.2** | 2026-10-13 | **Academy 08.4: where 27.78 comes from**: derivation of the mil-relation constant from 08.1's 3.6 in (27.78 = 1000 ÷ 36), the constant for other unit pairs (in→m 25.4, ft→yd 333.3, yd→yd 1000, cm→m 10, mm→m 1), a mental-math method, the small-angle and 1/6400-mil exceptions, two new quiz questions and recap lines. |
 | **v2.6.1** | 2026-10-13 | **Academy 08.1 subtension table**: 100 → 1000 yd in 100 yd steps (1 MIL and one 0.1-mil click in inches) with a column for how much a click changes per 100 yd — a constant +0.36 in, the linear pattern — plus a note contrasting it with bullet drop, and the metric equivalent. |
 | **v2.6.0** | 2026-10-09 | **Works offline + update bar**: installable app (manifest, icons, iOS home-screen support); a service worker precaches every file so all tabs and the Data Book open with no signal (network-first page with a 3 s budget for weak signal, cache-first versioned assets, old releases' caches removed); "Offline" pill in the header; storage marked persistent. A new release deployed while the app is open raises an **update bar** (version, build, what's new, Reload) — checked when the app returns to the foreground and every 15 min. **Version control**: `release.json` holds each release's version and notes; `package.json`, the `index.html` version meta and pill, the README badge and this table must agree or the tests fail; deploy stamps the commit as the build id. One staging script (`scripts/stage.mjs`) used by both the deploy and `npm run offline`, an end-to-end test that kills the server, hangs it, and ships a release mid-session. |
 | **v2.5.0** | 2026-10-03 | **Data Book tab (Phase 1 — record only)**: rifle profiles and ammo lots for your real rifle, a conditions panel with live density altitude from the solver (GPS altitude optional), three recording flows — zero, chronograph string, field dope — with thumb-sized steppers, result buttons and a conditions snapshot stamped on every row; sessions list, Field mode for sunlight, JSON export / import with validation and newest-wins merge, printable session sheet. 15 model tests, 2 new smoke checks |
